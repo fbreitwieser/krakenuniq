@@ -1,0 +1,510 @@
+Kraken taxonomic sequence classification system
+===============================================
+
+SPECIAL NOTE TO THOSE UPGRADING FROM v0.9.1b AND EARLIER:
+
+The database structure for Kraken has changed to increase classification
+speed.  Versions of Kraken prior to the v1.0 release will still run
+against databases created with older versions of Kraken, but the new
+databases cannot be run with older versions of Kraken.  See the section
+UPGRADING DATABASES TO v0.10+ for more details.
+
+
+INTRODUCTION
+============
+
+Kraken is a taxonomic sequence classifier, that assigns a taxonomic
+label to short DNA read.  It does this by examining the k-mers
+within a read and querying a database with those k-mers.  This database
+contains a mapping of every k-mer in Kraken's genomic library to the
+lowest common ancestor (LCA) in a taxonomic tree of all genomes that
+contain that k-mer.  The set of LCA taxa that correspond to the k-mers
+in a read are then analyzed to create a single taxonomic label for the
+read; this label can be any of the nodes in the taxonomic tree.
+
+Kraken is designed to be rapid, sensitive, and highly precise.  Our
+tests on various real and simulated data have shown Kraken to have
+sensitivity slightly lower than Megablast with precision being slightly
+higher.  On a set of simulated 100 bp reads, Kraken processed over 1.3
+million reads per minute on a single core in normal operation, and over
+4.1 million reads per minute in quick operation.
+
+The latest version of Kraken will be available at the Kraken website:
+
+  http://ccb.jhu.edu/software/kraken/
+
+If you use Kraken in your research, please cite our paper; the citation
+is available on the Kraken website.
+
+
+SYSTEM REQUIREMENTS
+===================
+
+Note: Users concerned about the disk or memory requirements should
+  read the paragraph about MiniKraken, below.
+
+Disk space: Kraken's standard database will require at least 150 GB
+  of disk space.  Customized databases may require more or less space.
+  Disk space used is linearly proportional to the number of distinct
+  k-mers; as of Dec. 2013, Kraken's default database contains just
+  over 5.8 billion (5.8e9) distinct k-mers.
+
+  In addition, the disk used to store the database should be
+  locally-attached storage.  Storing the database on a network
+  filesystem (NFS) partition can cause Kraken's operation to be
+  very slow, or to be stopped completely.  As NFS accesses are 
+  much slower than local disk accesses, both preloading and database
+  building will be slowed by use of NFS.
+
+Memory: To run efficiently, Kraken requires enough free memory to
+  hold the database in RAM.  While this can be accomplished using a
+  ramdisk, Kraken supplies a utility for loading the database into
+  RAM via the OS cache.  The default database size is 74 GB (as of
+  Dec. 2013), and so you will need at least that much if you want
+  to build or run with the default database.
+
+Dependencies: Kraken currently makes extensive use of Linux utilities
+  such as sed, find, and wget.  Many scripts are written using the
+  Bash shell, and the main scripts are written using Perl.  Core
+  programs needed to build the database and run the classifier are
+  written in C++, and need to be compiled using g++.
+
+  Finally, if you want to build your own database, you will need to
+  install the Jellyfish k-mer counter, available at:
+
+    http://www.cbcb.umd.edu/software/jellyfish/
+
+  Note that Kraken only supports use of Jellyfish version 1.  Future
+  major versions of Jellyfish may not be compatible with Kraken.
+  Should such incompatibility occur, we will make a compatible
+  version of Jellyfish available and/or update Kraken to work with
+  the new version.
+
+MiniKraken: To allow users with low-memory computing environments to
+  use Kraken, we supply a reduced standard database that can be
+  downloaded from the Kraken web site.  When Kraken is run with a
+  reduced database, we call it MiniKraken.
+  
+  The database we make available is only 4 GB in size, and should
+  run well on computers with as little as 8 GB of RAM.  Disk space
+  for this database is also only 4 GB.
+
+
+INSTALLATION
+============
+
+To begin using Kraken, you will first need to install it, and then
+either download or create a database.
+
+Kraken consists of two main scripts ("kraken" and "kraken-build"),
+along with several programs and smaller scripts.  As part of the
+installation process, all scripts and programs are installed in
+the same directory.  After installation, you can move the main
+scripts elsewhere, but moving the other scripts and programs
+requires editing the scripts and changing the "$KRAKEN_DIR" variables.
+
+Once a directory is selected, you need to run the following
+commands in the directory where you extracted the Kraken
+source (i.e., the directory where this README is located):
+
+  ./install_kraken.sh $KRAKEN_DIR
+
+(Replace "$KRAKEN_DIR" above with the directory where you want to
+install Kraken's programs/directories.)
+
+The install_kraken.sh script should compile all of Kraken's code
+and setup your Kraken data directory.  Installation is successful
+if you see the message "Kraken installation complete."
+
+Once installation is complete, you may want to copy the two main
+Kraken scripts into a directory found in your PATH variable 
+(e.g., "$HOME/bin"):
+
+  cp $KRAKEN_DIR/bin/kraken $HOME/bin
+  cp $KRAKEN_DIR/bin/kraken-build $HOME/bin
+
+After installation, you're ready to either create or download a
+database.
+
+
+KRAKEN DATABASES
+================
+
+A Kraken database is a directory containing at least 4 files:
+
+* database.kdb: Contains the k-mer to taxon mappings
+* database.idx: Contains minimizer offset locations in database.kdb
+* taxonomy/nodes.dmp: Taxonomy tree structure + ranks
+* taxonomy/names.dmp: Taxonomy names
+
+Other files may be present as part of the database build process.
+
+In interacting with Kraken, you should not have to directly reference
+any of these files, but rather simply provide the name of the directory
+in which they are stored.  Kraken allows both the use of a standard
+database as well as custom databases; these are described in the sections
+STANDARD KRAKEN DATABASE and CUSTOM DATABASES below, respectively.
+
+
+STANDARD KRAKEN DATABASE
+========================
+
+To create the standard Kraken database, you can use the following command:
+
+  kraken-build --standard --db $DBNAME
+
+(Replace "$DBNAME" above with your preferred database name/location.
+Please note that the database will use approximately 150 GB of
+disk space during creation.)
+
+This will download NCBI taxonomic information, as well as the
+complete genomes in RefSeq for the bacterial, archaeal, and
+viral kingdoms.  After downloading all this data, the build
+process begins; this is the most time-consuming step.  If you
+have multiple processing cores, you can run this process with
+multiple threads, e.g.:
+
+  kraken-build --standard --threads 24 --db $DBNAME
+
+Using 24 threads on our computer with 252 GB of RAM, the build
+process took approximately an hour and a half (steps with an asterisk
+have multi-threading enabled) in December 2013:
+
+  10m50s  *Step 1 (create set)
+     n/a   Step 2 (reduce database, optional and skipped)
+  21m24s  *Step 3 (sort set)
+   0m47s   Step 4 (GI number to file map)
+   0m58s   Step 5 (File to taxon map)
+  39m10s  *Step 6 (set LCA values)
+  ------
+  73m10s   Total build time
+
+To create a custom database, or to use a database from another
+source, see CUSTOM DATABASES.
+
+Notes for users with lower amounts of RAM:
+
+1) If you encounter problems with Jellyfish not being able
+to allocate enough memory on your system to run the build
+process, you can supply a smaller hash size to Jellyfish
+using kraken-build's --jellyfish-hash-size switch.  Each space
+in the hash table uses approximately 6.9 bytes, so using
+"--jellyfish-hash-size 6400M" will use a hash table size of
+6.4 billion spaces and require 44.3 GB of RAM.
+
+2) Kraken's build process will normally attempt to minimize
+disk writing by allocating large blocks of RAM and operating
+within them until data needs to be written to disk.  However,
+this extra RAM usage may exceed your capacity.  In such cases,
+you may want to use kraken-build's --work-on-disk switch.  This
+will minimize the amount of RAM usage and cause Kraken's build
+programs to perform most operations off of disk files.  (This
+switch can also be useful for people building on a ramdisk or
+solid state drive.)
+
+
+CLASSIFICATION
+==============
+
+To classify a set of sequences (reads), use the "kraken" command:
+
+  kraken --db $DBNAME seqs.fa
+
+Output will be sent to standard output by default.
+
+Note that to obtain optimum speeds, Kraken's database should be
+loaded into RAM first.  This can be done through use of a ramdisk,
+if you have superuser permissions.  Failing that, you can use
+the "--preload" switch to kraken, e.g.:
+
+  kraken --preload --db $DBNAME seqs.fa
+
+The database files will be loaded before classification using this
+switch.  See MEMORY USAGE AND EFFICIENCY for more information.
+
+The kraken program allows several different options:
+
+- Multithreading: Use the "--threads NUM" switch to use multiple
+  threads.
+
+- Quick operation: Rather than searching all k-mers in a sequence,
+  stop classification after the first database hit; use "--quick"
+  to enable this mode.  Note that "--min-hits" will allow you to
+  require multiple hits before declaring a sequence classified,
+  which can be especially useful with custom databases when testing
+  to see if sequences either do or do not belong to a particular
+  genome.
+
+- Sequence filtering: Classified or unclassified sequences can be
+  sent to a file for later processing, using the "--classified-out"
+  and "--unclassified-out" switches, respectively.
+
+- Output redirection: Output can be directed using standard shell
+  redirection ("|" or ">"), or using the "--output" switch.
+
+- FASTQ input: Input is normally expected to be in FASTA format, but
+  you can classify FASTQ data using the "--fastq-input" switch.
+
+To get a full list of options, use "kraken --help".
+
+
+OUTPUT FORMAT
+=============
+
+Each sequence classified by Kraken results in a single line of
+output.  Output lines contain five tab-delimited fields; from
+left to right, they are:
+
+  1) "C"/"U": one letter code indicating that the sequence was
+     either classified or unclassified.
+  2) The sequence ID, obtained from the FASTA/FASTQ header.
+  3) The taxonomy ID Kraken used to label the sequence; this is
+     0 if the sequence is unclassified.
+  4) The length of the sequence in bp.
+  5) A space-delimited list indicating the LCA mapping of each k-mer
+     in the sequence.  For example, "562:13 561:4 A:31 0:1 562:3"
+     would indicate that:
+     - the first 13 k-mers mapped to taxonomy ID #562
+     - the next 4 k-mers mapped to taxonomy ID #561
+     - the next 31 k-mers contained an ambiguous nucleotide
+     - the next k-mer was not in the database
+     - the last 3 k-mers mapped to taxonomy ID #562
+
+
+CUSTOM DATABASES
+================
+
+We realize the standard database may not suit everyone's needs.  Kraken
+also allows creation of customized databases.
+
+To build a custom database:
+
+  1) Install a taxonomy.  Usually, you will just use the NCBI taxonomy,
+     which you can easily download using:
+    
+       kraken-build --download-taxonomy --db $DBNAME
+
+     This will download the GI number to taxon map, as well as the
+     taxonomic name and tree information from NCBI.  These files can
+     be found in $DBNAME/taxonomy/ .  If you need to modify the taxonomy,
+     edits can be made to the names.dmp and nodes.dmp files in this directory;
+     the gi_taxid_nucl.dmp file will also need to be updated appropriately.
+
+  2) Install a genomic library.  Three sets of standard genomes are
+     made easily available through kraken-build:
+
+     - bacteria: RefSeq complete bacterial/archaeal genomes
+     - viruses: RefSeq complete viral genomes
+     - human: GRCh37 human genome
+
+     To download and install any one of these, use the "--download-library"
+     switch, e.g.:
+
+       kraken-build --download-library bacteria --db $DBNAME
+
+     Other genomes can also be added, but such genomes must meet certain
+     requirements:
+     - Each replicon must be in a separate FASTA file
+     - Each FASTA file must contain a GI number in the header,
+       to allow Kraken to lookup the correct taxa.
+
+     In practice, this means replicons must be downloaded from NCBI.
+     Replicons without assigned GI numbers will require modifying the
+     replicons' FASTA files (to assign a "fake" GI number) and then
+     modifying the $DBNAME/taxonomy/gi_taxid_nucl.dmp file to provide
+     your desired taxonomy information.
+
+     If your genomes meet the requirements above, then you can add each
+     replicon to your database's genomic library using the "--add-to-library"
+     switch, e.g.:
+
+       kraken-build --add-to-library chr1.fa --db $DBNAME
+       kraken-build --add-to-library chr2.fa --db $DBNAME
+
+  3) Once your library is finalized, you need to build the database.
+     Depending on your size requirements, you may want to adjust the
+     k-mer and/or minimizer lengths from the defaults.  Except for some
+     small bookkeeping fields, a Kraken database will use
+
+       12D + 8(4^M)
+
+     bytes, where D is the number of distinct k-mers in your library and
+     M is the length (in bp) of the minimizers.  Although D does increase
+     as k increases, it is impossible to know exactly how many distinct
+     k-mers will exist in a library for a given k without actually
+     performing the count.  By default, k = 31 and M = 15.
+
+     The minimizers serve to keep k-mers that are adjacent in query
+     sequences close to each other in the database, which allows
+     Kraken to exploit the CPU cache.  Changing the value of M can
+     significantly affect the speed of Kraken, and neither increasing
+     or decreasing M will guarantee faster or slower speed.
+
+     To build the database, you'll use the "--build" switch:
+
+       kraken-build --build --db $DBNAME
+
+     As noted above, you may want to also use any of "--threads",
+     "--kmer-len", or "--minimizer-len" to adjust the database build
+     time and/or final size.
+
+  4) Shrinking the database: The "--shrink" task allows you to take
+     an existing Kraken database and create a smaller MiniKraken database
+     from it.  The use of this option removes a specified percentage of
+     k-mer/taxon pairs to create a new, smaller database.  For example:
+
+       kraken-build --shrink 75 --db $DBNAME --new-db minikraken
+
+     This will create a new database named "minikraken" that is 75% the
+     size of the original, by removing 25% of k-mer/taxon pairs.
+
+     The "--shrink" task is only meant to be run on a completed database.
+     However, if you know before you create a database that you will
+     only be able to use a certain amount of memory, you can use the
+     "--max-db-size" switch for the "--build" task to provide a maximum
+     size (in GB) for the database.  This allows you to create a MiniKraken
+     database without having to create a full Kraken database first.
+
+  A full list of options for kraken-build can be obtained using
+  "kraken-build --help".
+
+  After building a database, if you want to reduce the disk usage of
+  the database you can use kraken-build's "--clean" switch to remove
+  all intermediate files from the database directory.
+
+
+MEMORY USAGE AND EFFICIENCY
+===========================
+
+Kraken's execution requires many random accesses to a very large file.
+To obtain maximal speed, these accesses need to be made as quickly as
+possible.  This means that the database must be in physical memory
+during execution.  Although we provide the "--preload" option to Kraken
+for users who cannot use a ramdisk, the ramdisk is likely the simplest
+option, and is well-suited for installations on computers where Kraken
+is to be run a majority of the time.  In addition, using a ramdisk
+allows the initial start-up of Kraken to be accomplished much more quickly.
+If a ramdisk is used, the "--preload" switch should not be used.
+
+We also note that in some cases, "--preload" may not be needed (or even
+advisable).  If you know that your database is already in memory (for
+example, if it has been recently read or unzipped, then it should be in
+your operating system cache, which resides in physical memory), then there
+is no need to perform this step.  We have noticed that in low-memory (~8 GB)
+situations, preloading a MiniKraken DB is actually much slower than simply
+using "cat minikraken/database.* > /dev/null".  The selection of the best way
+to get the database into memory is dependent on several factors, including
+your total amount of RAM, operating system, and current free memory.  For this
+reason, you may need to experiment with your own setup to find a good solution
+for you.
+
+To create a ramdisk, you will need to have superuser (root) permission.
+As root, you can use the following commands to create a ramdisk:
+
+  mkdir /ramdisk
+  mount -t ramfs none /ramdisk
+
+Optionally, you may have a trusted user who you want to be able to copy
+databases into this directory.  In that case, you'll need to make that
+user the owner of the directory via chown.
+
+To put the database on the ramdisk, simply copy the database directory
+to the ramdisk directory:
+
+  cp -a $DBNAME /ramdisk
+
+And then you can use it with Kraken by specifying the database copy on
+the ramdisk, e.g.:
+
+  kraken --db /ramdisk/$DBNAME seqs.fa
+
+Note that anything copied into a ramdisk will be deleted if the ramdisk
+is unmounted or the computer is restarted, so make sure that you have a
+copy of the database on a hard disk (or other non-volatile storage).
+
+
+PAIRED READS
+============
+
+Kraken does not query k-mers containing ambiguous nucleotides (non-ACGT).
+If you have paired reads, you can use this fact to your advantage and
+increase Kraken's accuracy by concatenating the pairs together with a
+single 'N' between the sequences.  We have found this to raise sensitivity
+by about 3 percentage points over classifying the sequences as single-end
+reads.  We expect future versions of Kraken to support classification of
+paired reads without the need for users to perform any concatenation prior to
+classification.
+
+
+SAMPLE REPORTS
+==============
+
+To get an idea as to Kraken's results across an entire sample, we provide
+the kraken-report script.  It is used like this:
+
+  kraken-report --db $DBNAME kraken.output
+
+Note that the database used must be the same as the one used to generate
+the output file, or the report script may encounter problems.  Output is
+sent to standard output.
+
+The output of kraken-report is tab-delimited, with one line per taxon.
+The fields of the output, from left-to-right, are as follows:
+
+  1) Percentage of reads covered by the clade rooted at this taxon
+  2) Number of reads covered by the clade rooted at this taxon
+  3) Number of reads assigned directly to this taxon
+  4) A rank code, indicating (U)nclassified, (P)hylum, (C)lass, (O)rder,
+     (F)amily, (G)enus, or (S)pecies.  All other ranks are simply '-'.
+  5) NCBI taxonomy ID
+  6) indented scientific name 
+
+The scientific names are indented using spaces, according to the tree
+structure specified by the taxonomy.
+
+By default, taxa with no reads assigned to (or under) them will not have
+any output produced.  However, if you wish to have all taxa displayed,
+you can use the "--show-zeros" switch to do so.  This can be useful if
+you are looking to do further downstream analysis of the reports, and
+want to compare samples.  Sorting by the taxonomy ID (using "sort -nf5")
+can provide a consistent line ordering between reports.
+
+
+UPGRADING DATABASES TO v0.10+
+=============================
+
+The minimizer ordering in Kraken versions prior to v0.10.0-beta was a
+simple lexicographical ordering that provided a suboptimal distribution
+of k-mers within the bins.  Ideally, the bin sizes would be uniform,
+but simple lexicographical ordering creates a bias toward low-complexity
+minimizers.  To resolve this, the ordering is now "scrambled" by XORing all
+minimizers with a predefined constant to toggle half of each minimizer's
+bits before sorting.  The more evenly distributed bins provide better
+caching performance, but databases created in this way are not compatible
+with earlier versions of Kraken.  Kraken versions from v0.10.0-beta up to
+(but not including) v1.0 will support the use of the older databases, but
+we nonetheless recommend one of the two following options:
+
+  1) Build a new database.  This is the preferred option, as a newly-created
+     database will have the latest genomes and NCBI taxonomy information.
+
+  2) Re-sort an existing database.  If you have a custom database, you may
+     want to simply reformat the database to provide you with Kraken's
+     increased speed.  To do so, you'll need to do the following:
+
+       kraken-build --upgrade --db $DBNAME
+
+     (NOTE: the --threads switch is both valid and encouraged with this
+     operation.)
+
+     This command will NOT delete your existing $DBNAME/database.*
+     files, but will simply rename them.  If you're satisfied with the new
+     database's performance, then you can use kraken-build's "--clean"
+     option to remove the old files and save space.
+
+     Sorting the database is step 3 of the build process, so you should
+     expect a database upgrade to take about as long as step 3 took when
+     building the original database.
+
+Note that the rest of Kraken v0.10.0-beta's speed improvements are available
+without upgrading or changing your database.
