@@ -198,9 +198,11 @@ within them until data needs to be written to disk.  However,
 this extra RAM usage may exceed your capacity.  In such cases,
 you may want to use kraken-build's --work-on-disk switch.  This
 will minimize the amount of RAM usage and cause Kraken's build
-programs to perform most operations off of disk files.  (This
+programs to perform most operations off of disk files.  This
 switch can also be useful for people building on a ramdisk or
-solid state drive.)
+solid state drive.  Please note that working off of disk files
+can be quite slow on some computers, causing builds to take
+several days if not weeks.
 
 
 CLASSIFICATION
