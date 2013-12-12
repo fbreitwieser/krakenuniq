@@ -1,0 +1,131 @@
+#!/usr/bin/perl
+
+# Copyright 2013, Derrick Wood <dwood@cs.umd.edu>
+#
+# This file is part of the Kraken taxonomic sequence classification system.
+#
+# Kraken is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Kraken is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long;
+
+my $PROG = basename $0;
+my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+
+# Test to see if the executables got moved, try to recover if we can
+if (! -e "$KRAKEN_DIR/classify") {
+  use Cwd 'abs_path';
+  $KRAKEN_DIR = dirname abs_path($0);
+}
+
+my $CLASSIFY = "$KRAKEN_DIR/classify";
+
+my $quick = 0;
+my $min_hits = 1;
+my $fastq_input = 0;
+my $db_prefix = "";
+my $threads = 1;
+my $preload = 0;
+my $unclassified_out;
+my $classified_out;
+my $outfile;
+
+GetOptions(
+  "help" => \&display_help,
+  "version" => \&display_version,
+  "db=s" => \$db_prefix,
+  "threads=i" => \$threads,
+  "fastq-input" => \$fastq_input,
+  "quick" => \$quick,
+  "min-hits=i" => \$min_hits,
+  "unclassified-out=s" => \$unclassified_out,
+  "classified-out=s" => \$classified_out,
+  "output=s" => \$outfile,
+  "preload" => \$preload
+);
+
+if (! @ARGV) {
+  print STDERR "Need to specify input filenames!\n";
+  usage();
+}
+
+my $taxonomy = "$db_prefix/taxonomy/nodes.dmp";
+if ($quick) {
+  undef $taxonomy;  # Skip loading nodes file, not needed in quick mode
+}
+
+my $kdb_file = "$db_prefix/database.kdb";
+my $idx_file = "$db_prefix/database.idx";
+if (! -e $kdb_file) {
+  die "$PROG: $kdb_file does not exist!\n";
+}
+if (! -e $idx_file) {
+  die "$PROG: $idx_file does not exist!\n";
+}
+
+if ($min_hits > 1 && ! $quick) {
+  die "$PROG: --min_hits requires --quick to be specified\n";
+}
+
+my @flags;
+push @flags, "-d", $kdb_file;
+push @flags, "-i", $idx_file;
+push @flags, "-t", $threads if $threads > 1;
+push @flags, "-n", $taxonomy if defined $taxonomy;
+push @flags, "-q" if $quick;
+push @flags, "-m", $min_hits if $min_hits > 1;
+push @flags, "-f" if $fastq_input;
+push @flags, "-U", $unclassified_out if defined $unclassified_out;
+push @flags, "-C", $classified_out if defined $classified_out;
+push @flags, "-o", $outfile if defined $outfile;
+push @flags, "-M" if $preload;
+
+exec $CLASSIFY, @flags, @ARGV;
+
+sub usage {
+  my $exit_code = @_ ? shift : 64;
+  print STDERR <<EOF;
+Usage: $PROG [options] <FASTA/FASTQ filename(s)>
+
+Options:
+  --db NAME               Name for Kraken DB
+  --threads NUM           Number of threads
+  --fastq-input           Input is FASTQ, not FASTA format
+  --quick                 Quick operation (use first hit or hits)
+  --min-hits NUM          In quick op., number of hits req'd for classification
+                          NOTE: this is ignored if --quick is not specified
+  --unclassified-out FILENAME
+                          Print unclassified sequences to filename
+  --classified-out FILENAME
+                          Print classified sequences to filename
+  --output FILENAME       Print output to filename (def. is stdout); "-" will
+                          suppress normal output
+  --preload               Loads DB into memory before classification
+  --help                  Print this message
+  --version               Print version information
+EOF
+  exit $exit_code;
+}
+
+sub display_help {
+  usage(0);
+}
+
+sub display_version {
+  print "Kraken version #####=VERSION=#####\n";
+  print "Copyright 2013, Derrick Wood (dwood\@cs.umd.edu)\n";
+  exit 0;
+}

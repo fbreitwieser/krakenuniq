@@ -1,0 +1,52 @@
+v0.10.3-beta:
+* remove Fatal.pm use in kraken-report
+* fixed false success message on make failure in installer
+* explicitly require g++ as C++ compiler in Makefile
+* change to quickfile.cpp to do proper syncing on close
+* fixed kraken-build bug w/ --work-on-disk (cause of some major build stalls)
+* changed hash size calculation to use Perl
+* close input files explicitly in db_sort/db_shrink to reduce reported memory
+* allow db_shrink to work in RAM
+* updates to README file
+
+v0.10.2-beta:
+* fixed kraken-report bug w/ --show-zeros
+* fixed kraken-report installation bug
+* updates to README file
+
+v0.10.1-beta:
+* fixed 2nd bug in build_kraken.sh in calculating hash size (thanks T. Antao)
+* fixed bug in add_to_library.sh for some bash versions (thanks T. Antao)
+* fixed issue where search window wasn't cached until a failure (query speedup)
+* added $KRAKEN_DIR fallback for kraken/kraken-build (thanks S. Koren)
+
+v0.10.0-beta:
+* added CHANGELOG
+* fixed quick mode hit list output
+* updated README citation
+* changed minimizer sort order (query speedup), changes database structure
+* use linear search with small windows (query speedup)
+* changed query procedure (query speedup); search w/o 1st calculating minimizer
+* changed readlink in installer to perl Cwd::abs_path (portability)
+* removed MAP_POPULATE for preloading, uses read loop instead (bugfix/port.)
+* added --work-on-disk switch to kraken-build
+* added kraken-report script
+* fixed bug in build_kraken.sh in calculating hash size (thanks T. Antao)
+
+v0.9.1b:
+* fixed bug to allow kraken-build --shrink
+
+v0.9.0b:
+* full rewrite
+* minimizers used to speed queries, prefix index removed
+
+v0.3:
+* DB build parallelized, Jellyfish removed from LCA assignment
+
+v0.2:
+* full rewrite, most progs. changed to C++
+* Jellyfish removed from classification step
+* prefix index used to speed queries
+
+v0.1:
+* initial version, mostly Perl

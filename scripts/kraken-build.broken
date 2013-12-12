@@ -1,0 +1,286 @@
+#!/usr/bin/perl
+
+# Copyright 2013, Derrick Wood <dwood@cs.umd.edu>
+#
+# This file is part of the Kraken taxonomic sequence classification system.
+#
+# Kraken is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Kraken is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long;
+
+my $PROG = basename $0;
+my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+
+# Test to see if the executables got moved, try to recover if we can
+if (! -e "$KRAKEN_DIR/classify") {
+  use Cwd 'abs_path';
+  $KRAKEN_DIR = dirname abs_path($0);
+}
+
+$ENV{"KRAKEN_DIR"} = $KRAKEN_DIR;
+$ENV{"PATH"} = "$KRAKEN_DIR:$ENV{PATH}";
+
+my $DEF_MINIMIZER_LEN = 15;
+my $DEF_KMER_LEN = 31;
+my $DEF_THREAD_CT = 1;
+
+my @VALID_LIBRARY_TYPES = qw/bacteria viruses human/;
+
+# Option/task option variables
+my (
+  $db,
+  $threads,
+  $minimizer_len,
+  $kmer_len,
+  $new_db,
+  $hash_size,
+  $max_db_size,
+  $work_on_disk,
+
+  $dl_taxonomy,
+  $dl_library,
+  $add_to_library,
+  $build,
+  $shrink,
+  $standard,
+  $upgrade,
+  $clean,
+);
+
+$threads = $DEF_THREAD_CT;
+$minimizer_len = $DEF_MINIMIZER_LEN;
+$kmer_len = $DEF_KMER_LEN;
+$work_on_disk = "";
+$hash_size = "";
+$max_db_size = "";
+
+# variables corresponding to task options
+my @TASK_LIST = (
+  \$dl_taxonomy,
+  \$dl_library,
+  \$add_to_library,
+  \$build,
+  \$shrink,
+  \$standard,
+  \$upgrade,
+  \$clean,
+);
+
+GetOptions(
+  "help" => \&display_help,
+  "version" => \&display_version,
+
+  "db=s" => \$db,
+  "threads=i" => \$threads,
+  "minimizer-len=i", \$minimizer_len,
+  "kmer-len=i", \$kmer_len,
+  "new-db=s", \$new_db,
+  "jellyfish-hash-size=s", \$hash_size,
+  "max-db-size=s", \$max_db_size,
+  "work-on-disk", \$work_on_disk,
+
+  "download-taxonomy" => \$dl_taxonomy,
+  "download-library=s" => \$dl_library,
+  "add-to-library=s" => \$add_to_library,
+  "build" => \$build,
+  "shrink=i" => \$shrink,
+  "upgrade" => \$upgrade,
+  "standard" => \$standard,
+  "clean" => \$clean,
+) or usage();
+
+if (@ARGV) {
+  warn "Extra arguments on command line.\n";
+  usage();
+}
+my $task_options = 0;
+for my $flag_ref (@TASK_LIST) {
+  defined($$flag_ref) and $task_options++;
+}
+if ($task_options > 1) {
+  warn "More than one task option selected.\n";
+  usage();
+}
+if ($task_options == 0) {
+  warn "Must select a task option.\n";
+  usage();
+}
+
+if (! defined $db) {
+  die "Must specify a database name\n";
+}
+if ($threads <= 0) {
+  die "Can't use nonpositive thread count of $threads\n";
+}
+if ($minimizer_len >= $kmer_len) {
+  die "Minimizer length ($minimizer_len) must be less than k ($kmer_len)\n";
+}
+if ($minimizer_len <= 0) {
+  die "Can't use nonpositive minimizer length of $minimizer_len\n";
+}
+if ($kmer_len <= 2) {
+  die "Can't use k of $kmer_len (must be >= 2)\n";
+}
+if ($kmer_len > 31) {
+  die "Can't use k of $kmer_len (must be <= 31)\n";
+}
+if ($hash_size !~ /^(\d+[kKmMgG]?)?$/) {
+  die "Illegal hash size string\n";
+}
+if ($max_db_size !~ /^$/ && $max_db_size <= 0) {
+  die "Can't have negative max database size.\n";
+}
+
+$ENV{"KRAKEN_DB_NAME"} = $db;
+$ENV{"KRAKEN_THREAD_CT"} = $threads;
+$ENV{"KRAKEN_MINIMIZER_LEN"} = $minimizer_len;
+$ENV{"KRAKEN_KMER_LEN"} = $kmer_len;
+$ENV{"KRAKEN_HASH_SIZE"} = $hash_size;
+$ENV{"KRAKEN_MAX_DB_SIZE"} = $max_db_size;
+$ENV{"KRAKEN_WORK_ON_DISK"} = $work_on_disk;
+
+if ($dl_taxonomy) {
+  download_taxonomy();
+}
+elsif (defined($dl_library)) {
+  download_library($dl_library);
+}
+elsif (defined($add_to_library)) {
+  add_to_library($add_to_library);
+}
+elsif (defined($shrink)) {
+  shrink_db($shrink);
+}
+elsif ($standard) {
+  standard_installation();
+}
+elsif ($build) {
+  build_database();
+}
+elsif ($clean) {
+  clean_database();
+}
+elsif ($upgrade) {
+  upgrade_database();
+}
+else {
+  usage();
+}
+
+exit -1;
+# END OF MAIN CODE.
+
+sub usage {
+  my $exit_code = @_ ? shift : 64;
+  print STDERR <<EOF;
+Usage: $PROG [task option] [options]
+
+Task options (exactly one must be selected):
+  --download-taxonomy        Download NCBI taxonomic information
+  --download-library TYPE    Download partial library
+                             (TYPE = one of "bacteria", "viruses", "human")
+  --add-to-library FILE      Add FILE to library
+  --build                    Create DB from library
+                             (requires taxonomy d/l'ed and at least one file
+                             in library)
+  --clean                    Remove unneeded files from a built database
+  --shrink PCT               Shrink an existing DB to PCT % of its original
+                             size.
+  --standard                 Download and create default database
+  --upgrade                  Upgrade an existing older database to use scrambled
+                             minimizer ordering (see README for details)
+  --help                     Print this message
+  --version                  Print version information
+
+Options:
+  --db NAME                  Kraken DB/library name (mandatory except for
+                             --help/--version)
+  --threads #                Number of threads (def: $DEF_THREAD_CT)
+  --new-db NAME              New Kraken DB name (shrink task only; mandatory
+                             for shrink task)
+  --kmer-len NUM             K-mer length in bp (build/shrink tasks only;
+                             def: $DEF_KMER_LEN)
+  --minimizer-len NUM        Minimizer length in bp (build/shrink tasks only;
+                             def: $DEF_MINIMIZER_LEN)
+  --jellyfish-hash-size STR  Pass a specific hash size argument to jellyfish
+                             when building database (build task only)
+  --max-db-size SIZE         Shrink the DB before full build, making sure
+                             database and index together use <= SIZE gigabytes
+                             (build task only)
+  --work-on-disk             Perform most operations on disk rather than in
+                             RAM (will slow down build in most cases)
+EOF
+  exit $exit_code;
+}
+
+sub display_help {
+  usage(0);
+}
+
+sub display_version {
+  print "Kraken version #####=VERSION=#####\n";
+  print "Copyright 2013, Derrick Wood (dwood\@cs.umd.edu)\n";
+  exit 0;
+}
+
+sub download_taxonomy {
+  exec "download_taxonomy.sh";
+}
+
+sub download_library {
+  my $type = shift;
+  if (! grep $type eq $_, @VALID_LIBRARY_TYPES) {
+    warn "Unknown library type \"$type\"\n";
+    usage();
+  }
+  exec "download_genomic_library.sh", $type;
+}
+
+sub add_to_library {
+  my $arg = shift;
+  exec "add_to_library.sh", $arg;
+}
+
+sub shrink_db {
+  my $percentage = shift;
+  if ($percentage <= 0) {
+    die "Can't use shrink percentage of $percentage (must be > 0)\n";
+  }
+  if ($percentage >= 100) {
+    die "Can't use shrink percentage of $percentage (must be < 100)\n";
+  }
+  if (! defined($new_db)) {
+    die "Must specify new database name to perform shrink task\n";
+  }
+  exec "shrink_db.sh", $percentage, $new_db;
+}
+
+sub standard_installation {
+  exec "standard_installation.sh";
+}
+
+sub build_database {
+  exec "build_kraken_db.sh";
+}
+
+sub clean_database {
+  exec "clean_db.sh";
+}
+
+sub upgrade_database {
+  exec "upgrade_db.sh";
+}
