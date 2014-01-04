@@ -172,12 +172,12 @@ have multi-threading enabled) in December 2013:
 
   10m50s  *Step 1 (create set)
      n/a   Step 2 (reduce database, optional and skipped)
-  21m24s  *Step 3 (sort set)
-   0m47s   Step 4 (GI number to file map)
-   0m58s   Step 5 (File to taxon map)
-  39m10s  *Step 6 (set LCA values)
+  24m10s  *Step 3 (sort set)
+   1m28s   Step 4 (GI number to file map)
+   1m10s   Step 5 (File to taxon map)
+  47m08s  *Step 6 (set LCA values)
   ------
-  73m10s   Total build time
+  84m47s   Total build time
 
 To create a custom database, or to use a database from another
 source, see CUSTOM DATABASES.
