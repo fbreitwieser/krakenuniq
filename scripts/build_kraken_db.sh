@@ -66,11 +66,11 @@ else
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
-    KRAKEN_HASH_SIZE=$(find library/ -name '*.fna' -printf '%s\n' | perl -nle '$sum += $_; END {printf "%d\n", 1.15 * $sum}')
+    KRAKEN_HASH_SIZE=$(find library/ -name '*.fna' -or -name '*.ffn' -printf '%s\n' | perl -nle '$sum += $_; END {printf "%d\n", 1.15 * $sum}')
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  find library/ -name '*.fna' -print0 | xargs -0 cat | \
+  find library/ -name '*.fna' -or -name '*.ffn'  -print0 | xargs -0 cat | \
     jellyfish count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
       -o database /dev/fd/0
 
@@ -147,7 +147,7 @@ then
 else
   echo "Creating GI number to file map (step 4 of 6)..."
   start_time1=$(date "+%s.%N")
-  find library/ -name '*.fna' -print0 | \
+  find library/ -name '*.fna' -or -name '*.ffn' -print0 | \
     xargs -0 grep -m1 -H '^>' | \
     awk -F '\\|' '{ sub(/:>gi$/, "", $1); print $2 "|" $1 }' \
     > gi2file.map.tmp
