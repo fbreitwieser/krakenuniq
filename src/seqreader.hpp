@@ -21,7 +21,6 @@
 #define SEQREADER_HPP
 
 #include "kraken_headers.hpp"
-#include "quickfile.hpp"
 
 namespace kraken {
   typedef struct {
@@ -44,8 +43,8 @@ namespace kraken {
     bool is_valid();
 
     private:
-    QuickFile file;
-    char *ptr;
+    std::ifstream file;
+    std::string linebuffer;
     bool valid;
   };
 

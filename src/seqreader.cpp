@@ -18,55 +18,61 @@
  */
 
 #include "kraken_headers.hpp"
-#include "quickfile.hpp"
 #include "seqreader.hpp"
 
 using namespace std;
 
 namespace kraken {
   FastaReader::FastaReader(string filename) {
-    file.open_file(filename);
-    ptr = file.ptr();
+    file.open(filename.c_str());
+    if (file.rdstate() & ifstream::failbit) {
+      err(EX_NOINPUT, "can't open %s", filename.c_str());
+    }
     valid = true;
   }
 
   DNASequence FastaReader::next_sequence() {
     DNASequence dna;
 
-    if (! valid || ! ptr || (size_t)(ptr - file.ptr()) >= file.size()) {
+    if (! valid || ! file.good()) {
       valid = false;
       return dna;
     }
-
-    size_t remaining = file.size() - (ptr - file.ptr());
-    char *end_ptr = ptr;
-    size_t end_rem = remaining;
-    while (end_ptr) {
-      end_ptr = (char *) memchr(end_ptr+1, '>', end_rem-1);
-      if (! end_ptr || *(end_ptr - 1) == '\n')
-        break;
-      end_rem = remaining - (end_ptr - ptr);
-    }
-
-    size_t record_len = end_ptr ? end_ptr - ptr : remaining;
-    string fasta_record(ptr, record_len);
-    ptr += record_len;
-
-    istringstream iss(fasta_record);
     string line;
 
-    getline(iss, line);
-    if (line[0] != '>')
-      errx(EX_DATAERR, "malformed fasta file");
-    istringstream line_ss(line.substr(1));
+    if (linebuffer.empty()) {
+      getline(file, line);
+    }
+    else {
+      line = linebuffer;
+      linebuffer.clear();
+    }
+
+    if (line[0] != '>') {
+      warnx("malformed fasta file - expected header char > not found");
+      valid = false;
+      return dna;
+    }
+    dna.id = line.substr(1);
     
-    line_ss >> dna.id;
-    dna.seq = "";
-    while (iss.good()) {
-      getline(iss, line);
-      if (line.empty())
+    ostringstream seq_ss;
+
+    while (file.good()) {
+      getline(file, line);
+      if (line[0] == '>') {
+        linebuffer = line;
         break;
-      dna.seq.append(line);
+      }
+      else {
+        seq_ss << line;
+      }
+    }
+    dna.seq = seq_ss.str();
+
+    if (dna.seq.empty()) {
+      warnx("malformed fasta file - zero-length record (%s)", dna.id.c_str());
+      valid = false;
+      return dna;
     }
 
     return dna;
