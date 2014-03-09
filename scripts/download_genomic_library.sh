@@ -20,8 +20,8 @@
 # Download specific genomic libraries for use with Kraken.
 # Supported choices are:
 #   bacteria - NCBI RefSeq complete bacterial/archaeal genomes
-#   viruses - NCBI RefSeq complete viral genomes
-#   human - NCBI RefSeq GRCh37 human reference genome
+#   viruses - NCBI RefSeq complete viral DNA and RNA genomes
+#   human - NCBI RefSeq GRCh38 human reference genome
 
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
@@ -55,10 +55,14 @@ case "$1" in
     if [ ! -e "lib.complete" ]
     then
       rm -f all.fna.tar.gz
+      rm -f all.ffn.tar.gz
       wget $FTP_SERVER/genomes/Viruses/all.fna.tar.gz
+      wget $FTP_SERVER/genomes/Viruses/all.ffn.tar.gz
       echo -n "Unpacking..."
       tar zxf all.fna.tar.gz
+      tar zxf all.ffn.tar.gz
       rm all.fna.tar.gz
+      rm all.ffn.tar.gz
       echo " complete."
       touch "lib.complete"
     else
@@ -66,9 +70,10 @@ case "$1" in
     fi
     ;;
   "human")
+    mkdir -p $LIBRARY_DIR/H_sapiens
     if [ ! -e "$LIBRARY_DIR/H_sapiens/lib.complete" ]
     then
-      rsync -avz --include "H_sapiens/" --include "*/CHR_*/" --include "hs_ref_GRCh37*.fa.gz" --exclude "*" \
+      rsync -avz --include "H_sapiens/" --include "*/CHR_*/" --include "hs_ref_GRCh*.fa.gz" --exclude "*" \
         $RSYNC_SERVER/genomes/H_sapiens $LIBRARY_DIR
       for gzfile in $LIBRARY_DIR/H_sapiens/*/*.gz
       do
