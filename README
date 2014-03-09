@@ -297,7 +297,7 @@ To build a custom database:
 
      - bacteria: RefSeq complete bacterial/archaeal genomes
      - viruses: RefSeq complete viral genomes
-     - human: GRCh37 human genome
+     - human: GRCh38 human genome
 
      To download and install any one of these, use the "--download-library"
      switch, e.g.:
