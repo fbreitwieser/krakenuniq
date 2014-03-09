@@ -35,12 +35,14 @@ then
   exit 1
 fi
 
-if ! head -1 "$1" | perl -nle 'exit 1 unless /^>gi\|(\d+)\|/'
+gi_num=$(head -1 "$1" | perl -nle 'exit 1 if ! /^>gi\|(\d+)\|/; print $1')
+if (( $? )) || [ -z "$gi_num" ]
 then
   echo "Can't add \"$1\": could not find GI number"
   exit 1
 fi
-seq_ct=$(grep -m2 '^>' "$1" | wc -l)
+
+seq_ct=$(grep -c -m2 '^>' "$1")
 if (( seq_ct > 1 ))
 then
   echo "Can't add \"$1\": multiple sequences found"
@@ -48,16 +50,12 @@ then
 fi
 
 mkdir -p "$LIBRARY_DIR/added"
-ct=0
-freefile=""
-while [ -z "$freefile" ]
-do
-  freefile=$(seq -f '%015g' $ct $ct).fna
-  if [ -e "$LIBRARY_DIR/added/$freefile" ]
-  then
-    ct=$(($ct + 1))
-    freefile=""
-  fi
-done
-cp "$1" "$LIBRARY_DIR/added/$freefile"
+filename="$LIBRARY_DIR/added/gi_$gi_num.fna"
+if [ -e "$filename" ]
+then
+  echo "GI number $gi_num appears to already be added:"
+  echo "  '$filename' exists."
+  exit 1
+fi
+cp "$1" "$filename"
 echo "Added \"$1\" to library ($KRAKEN_DB_NAME)"
