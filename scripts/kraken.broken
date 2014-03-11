@@ -34,13 +34,18 @@ if (! -e "$KRAKEN_DIR/classify") {
 }
 
 my $CLASSIFY = "$KRAKEN_DIR/classify";
+my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
+my $BZIP2_MAGIC = "BZ";
 
 my $quick = 0;
 my $min_hits = 1;
+my $fasta_input = 0;
 my $fastq_input = 0;
 my $db_prefix = "";
 my $threads = 1;
 my $preload = 0;
+my $gunzip = 0;
+my $bunzip2 = 0;
 my $unclassified_out;
 my $classified_out;
 my $outfile;
@@ -50,13 +55,16 @@ GetOptions(
   "version" => \&display_version,
   "db=s" => \$db_prefix,
   "threads=i" => \$threads,
+  "fasta-input" => \$fasta_input,
   "fastq-input" => \$fastq_input,
   "quick" => \$quick,
   "min-hits=i" => \$min_hits,
   "unclassified-out=s" => \$unclassified_out,
   "classified-out=s" => \$classified_out,
   "output=s" => \$outfile,
-  "preload" => \$preload
+  "preload" => \$preload,
+  "gzip-compressed" => \$gunzip,
+  "bzip2-compressed" => \$bunzip2
 );
 
 if (! @ARGV) {
@@ -82,6 +90,25 @@ if ($min_hits > 1 && ! $quick) {
   die "$PROG: --min_hits requires --quick to be specified\n";
 }
 
+my $compressed = $gunzip || $bunzip2;
+if ($gunzip && $bunzip2) {
+  die "$PROG: can't use both gzip and bzip2 compression flags\n";
+}
+if ($fasta_input && $fastq_input) {
+  die "$PROG: can't use both FASTA and FASTQ input flags\n";
+}
+
+my $auto_detect = 1;
+if ($fasta_input || $fastq_input || $compressed) {
+  $auto_detect = 0;
+}
+if (! -f $ARGV[0]) {
+  $auto_detect = 0;
+}
+if ($auto_detect) {
+  auto_detect_file_format();
+}
+
 my @flags;
 push @flags, "-d", $kdb_file;
 push @flags, "-i", $idx_file;
@@ -95,17 +122,50 @@ push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-M" if $preload;
 
+if ($compressed) {
+  pipe RD, WR;
+  my $pid = fork();
+  if ($pid < 0) {
+    die "$PROG: could not fork to do unzipping: $!\n";
+  }
+  if ($pid) {  # parent; sets stdin to pipe output and execs classifier
+    close WR;
+    open STDIN, "<&RD" or die "$PROG: can't dup stdin: $!\n";
+    close RD;
+    @ARGV = "/dev/fd/0";
+  }
+  else {  # child; sets stdout to pipe input and execs decompression program
+    close RD;
+    open STDOUT, ">&WR" or die "$PROG: can't dup stdout: $!\n";
+    close WR;
+    if ($gunzip) {
+      exec "gunzip", "-c", @ARGV;
+    }
+    elsif ($bunzip2) {
+      exec "bunzip2", "-c", @ARGV;
+    }
+    else {
+      die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
+    }
+    die "$PROG: exec error: $!\n";
+  }
+}
+
 exec $CLASSIFY, @flags, @ARGV;
+die "$PROG: exec error: $!\n";
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
   print STDERR <<EOF;
-Usage: $PROG [options] <FASTA/FASTQ filename(s)>
+Usage: $PROG [options] <filename(s)>
 
 Options:
   --db NAME               Name for Kraken DB
   --threads NUM           Number of threads
-  --fastq-input           Input is FASTQ, not FASTA format
+  --fasta-input           Input is FASTA format
+  --fastq-input           Input is FASTQ format
+  --gzip-compressed       Input is gzip compressed
+  --bzip2-compressed      Input is bzip2 compressed
   --quick                 Quick operation (use first hit or hits)
   --min-hits NUM          In quick op., number of hits req'd for classification
                           NOTE: this is ignored if --quick is not specified
@@ -118,6 +178,9 @@ Options:
   --preload               Loads DB into memory before classification
   --help                  Print this message
   --version               Print version information
+
+If none of the *-input or *-compressed flags are specified, and the 
+file is a regular file, automatic format detection is attempted.
 EOF
   exit $exit_code;
 }
@@ -130,4 +193,49 @@ sub display_version {
   print "Kraken version #####=VERSION=#####\n";
   print "Copyright 2013-2014, Derrick Wood (dwood\@cs.umd.edu)\n";
   exit 0;
+}
+
+sub auto_detect_file_format {
+  my $magic;
+
+  # read 2-byte magic number to determine type of compression (if any)
+  open FILE, "<", $ARGV[0];
+  read FILE, $magic, 2;
+  close FILE;
+  if ($magic eq $GZIP_MAGIC) {
+    $compressed = 1;
+    $gunzip = 1;
+  }
+  elsif ($magic eq $BZIP2_MAGIC) {
+    $compressed = 1;
+    $bunzip2 = 1;
+  }
+  else {
+    # if no compression, just look at first char
+    chop $magic;
+  }
+
+  # uncompress to stream and read first char
+  if ($gunzip) {
+    open FILE, "-|", "gunzip", "-c", $ARGV[0]
+      or die "$PROG: can't determine format of $ARGV[0] (gunzip error): $!\n";
+    read FILE, $magic, 1;
+    close FILE;
+  }
+  elsif ($bunzip2) {
+    open FILE, "-|", "bunzip2", "-c", $ARGV[0]
+      or die "$PROG: can't determine format of $ARGV[0] (bunzip2 error): $!\n";
+    read FILE, $magic, 1;
+    close FILE;
+  }
+
+  if ($magic eq ">") {
+    $fasta_input = 1;
+  }
+  elsif ($magic eq "@") {
+    $fastq_input = 1;
+  }
+  else {
+    die "$PROG: can't determine what format $ARGV[0] is!\n";
+  }
 }
