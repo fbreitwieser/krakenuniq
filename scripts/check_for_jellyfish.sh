@@ -17,26 +17,19 @@
 # You should have received a copy of the GNU General Public License
 # along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
 
-# Build the standard Kraken database
+# Check that jellyfish is executable and is proper version
 # Designed to be called by kraken_build
 
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
-WOD_FLAG=""
-if [ -n "$KRAKEN_WORK_ON_DISK" ]
+JELLYFISH_VERSION=$(jellyfish --version | awk '{print $2}')
+if [[ $JELLYFISH_VERSION =~ '^1\.' ]]
 then
-  WOD_FLAG="--work-on-disk"
+  echo "Found jellyfish v$JELLYFISH_VERSION"
+else
+  echo "Found jellyfish v$JELLYFISH_VERSION"
+  echo "Kraken requires jellyfish version 1"
+  exit 1
 fi
-
-check_for_jellyfish.sh
-kraken-build --db $KRAKEN_DB_NAME --download-taxonomy
-kraken-build --db $KRAKEN_DB_NAME --download-library bacteria
-kraken-build --db $KRAKEN_DB_NAME --download-library viruses
-kraken-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \
-               --jellyfish-hash-size "$KRAKEN_HASH_SIZE" \
-               --max-db-size "$KRAKEN_MAX_DB_SIZE" \
-               --minimizer-len $KRAKEN_MINIMIZER_LEN \
-               --kmer-len $KRAKEN_KMER_LEN \
-               $WOD_FLAG

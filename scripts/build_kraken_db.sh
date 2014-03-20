@@ -63,6 +63,7 @@ else
   echo "Creating k-mer set (step 1 of 6)..."
   start_time1=$(date "+%s.%N")
 
+  check_for_jellyfish.sh
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
