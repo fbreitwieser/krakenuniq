@@ -41,7 +41,7 @@ my $quick = 0;
 my $min_hits = 1;
 my $fasta_input = 0;
 my $fastq_input = 0;
-my $db_prefix = "";
+my $db_prefix;
 my $threads = 1;
 my $preload = 0;
 my $gunzip = 0;
@@ -66,6 +66,10 @@ GetOptions(
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2
 );
+
+if (! defined $db_prefix) {
+  die "$PROG: must specify database name with --db\n";
+}
 
 if (! @ARGV) {
   print STDERR "Need to specify input filenames!\n";
@@ -197,9 +201,10 @@ sub display_version {
 
 sub auto_detect_file_format {
   my $magic;
+  my $filename = $ARGV[0];
 
   # read 2-byte magic number to determine type of compression (if any)
-  open FILE, "<", $ARGV[0];
+  open FILE, "<", $filename;
   read FILE, $magic, 2;
   close FILE;
   if ($magic eq $GZIP_MAGIC) {
@@ -217,14 +222,14 @@ sub auto_detect_file_format {
 
   # uncompress to stream and read first char
   if ($gunzip) {
-    open FILE, "-|", "gunzip", "-c", $ARGV[0]
-      or die "$PROG: can't determine format of $ARGV[0] (gunzip error): $!\n";
+    open FILE, "-|", "gunzip", "-c", $filename
+      or die "$PROG: can't determine format of $filename (gunzip error): $!\n";
     read FILE, $magic, 1;
     close FILE;
   }
   elsif ($bunzip2) {
     open FILE, "-|", "bunzip2", "-c", $ARGV[0]
-      or die "$PROG: can't determine format of $ARGV[0] (bunzip2 error): $!\n";
+      or die "$PROG: can't determine format of $filename (bunzip2 error): $!\n";
     read FILE, $magic, 1;
     close FILE;
   }
@@ -236,6 +241,6 @@ sub auto_detect_file_format {
     $fastq_input = 1;
   }
   else {
-    die "$PROG: can't determine what format $ARGV[0] is!\n";
+    die "$PROG: can't determine what format $filename is!\n";
   }
 }
