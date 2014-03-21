@@ -23,7 +23,7 @@
 using namespace std;
 using namespace kraken;
 
-map<uint64_t, string> requests;
+map<uint64_t, set<string> > requests;
 uint64_t request_count = 0;
 
 void fill_request_map(char *filename);
@@ -56,9 +56,12 @@ void report_taxo_numbers(char *filename) {
     
     if (requests.count(gi) > 0) {
       char *tab_ptr = strchr(fptr, '\t');
-      cout << requests[gi] << "\t";
-      cout.write(tab_ptr + 1, nl_ptr - tab_ptr);
-      request_count--;
+      set<string>::iterator it;
+      for (it = requests[gi].begin(); it != requests[gi].end(); it++) {
+        cout << *it << "\t";
+        cout.write(tab_ptr + 1, nl_ptr - tab_ptr);
+        request_count--;
+      }
     }
 
     fptr = nl_ptr + 1;
@@ -78,7 +81,7 @@ void fill_request_map(char *filename) {
     char *nl_ptr = strchr(fptr, '\n');
     char *sep_ptr = strchr(fptr, '|');
     uint64_t gi = atoll(fptr);
-    requests[gi] = string(sep_ptr + 1, nl_ptr - sep_ptr - 1);
+    requests[gi].insert(string(sep_ptr + 1, nl_ptr - sep_ptr - 1));
     request_count++;
     fptr = nl_ptr + 1;
   }

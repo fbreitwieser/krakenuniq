@@ -53,7 +53,8 @@ namespace kraken {
       valid = false;
       return dna;
     }
-    dna.id = line.substr(1);
+    istringstream seq_id(line.substr(1));
+    seq_id >> dna.id;
     
     ostringstream seq_ss;
 

@@ -63,6 +63,7 @@ case "$1" in
       tar zxf all.ffn.tar.gz
       rm all.fna.tar.gz
       rm all.ffn.tar.gz
+      find . -name '*.ffn' -print0 | xargs -0 -n1 fasta_split.pl
       echo " complete."
       touch "lib.complete"
     else
