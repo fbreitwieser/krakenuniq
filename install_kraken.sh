@@ -40,14 +40,13 @@ export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
 (cd src && make)
 mkdir -p "$KRAKEN_DIR"
-for file in scripts/*.broken
+for file in scripts/*
 do
   perl -pl -e 'BEGIN { while (@ARGV) { $_ = shift; ($k,$v) = split /=/, $_, 2; $H{$k} = $v } }'\
            -e 's/#####=(\w+)=#####/$H{$1}/g' \
            "KRAKEN_DIR=$KRAKEN_DIR" "VERSION=$VERSION" \
-           < "$file" > "$KRAKEN_DIR/$(basename $file .broken)"
+           < "$file" > "$KRAKEN_DIR/$(basename $file)"
 done
-cp scripts/*.sh "$KRAKEN_DIR"
 make -C src install
 chmod -R +x "$KRAKEN_DIR"
 
@@ -56,6 +55,7 @@ echo "Kraken installation complete."
 echo
 echo "To make things easier for you, you may want to copy/symlink the following"
 echo "files into a directory in your PATH:"
-echo "  $KRAKEN_DIR/kraken"
-echo "  $KRAKEN_DIR/kraken-build"
-echo "  $KRAKEN_DIR/kraken-report"
+for file in $KRAKEN_DIR/kraken*
+do
+  echo "  $file"
+done
