@@ -13,8 +13,8 @@ UPGRADING DATABASES TO v0.10+ for more details.
 INTRODUCTION
 ============
 
-Kraken is a taxonomic sequence classifier, that assigns a taxonomic
-label to short DNA read.  It does this by examining the k-mers
+Kraken is a taxonomic sequence classifier that assigns a taxonomic
+label to short DNA reads.  It does this by examining the k-mers
 within a read and querying a database with those k-mers.  This database
 contains a mapping of every k-mer in Kraken's genomic library to the
 lowest common ancestor (LCA) in a taxonomic tree of all genomes that
@@ -67,18 +67,16 @@ Dependencies: Kraken currently makes extensive use of Linux utilities
   such as sed, find, and wget.  Many scripts are written using the
   Bash shell, and the main scripts are written using Perl.  Core
   programs needed to build the database and run the classifier are
-  written in C++, and need to be compiled using g++.
+  written in C++, and need to be compiled using g++.  Downloads of
+  NCBI data are performed by wget and in some cases, by rsync.
 
   Finally, if you want to build your own database, you will need to
   install the Jellyfish k-mer counter, available at:
 
     http://www.cbcb.umd.edu/software/jellyfish/
 
-  Note that Kraken only supports use of Jellyfish version 1.  Future
-  major versions of Jellyfish may not be compatible with Kraken.
-  Should such incompatibility occur, we will make a compatible
-  version of Jellyfish available and/or update Kraken to work with
-  the new version.
+  Note that Kraken only supports use of Jellyfish version 1.
+  Jellyfish version 2 is not yet compatible with Kraken.
 
 MiniKraken: To allow users with low-memory computing environments to
   use Kraken, we supply a reduced standard database that can be
@@ -159,7 +157,7 @@ disk space during creation.)
 
 This will download NCBI taxonomic information, as well as the
 complete genomes in RefSeq for the bacterial, archaeal, and
-viral kingdoms.  After downloading all this data, the build
+viral domains.  After downloading all this data, the build
 process begins; this is the most time-consuming step.  If you
 have multiple processing cores, you can run this process with
 multiple threads, e.g.:
@@ -178,6 +176,13 @@ have multi-threading enabled) in December 2013:
   47m08s  *Step 6 (set LCA values)
   ------
   84m47s   Total build time
+
+Note that if any step (including the initial downloads) fails,
+the build process will abort.  However, kraken-build will
+produce checkpoints throughout the installation process, and
+will restart the build at the last incomplete step if you
+attempt to run the same command again on a partially-built
+database.
 
 To create a custom database, or to use a database from another
 source, see CUSTOM DATABASES.
@@ -246,6 +251,18 @@ The kraken program allows several different options:
 
 - FASTQ input: Input is normally expected to be in FASTA format, but
   you can classify FASTQ data using the "--fastq-input" switch.
+
+- Compressed input: Kraken can handle gzip and bzip2 compressed
+  files as input by specifying the proper switch of "--gzip-compressed"
+  or "--bzip2-compressed".
+
+- Input format auto-detection: If regular files are specified on
+  the command line as input, Kraken will attempt to determine the
+  format of your input prior to classification.  You can disable this
+  by explicitly specifying "--fasta-input", "--fastq-input",
+  "--gzip-compressed", and/or "--bzip2-compressed" as appropriate.
+  Note that use of the character device file "/dev/fd/0" to read
+  from standard input (aka "stdin") will NOT allow auto-detection.
 
 To get a full list of options, use "kraken --help".
 
@@ -431,11 +448,11 @@ PAIRED READS
 Kraken does not query k-mers containing ambiguous nucleotides (non-ACGT).
 If you have paired reads, you can use this fact to your advantage and
 increase Kraken's accuracy by concatenating the pairs together with a
-single 'N' between the sequences.  We have found this to raise sensitivity
-by about 3 percentage points over classifying the sequences as single-end
-reads.  We expect future versions of Kraken to support classification of
-paired reads without the need for users to perform any concatenation prior to
-classification.
+single 'N' between the sequences.  Using the "--paired" option when
+running kraken will automatically do this for you; simply specify the
+two mate pair files on the command line.  We have found this to raise
+sensitivity by about 3 percentage points over classifying the sequences
+as single-end reads.
 
 
 SAMPLE REPORTS
@@ -456,8 +473,9 @@ The fields of the output, from left-to-right, are as follows:
   1) Percentage of reads covered by the clade rooted at this taxon
   2) Number of reads covered by the clade rooted at this taxon
   3) Number of reads assigned directly to this taxon
-  4) A rank code, indicating (U)nclassified, (P)hylum, (C)lass, (O)rder,
-     (F)amily, (G)enus, or (S)pecies.  All other ranks are simply '-'.
+  4) A rank code, indicating (U)nclassified, (D)omain, (K)ingdom,
+     (P)hylum, (C)lass, (O)rder, (F)amily, (G)enus, or (S)pecies.
+     All other ranks are simply '-'.
   5) NCBI taxonomy ID
   6) indented scientific name 
 
@@ -470,6 +488,14 @@ you can use the "--show-zeros" switch to do so.  This can be useful if
 you are looking to do further downstream analysis of the reports, and
 want to compare samples.  Sorting by the taxonomy ID (using "sort -nf5")
 can provide a consistent line ordering between reports.
+
+In addition, we also provide the program kraken-mpa-report; this program
+provides output in a format similar to MetaPhlAn's tab-delimited output.
+For kraken-mpa-report, multiple Kraken output files can be specified on
+the command line and each will be treated as a separate sample.  For each
+taxon at the standard ranks (from domain to species), the count of reads
+in each sample assigned to any node in the clade rooted at that taxon is
+displayed.  Output of kraken-mpa-report is sent to standard output.
 
 
 UPGRADING DATABASES TO v0.10+
