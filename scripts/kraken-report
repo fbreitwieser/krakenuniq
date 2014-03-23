@@ -104,6 +104,8 @@ sub rank_code {
     $_ eq "order" and return "O";
     $_ eq "class" and return "C";
     $_ eq "phylum" and return "P";
+    $_ eq "kingdom" and return "K";
+    $_ eq "superkingdom" and return "D";
   }
   return "-";
 }
