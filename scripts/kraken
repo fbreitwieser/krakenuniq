@@ -46,6 +46,7 @@ my $threads = 1;
 my $preload = 0;
 my $gunzip = 0;
 my $bunzip2 = 0;
+my $paired = 0;
 my $unclassified_out;
 my $classified_out;
 my $outfile;
@@ -63,6 +64,7 @@ GetOptions(
   "classified-out=s" => \$classified_out,
   "output=s" => \$outfile,
   "preload" => \$preload,
+  "paired" => \$paired,
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2
 );
@@ -94,6 +96,10 @@ if ($min_hits > 1 && ! $quick) {
   die "$PROG: --min_hits requires --quick to be specified\n";
 }
 
+if ($paired && @ARGV != 2) {
+  die "$PROG: --paired requires exactly two filenames\n";
+}
+
 my $compressed = $gunzip || $bunzip2;
 if ($gunzip && $bunzip2) {
   die "$PROG: can't use both gzip and bzip2 compression flags\n";
@@ -113,6 +119,7 @@ if ($auto_detect) {
   auto_detect_file_format();
 }
 
+# set flags for classifier
 my @flags;
 push @flags, "-d", $kdb_file;
 push @flags, "-i", $idx_file;
@@ -120,39 +127,44 @@ push @flags, "-t", $threads if $threads > 1;
 push @flags, "-n", $taxonomy if defined $taxonomy;
 push @flags, "-q" if $quick;
 push @flags, "-m", $min_hits if $min_hits > 1;
-push @flags, "-f" if $fastq_input;
+push @flags, "-f" if $fastq_input && ! $paired;  # merger always outputs FASTA
 push @flags, "-U", $unclassified_out if defined $unclassified_out;
 push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-M" if $preload;
 
-if ($compressed) {
-  pipe RD, WR;
-  my $pid = fork();
-  if ($pid < 0) {
-    die "$PROG: could not fork to do unzipping: $!\n";
+# handle piping for decompression/merging
+my $kraken_in;
+if ($paired) {
+  my @merge_flags;
+  push @merge_flags, "--fa" if $fasta_input;
+  push @merge_flags, "--fq" if $fastq_input;
+  push @merge_flags, "--gz" if $gunzip;
+  push @merge_flags, "--bz2" if $bunzip2;
+  open $kraken_in, "-|", "read_merger.pl", @merge_flags, @ARGV
+    or die "$PROG: can't open pipe to merger script: $!\n";
+}
+elsif ($compressed) {
+  if ($gunzip) {
+    open $kraken_in, "-|", "gzip", "-dc", @ARGV
+      or die "$PROG: can't open pipe to gzip: $!\n";
   }
-  if ($pid) {  # parent; sets stdin to pipe output and execs classifier
-    close WR;
-    open STDIN, "<&RD" or die "$PROG: can't dup stdin: $!\n";
-    close RD;
-    @ARGV = "/dev/fd/0";
+  elsif ($bunzip2) {
+    open $kraken_in, "-|", "bzip2", "-dc", @ARGV
+      or die "$PROG: can't open pipe to bzip2: $!\n";
   }
-  else {  # child; sets stdout to pipe input and execs decompression program
-    close RD;
-    open STDOUT, ">&WR" or die "$PROG: can't dup stdout: $!\n";
-    close WR;
-    if ($gunzip) {
-      exec "gunzip", "-c", @ARGV;
-    }
-    elsif ($bunzip2) {
-      exec "bunzip2", "-c", @ARGV;
-    }
-    else {
-      die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
-    }
-    die "$PROG: exec error: $!\n";
+  else {
+    die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
   }
+}
+
+# $kraken_in is FH for pipe from decompression/merging
+if (defined $kraken_in) {
+  @ARGV = ("/dev/fd/0");  # make classifier read from STDIN
+  my $fd = fileno $kraken_in;
+  open STDIN, "<&$fd"
+    or die "$PROG: can't dup pipe input to classifier STDIN: $!\n";
+  close $kraken_in;
 }
 
 exec $CLASSIFY, @flags, @ARGV;
@@ -180,6 +192,7 @@ Options:
   --output FILENAME       Print output to filename (def. is stdout); "-" will
                           suppress normal output
   --preload               Loads DB into memory before classification
+  --paired                The two filenames provided are paired-end reads
   --help                  Print this message
   --version               Print version information
 
@@ -222,14 +235,14 @@ sub auto_detect_file_format {
 
   # uncompress to stream and read first char
   if ($gunzip) {
-    open FILE, "-|", "gunzip", "-c", $filename
-      or die "$PROG: can't determine format of $filename (gunzip error): $!\n";
+    open FILE, "-|", "gzip", "-dc", $filename
+      or die "$PROG: can't determine format of $filename (gzip error): $!\n";
     read FILE, $magic, 1;
     close FILE;
   }
   elsif ($bunzip2) {
-    open FILE, "-|", "bunzip2", "-c", $ARGV[0]
-      or die "$PROG: can't determine format of $filename (bunzip2 error): $!\n";
+    open FILE, "-|", "bzip2", "-dc", $ARGV[0]
+      or die "$PROG: can't determine format of $filename (bzip2 error): $!\n";
     read FILE, $magic, 1;
     close FILE;
   }
