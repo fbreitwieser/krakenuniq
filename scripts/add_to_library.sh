@@ -46,22 +46,14 @@ seq_ct=$(grep -c -m2 '^>' "$1")
 add_dir="$LIBRARY_DIR/added"
 mkdir -p "$add_dir"
 
-free_num=0
-if [ -e "$add_dir/next.free" ]
-then
-  free_num=$(cat "$add_dir/next.free")
-fi
-filename=$(printf '%015g' "$free_num")
-
 if (( seq_ct > 1 ))
 then
-  cp "$1" "$add_dir/$filename.ffn"
-  fasta_split.pl "$add_dir/$filename.ffn"
+  filename=$(mktemp --tmpdir=$add_dir XXXXXXXXXX.ffn)
+  cp "$1" "$filename"
+  fasta_split.pl "$filename"
 else
-  cp "$1" "$add_dir/$filename.fna"
+  filename=$(mktemp --tmpdir=$add_dir XXXXXXXXXX.fna)
+  cp "$1" "$filename"
 fi
-
-free_num=$(( free_num + 1 ))
-echo "$free_num" > "$add_dir/next.free"
 
 echo "Added \"$1\" to library ($KRAKEN_DB_NAME)"
