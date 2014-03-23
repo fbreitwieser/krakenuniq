@@ -35,27 +35,33 @@ then
   exit 1
 fi
 
-gi_num=$(head -1 "$1" | perl -nle 'exit 1 if ! /^>gi\|(\d+)\|/; print $1')
-if (( $? )) || [ -z "$gi_num" ]
+if ! (grep '^>' "$1" | perl -nle 'exit 1 if ! /^>gi\|\d+\|/')
 then
-  echo "Can't add \"$1\": could not find GI number"
+  echo "Can't add \"$1\": sequence is missing GI number"
   exit 1
 fi
 
 seq_ct=$(grep -c -m2 '^>' "$1")
+
+add_dir="$LIBRARY_DIR/added"
+mkdir -p "$add_dir"
+
+free_num=0
+if [ -e "$add_dir/next.free" ]
+then
+  free_num=$(cat "$add_dir/next.free")
+fi
+filename=$(printf '%015g' "$free_num")
+
 if (( seq_ct > 1 ))
 then
-  echo "Can't add \"$1\": multiple sequences found"
-  exit 1
+  cp "$1" "$add_dir/$filename.ffn"
+  fasta_split.pl "$add_dir/$filename.ffn"
+else
+  cp "$1" "$add_dir/$filename.fna"
 fi
 
-mkdir -p "$LIBRARY_DIR/added"
-filename="$LIBRARY_DIR/added/gi_$gi_num.fna"
-if [ -e "$filename" ]
-then
-  echo "GI number $gi_num appears to already be added:"
-  echo "  '$filename' exists."
-  exit 1
-fi
-cp "$1" "$filename"
+free_num=$(( free_num + 1 ))
+echo "$free_num" > "$add_dir/next.free"
+
 echo "Added \"$1\" to library ($KRAKEN_DB_NAME)"
