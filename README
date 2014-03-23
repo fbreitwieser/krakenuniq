@@ -329,8 +329,8 @@ To build a custom database:
 
      Other genomes can also be added, but such genomes must meet certain
      requirements:
-     - Each replicon must be in a separate FASTA file
-     - Each FASTA file must contain a GI number in the header,
+     - Each sequence must be in a FASTA file
+     - Each sequence's FASTA header must contain a GI number,
        to allow Kraken to lookup the correct taxa.
 
      In practice, this means replicons must be downloaded from NCBI.
@@ -345,6 +345,19 @@ To build a custom database:
 
        kraken-build --add-to-library chr1.fa --db $DBNAME
        kraken-build --add-to-library chr2.fa --db $DBNAME
+
+     Note that if you have a list of files to add, you can do something like
+     this in bash:
+
+       for file in chr*.fa
+       do
+         kraken-build --add-to-library $file --db $DBNAME
+       done
+
+     Or even add all *.fa files found in directory "genomes":
+
+       find genomes/ -name '*.fa' -print0 | \
+         xargs -0 -I{} -n1 kraken-build --add-to-library {} --db $DBNAME
 
   3) Once your library is finalized, you need to build the database.
      Depending on your size requirements, you may want to adjust the
