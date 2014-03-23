@@ -17,6 +17,13 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Produce a mapping of filenames to taxon IDs
+
+// This program's reason for being is that the gi_taxid_nucl.dmp file
+// is monstrously huge, and the only efficient way to do this task is
+// to use mmap to quickly access the file.  Otherwise, I'd have just
+// used a little Perl script instead of all these strchr() calls.
+
 #include "kraken_headers.hpp"
 #include "quickfile.hpp"
 
@@ -50,6 +57,7 @@ void report_taxo_numbers(char *filename) {
   fptr_start = fptr = file.ptr();
   size_t file_size = file.size();
 
+  // Line format: <gi num><tab><taxon ID>
   while (request_count > 0 && (size_t)(fptr - fptr_start) < file_size) {
     char *nl_ptr = strchr(fptr, '\n');
     uint64_t gi = atoll(fptr);
@@ -57,6 +65,7 @@ void report_taxo_numbers(char *filename) {
     if (requests.count(gi) > 0) {
       char *tab_ptr = strchr(fptr, '\t');
       set<string>::iterator it;
+      // Output line format: <filename><tab><taxon ID>
       for (it = requests[gi].begin(); it != requests[gi].end(); it++) {
         cout << *it << "\t";
         cout.write(tab_ptr + 1, nl_ptr - tab_ptr);
@@ -77,6 +86,7 @@ void fill_request_map(char *filename) {
   fptr_start = fptr = file.ptr();
   size_t file_size = file.size();
 
+  // Line format: <gi num><pipe><filename>
   while ((size_t)(fptr - fptr_start) < file_size) {
     char *nl_ptr = strchr(fptr, '\n');
     char *sep_ptr = strchr(fptr, '|');
