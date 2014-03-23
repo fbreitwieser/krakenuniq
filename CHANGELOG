@@ -1,3 +1,15 @@
+v0.10.4-beta:
+* use GRCh38 for human genome library
+* enable input via stdin (/dev/fd/0)
+* enable compressed (gzip/bzip2) input
+* enable auto-detection of fasta/fastq/gz/bz2
+* simplified add_to_library.sh code to speed up large additions
+* use RNA genomes for viral genome library
+* scan .ffn (RNA) files for genomic data when building databases
+* updates to README file
+* handle paired-end reads with --paired option
+* provide MetaPhlAn-compatible output with kraken-mpa-report
+
 v0.10.3-beta:
 * remove Fatal.pm use in kraken-report
 * fixed false success message on make failure in installer
