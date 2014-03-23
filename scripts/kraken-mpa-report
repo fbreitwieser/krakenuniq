@@ -1,0 +1,180 @@
+#!/usr/bin/perl
+
+# Copyright 2013-2014, Derrick Wood <dwood@cs.umd.edu>
+#
+# This file is part of the Kraken taxonomic sequence classification system.
+#
+# Kraken is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Kraken is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
+
+# Reports a summary of Kraken's results, in a MetaPhlAn-like format
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long;
+
+my $PROG = basename $0;
+my $show_zeros = 0;
+my $db_prefix;
+my @RANK_CODES = qw/D K P C O F G S/;
+
+GetOptions(
+  "help" => \&display_help,
+  "version" => \&display_version,
+  "show-zeros" => \$show_zeros,
+  "db=s" => \$db_prefix,
+);
+
+if (! defined $db_prefix) {
+  die "$PROG: must specify database name\n";
+}
+
+sub display_help {
+  print STDERR "Usage: $PROG --db KRAKEN_DB_NAME [--show-zeros] <kraken output file(s)>\n";
+  exit 0;
+}
+
+sub display_version {
+  print "Kraken version #####=VERSION=#####\n";
+  print "Copyright 2013-2014, Derrick Wood (dwood\@cs.umd.edu)\n";
+  exit 0;
+}
+
+my (%child_lists, %name_map, %rank_map);
+load_taxonomy($db_prefix);
+
+my @file_data;
+my %hit_taxa;
+for my $file (@ARGV) {
+  open FILE, "<", $file
+    or die "$PROG: can't open $file: $!\n";
+  my %taxo_counts;
+  while (<FILE>) {
+    my @fields = split;
+    $taxo_counts{$fields[2]}++;
+  }
+  my %clade_counts = %taxo_counts;
+  dfs_summation(1, \%clade_counts);
+  for (keys %clade_counts) {
+    if ($clade_counts{$_}) {
+      $hit_taxa{$_}++
+    }
+  }
+  push @file_data, \%clade_counts;
+}
+
+my %output_lines;
+$output_lines{$_} = "" for @RANK_CODES;
+dfs_report(1);
+print $output_lines{$_} for @RANK_CODES;
+
+sub dfs_report {
+  my $node = shift;
+  my $name = shift;
+  if (! $show_zeros) {
+    return unless $hit_taxa{$node};
+  }
+  my $code = rank_code($node);
+  if ($code ne "-") {
+    if (defined $name) {
+      $name .= "|"
+    }
+    else {
+      $name = "";
+    }
+
+    $name .= lc($code) . "__" . sanitize_name($node);
+    my $output = $name;
+    for my $file (@file_data) {
+      $output .= "\t" . ($file->{$node} || 0);
+    }
+    $output .= "\n";
+
+    $output_lines{$code} .= $output;
+  }
+  my $children = $child_lists{$node};
+  if ($children) {
+    for my $child (@$children) {
+      dfs_report($child, $name);
+    }
+  }
+}
+
+sub sanitize_name {
+  my $node = shift;
+  my $name = $name_map{$node};
+  $name =~ tr/|][.//d;
+  $name =~ tr/ /_/;
+  return $name;
+}
+
+sub rank_code {
+  my $node = shift;
+  my $rank = $rank_map{$node};
+  for ($rank) {
+    $_ eq "species" and return "S";
+    $_ eq "genus" and return "G";
+    $_ eq "family" and return "F";
+    $_ eq "order" and return "O";
+    $_ eq "class" and return "C";
+    $_ eq "phylum" and return "P";
+    $_ eq "superkingdom" and return "D";
+    $_ eq "kingdom" and return "K";
+  }
+  return "-";
+}
+
+sub dfs_summation {
+  my $node = shift;
+  my $count_ref = shift;
+  my $children = $child_lists{$node};
+  if ($children) {
+    for my $child (@$children) {
+      dfs_summation($child, $count_ref);
+      $count_ref->{$node} += ($count_ref->{$child} || 0);
+    }
+  }
+}
+
+sub load_taxonomy {
+  my $prefix = shift;
+
+  open NAMES, "<", "$prefix/taxonomy/names.dmp"
+    or die "$PROG: can't open names file: $!\n";
+  while (<NAMES>) {
+    chomp;
+    s/\t\|$//;
+    my @fields = split /\t\|\t/;
+    my ($node_id, $name, $type) = @fields[0,1,3];
+    if ($type eq "scientific name") {
+      $name_map{$node_id} = $name;
+    }
+  }
+  close NAMES;
+
+  open NODES, "<", "$prefix/taxonomy/nodes.dmp"
+    or die "$PROG: can't open nodes file: $!\n";
+  while (<NODES>) {
+    chomp;
+    my @fields = split /\t\|\t/;
+    my ($node_id, $parent_id, $rank) = @fields[0,1,2];
+    if ($node_id == 1) {
+      $parent_id = 0;
+    }
+    $child_lists{$parent_id} ||= [];
+    push @{ $child_lists{$parent_id} }, $node_id;
+    $rank_map{$node_id} = $rank;
+  }
+  close NODES;
+}
