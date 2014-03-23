@@ -78,6 +78,12 @@ Dependencies: Kraken currently makes extensive use of Linux utilities
   Note that Kraken only supports use of Jellyfish version 1.
   Jellyfish version 2 is not yet compatible with Kraken.
 
+Network connectivity: Kraken's standard database build and download
+  commands expect unfettered FTP and rsync access to the NCBI FTP
+  server.  If you're working behind a proxy, you may need to set
+  certain environment variables (such as ftp_proxy or RSYNC_PROXY)
+  in order to get these commands to work properly.
+
 MiniKraken: To allow users with low-memory computing environments to
   use Kraken, we supply a reduced standard database that can be
   downloaded from the Kraken web site.  When Kraken is run with a
