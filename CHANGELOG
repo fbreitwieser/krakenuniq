@@ -6,10 +6,11 @@ v0.10.4-beta:
 * simplified add_to_library.sh code to speed up large additions
 * use RNA genomes for viral genome library
 * scan .ffn (RNA) files for genomic data when building databases
-* updates to README file
 * handle paired-end reads with --paired option
 * provide MetaPhlAn-compatible output with kraken-mpa-report
 * added domain/kingdom codes to kraken-report
+* added kraken-filter script for simple confidence scoring
+* updates to README file
 
 v0.10.3-beta:
 * remove Fatal.pm use in kraken-report
