@@ -19,7 +19,7 @@
 
 set -e
 
-VERSION="0.10.4-alpha"
+VERSION="0.10.4-beta"
 
 if [ -z "$1" ] || [ -n "$2" ]
 then
