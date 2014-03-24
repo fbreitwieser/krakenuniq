@@ -25,13 +25,16 @@ use File::Basename;
 use Getopt::Long;
 
 my $PROG = basename $0;
-my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+my $KRAKEN_DIR = "/scratch0/igm2/dwood/k0X4b";
 
 # Test to see if the executables got moved, try to recover if we can
 if (! -e "$KRAKEN_DIR/classify") {
   use Cwd 'abs_path';
   $KRAKEN_DIR = dirname abs_path($0);
 }
+
+$ENV{"KRAKEN_DIR"} = $KRAKEN_DIR;
+$ENV{"PATH"} = "$KRAKEN_DIR:$ENV{PATH}";
 
 my $CLASSIFY = "$KRAKEN_DIR/classify";
 my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
@@ -134,37 +137,49 @@ push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-M" if $preload;
 
 # handle piping for decompression/merging
-my $kraken_in;
+my @pipe_argv;
 if ($paired) {
   my @merge_flags;
   push @merge_flags, "--fa" if $fasta_input;
   push @merge_flags, "--fq" if $fastq_input;
   push @merge_flags, "--gz" if $gunzip;
   push @merge_flags, "--bz2" if $bunzip2;
-  open $kraken_in, "-|", "read_merger.pl", @merge_flags, @ARGV
-    or die "$PROG: can't open pipe to merger script: $!\n";
+  @pipe_argv = ("read_merger.pl", @merge_flags, @ARGV);
 }
 elsif ($compressed) {
   if ($gunzip) {
-    open $kraken_in, "-|", "gzip", "-dc", @ARGV
-      or die "$PROG: can't open pipe to gzip: $!\n";
+    @pipe_argv = ("gzip", "-dc", @ARGV);
   }
   elsif ($bunzip2) {
-    open $kraken_in, "-|", "bzip2", "-dc", @ARGV
-      or die "$PROG: can't open pipe to bzip2: $!\n";
+    @pipe_argv = ("bzip2", "-dc", @ARGV);
   }
   else {
     die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
   }
 }
 
-# $kraken_in is FH for pipe from decompression/merging
-if (defined $kraken_in) {
-  @ARGV = ("/dev/fd/0");  # make classifier read from STDIN
-  my $fd = fileno $kraken_in;
-  open STDIN, "<&$fd"
-    or die "$PROG: can't dup pipe input to classifier STDIN: $!\n";
-  close $kraken_in;
+# if args exist, set up the pipe/fork/exec 
+if (@pipe_argv) {
+  pipe RD, WR;
+  my $pid = fork();
+  if ($pid < 0) {
+    die "$PROG: fork error: $!\n";
+  }
+  if ($pid) {
+    open STDIN, "<&RD"
+      or die "$PROG: can't dup stdin to read end of pipe: $!\n";
+    close RD;
+    close WR;
+    @ARGV = ("/dev/fd/0");  # make classifier read from pipe
+  }
+  else {
+    open STDOUT, ">&WR"
+      or die "$PROG: can't dup stdout to write end of pipe: $!\n";
+    close RD;
+    close WR;
+    exec @pipe_argv
+      or die "$PROG: can't exec $pipe_argv[0]: $!\n";
+  }
 }
 
 exec $CLASSIFY, @flags, @ARGV;
@@ -207,7 +222,7 @@ sub display_help {
 }
 
 sub display_version {
-  print "Kraken version #####=VERSION=#####\n";
+  print "Kraken version 0.10.4-beta\n";
   print "Copyright 2013-2014, Derrick Wood (dwood\@cs.umd.edu)\n";
   exit 0;
 }
