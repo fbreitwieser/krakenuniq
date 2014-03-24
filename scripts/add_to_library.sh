@@ -48,12 +48,10 @@ mkdir -p "$add_dir"
 
 if (( seq_ct > 1 ))
 then
-  filename=$(mktemp --tmpdir=$add_dir XXXXXXXXXX.ffn)
-  cp "$1" "$filename"
+  filename=$(cp_into_tempfile.pl -t "XXXXXXXXXX" -d "$add_dir" -s ffn "$1")
   fasta_split.pl "$filename"
 else
-  filename=$(mktemp --tmpdir=$add_dir XXXXXXXXXX.fna)
-  cp "$1" "$filename"
+  filename=$(cp_into_tempfile.pl -t "XXXXXXXXXX" -d "$add_dir" -s fna "$1")
 fi
 
 echo "Added \"$1\" to library ($KRAKEN_DB_NAME)"
