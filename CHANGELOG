@@ -9,6 +9,7 @@ v0.10.4-beta:
 * updates to README file
 * handle paired-end reads with --paired option
 * provide MetaPhlAn-compatible output with kraken-mpa-report
+* added domain/kingdom codes to kraken-report
 
 v0.10.3-beta:
 * remove Fatal.pm use in kraken-report
