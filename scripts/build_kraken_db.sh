@@ -114,7 +114,14 @@ else
       fi
       # Key ct is 8 byte int stored 48 bytes from start of file
       key_ct=$(perl -MFcntl -le 'open F, "database.jdb"; seek F, 48, SEEK_SET; read F, $b, 8; $a = unpack("Q", $b); print $a')
-      overage=$(echo "($kdb_size - $max_kdb_size + 11) / 12" | bc)
+      # key_bits is 8 bytes from start
+      key_bits=$(perl -MFcntl -le 'open F, "database.jdb"; seek F, 8, SEEK_SET; read F, $b, 8; $a = unpack("Q", $b); print $a')
+      # this is basically ceil(key_bits / 8) - why no ceiling function, bc?
+      key_len=$(echo "($key_bits + 7) / 8" | bc)
+      # val_len is 16 bytes from start
+      val_len=$(perl -MFcntl -le 'open F, "database.jdb"; seek F, 16, SEEK_SET; read F, $b, 8; $a = unpack("Q", $b); print $a')
+      record_len=$(( key_len + val_len ))
+      overage=$(echo "($kdb_size - $max_kdb_size + $record_len - 1) / $record_len" | bc)
       percentage=$(echo "100 * ($key_ct - $overage) / $key_ct" | bc)
       echo "Using $percentage percent of original database."
       db_shrink $MEMFLAG -d database.jdb -o database.jdb.small -p $percentage
