@@ -223,7 +223,10 @@ To classify a set of sequences (reads), use the "kraken" command:
 
   kraken --db $DBNAME seqs.fa
 
-Output will be sent to standard output by default.
+Output will be sent to standard output by default.  The files
+containing the sequences to be classified should be specified
+on the command line.  Sequences can also be provided through
+standard input using the special filename "/dev/fd/0".
 
 Note that to obtain optimum speeds, Kraken's database should be
 loaded into RAM first.  This can be done through use of a ramdisk,
