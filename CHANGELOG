@@ -1,6 +1,6 @@
 v0.10.4-beta:
 * use GRCh38 for human genome library
-* enable input via stdin (/dev/fd/0)
+* enable input via stdin (via /dev/fd/0)
 * enable compressed (gzip/bzip2) input
 * enable auto-detection of fasta/fastq/gz/bz2
 * simplified add_to_library.sh code to speed up large additions
@@ -10,6 +10,8 @@ v0.10.4-beta:
 * provide MetaPhlAn-compatible output with kraken-mpa-report
 * added domain/kingdom codes to kraken-report
 * added kraken-filter script for simple confidence scoring
+* added support for multi-FASTA files in custom DBs
+* fixed build_kraken_db.sh bug for k-mers w/ k < 31
 * updates to README file
 
 v0.10.3-beta:
