@@ -18,14 +18,14 @@
 # along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
 
 # Check that jellyfish is executable and is proper version
-# Designed to be called by kraken_build
+# Designed to be called by kraken-build
 
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
 JELLYFISH_VERSION=$(jellyfish --version | awk '{print $2}')
-if [[ $JELLYFISH_VERSION =~ '^1\.' ]]
+if [[ $JELLYFISH_VERSION =~ ^1\. ]]
 then
   echo "Found jellyfish v$JELLYFISH_VERSION"
 else
