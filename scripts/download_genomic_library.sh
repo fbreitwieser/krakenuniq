@@ -86,8 +86,7 @@ case "$1" in
       done
       for fafile in $LIBRARY_DIR/H_sapiens/*/*.fa
       do
-        mv $fafile ${fafile%.fa}.fna
-        echo "Renamed $(basename $fafile)"
+        kraken-build --db "$KRAKEN_DB_NAME" --add-to-library "$fafile"
       done
       touch "$LIBRARY_DIR/H_sapiens/lib.complete"
     else
