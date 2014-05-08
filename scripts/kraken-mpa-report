@@ -26,6 +26,8 @@ use Getopt::Long;
 
 my $PROG = basename $0;
 my $show_zeros = 0;
+my $header_line = 0;
+my $intermediate = 0;
 my $db_prefix;
 my @RANK_CODES = qw/D K P C O F G S/;
 
@@ -33,6 +35,8 @@ GetOptions(
   "help" => \&display_help,
   "version" => \&display_version,
   "show-zeros" => \$show_zeros,
+  "header-line" => \$header_line,
+  "intermediate-ranks" => \$intermediate,
   "db=s" => \$db_prefix,
 );
 
@@ -40,9 +44,22 @@ if (! defined $db_prefix) {
   die "$PROG: must specify database name\n";
 }
 
+sub usage {
+  my $exit_code = @_ ? shift : 64;
+  print STDERR <<__EOF__;
+Usage: $PROG --db KRAKEN_DB_NAME [options] <kraken output file(s)>
+
+Options:
+  --show-zeros          Display taxa even if they lack a read in any sample
+  --header-line         Display a header line indicating sample IDs
+                        (sample IDs are the filenames)
+  --intermediate-ranks  Display taxa not at the standard ranks with x__ prefix
+__EOF__
+  exit $exit_code;
+}
+
 sub display_help {
-  print STDERR "Usage: $PROG --db KRAKEN_DB_NAME [--show-zeros] <kraken output file(s)>\n";
-  exit 0;
+  usage(0);
 }
 
 sub display_version {
@@ -74,8 +91,15 @@ for my $file (@ARGV) {
   push @file_data, \%clade_counts;
 }
 
+if ($intermediate) {
+  push @RANK_CODES, "X";
+}
+
 my %output_lines;
 $output_lines{$_} = "" for @RANK_CODES;
+if ($header_line) {
+  print "#Sample ID\t" . join("\t", @ARGV) . "\n";
+}
 dfs_report(1);
 print $output_lines{$_} for @RANK_CODES;
 
@@ -86,7 +110,8 @@ sub dfs_report {
     return unless $hit_taxa{$node};
   }
   my $code = rank_code($node);
-  if ($code ne "-") {
+  if ($code ne "-" || $intermediate) {
+    $code = "X" if $code eq "-";
     if (defined $name) {
       $name .= "|"
     }
