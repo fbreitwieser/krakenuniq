@@ -71,24 +71,34 @@ case "$1" in
     fi
     ;;
   "human")
-    mkdir -p $LIBRARY_DIR/H_sapiens
-    if [ ! -e "$LIBRARY_DIR/H_sapiens/lib.complete" ]
+    mkdir -p $LIBRARY_DIR/Human
+    cd $LIBRARY_DIR/Human
+    if [ ! -e "lib.complete" ]
     then
-      rsync -avz --include "H_sapiens/" --include "*/CHR_*/" --include "hs_ref_GRCh*.fa.gz" --exclude "*" \
-        $RSYNC_SERVER/genomes/H_sapiens $LIBRARY_DIR
-      for gzfile in $LIBRARY_DIR/H_sapiens/*/*.gz
+      # get list of CHR_* directories
+      wget --spider --no-remove-listing $FTP_SERVER/genomes/H_sapiens/
+      directories=$(perl -nle '/^d/ and /(CHR_\w+)\s*$/ and print $1' .listing)
+      rm .listing
+
+      # For each CHR_* directory, get GRCh* fasta gzip file name, d/l, unzip, and add
+      for directory in $directories
       do
-        dir=$(dirname $gzfile)
-        cd $dir
-        gunzip $(basename $gzfile)
-        echo "Unzipped $(basename $gzfile)"
-        cd $THIS_DIR
+        wget --spider --no-remove-listing $FTP_SERVER/genomes/H_sapiens/$directory/
+        file=$(perl -nle '/^-/ and /\b(hs_ref_GRCh\w+\.fa\.gz)\s*$/ and print $1' .listing)
+        [ -z "$file" ] && exit 1
+        rm .listing
+        wget $FTP_SERVER/genomes/H_sapiens/$directory/$file
+        gunzip "$file"
       done
-      for fafile in $LIBRARY_DIR/H_sapiens/*/*.fa
+
+      # Move back to original directory so --add-to-library adds to correct dir
+      cd -
+      for file in $LIBRARY_DIR/Human/*.fa
       do
-        kraken-build --db "$KRAKEN_DB_NAME" --add-to-library "$fafile"
+        kraken-build --db "$KRAKEN_DB_NAME" --add-to-library "$file"
       done
-      touch "$LIBRARY_DIR/H_sapiens/lib.complete"
+
+      touch "$LIBRARY_DIR/Human/lib.complete"
     else
       echo "Skipping download of human genome, already downloaded here."
     fi
