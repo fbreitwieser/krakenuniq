@@ -139,7 +139,7 @@ sub dfs_report {
 sub sanitize_name {
   my $node = shift;
   my $name = $name_map{$node};
-  $name =~ tr/|][.//d;
+  $name =~ tr/|.//d;
   $name =~ tr/ /_/;
   return $name;
 }
