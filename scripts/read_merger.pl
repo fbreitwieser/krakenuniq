@@ -148,7 +148,7 @@ close $fh2;
       die "$PROG: I have no idea what kind of input I'm reading!!!\n";
     }
 
-    $id =~ s/\/[12]$//;  # strip /1 or /2 to help comparison
+    $id =~ s/[\/_.][12]$//;  # strip /1 (or .1, _1) or /2 to help comparison
     return { id => $id, seq => $seq };
   }
 }
