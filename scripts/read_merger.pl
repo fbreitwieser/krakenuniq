@@ -42,11 +42,13 @@ GetOptions(
 if (@ARGV != 2) {
   die "$PROG: must have exactly two filename arguments\n";
 }
-if (! -f $ARGV[0]) {
-  die "$PROG: $ARGV[0] must be regular file\n";
-}
-if (! -f $ARGV[1]) {
-  die "$PROG: $ARGV[1] must be regular file\n";
+for my $file (@ARGV) {
+  if (! -e $file) {
+    die "$PROG: $file does not exist\n";
+  } 
+  if (! -f $file) {
+    die "$PROG: $file is not a regular file\n";
+  }
 }
 
 my $compressed = $gunzip || $bunzip2;
