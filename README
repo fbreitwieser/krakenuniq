@@ -177,8 +177,8 @@ have multi-threading enabled) in December 2013:
   10m50s  *Step 1 (create set)
      n/a   Step 2 (reduce database, optional and skipped)
   24m10s  *Step 3 (sort set)
-   1m28s   Step 4 (GI number to file map)
-   1m10s   Step 5 (File to taxon map)
+   1m28s   Step 4 (GI number to sequence ID map)
+   1m10s   Step 5 (Sequence ID to taxon map)
   47m08s  *Step 6 (set LCA values)
   ------
   84m47s   Total build time
