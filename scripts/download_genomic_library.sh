@@ -63,7 +63,6 @@ case "$1" in
       tar zxf all.ffn.tar.gz
       rm all.fna.tar.gz
       rm all.ffn.tar.gz
-      find . -name '*.ffn' -print0 | xargs -0 -n1 fasta_split.pl
       echo " complete."
       touch "lib.complete"
     else
@@ -91,14 +90,7 @@ case "$1" in
         gunzip "$file"
       done
 
-      # Move back to original directory so --add-to-library adds to correct dir
-      cd -
-      for file in $LIBRARY_DIR/Human/*.fa
-      do
-        kraken-build --db "$KRAKEN_DB_NAME" --add-to-library "$file"
-      done
-
-      touch "$LIBRARY_DIR/Human/lib.complete"
+      touch "lib.complete"
     else
       echo "Skipping download of human genome, already downloaded here."
     fi

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/perl
 
 # Copyright 2013-2014, Derrick Wood <dwood@cs.jhu.edu>
 #
@@ -17,33 +17,38 @@
 # You should have received a copy of the GNU General Public License
 # along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
 
-# Copy specified file into a Kraken library
+# Checks each sequence header to ensure it has a GI number to
+# enable taxonomic ID lookup later.  Also has some (very basic)
+# FASTA-format checking.
 
-set -u  # Protect against uninitialized vars.
-set -e  # Stop on error
+use strict;
+use warnings;
+use File::Basename;
 
-LIBRARY_DIR="$KRAKEN_DB_NAME/library"
+my $PROG = basename $0;
 
-if [ ! -e "$1" ]
-then
-  echo "Can't add \"$1\": file does not exist"
-  exit 1
-fi
-if [ ! -f "$1" ]
-then
-  echo "Can't add \"$1\": not a regular file"
-  exit 1
-fi
+die "$PROG: must specify one filename!\n" if @ARGV != 1;
 
-if ! verify_gi_numbers.pl "$1"
-then
-  echo "Can't add \"$1\": sequence is missing GI number"
-  exit 1
-fi
+my $filename = shift;
 
-add_dir="$LIBRARY_DIR/added"
-mkdir -p "$add_dir"
+open FASTA, "<", $filename
+  or die "$PROG: can't open $filename: $!\n";
+my $seq_ct = 0;
+my $errors = 0;
+while (<FASTA>) {
+  next unless /^>/;
+  $seq_ct++;
+  if (! /^>(\S+)/) {
+    $errors++;
+    warn "file $filename, line $. lacks sequence ID\n";
+  }
+  if ($1 !~ /(^|\|)gi\|(\d+)/) {
+    $errors++;
+    warn "file $filename, line $.: sequence ID lacks GI number\n";
+  }
+}
+close FASTA;
 
-filename=$(cp_into_tempfile.pl -t "XXXXXXXXXX" -d "$add_dir" -s fna "$1")
-
-echo "Added \"$1\" to library ($KRAKEN_DB_NAME)"
+if ($errors) {
+  exit 1;
+}

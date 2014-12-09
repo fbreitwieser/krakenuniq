@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/perl
 
 # Copyright 2013-2014, Derrick Wood <dwood@cs.jhu.edu>
 #
@@ -17,33 +17,23 @@
 # You should have received a copy of the GNU General Public License
 # along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
 
-# Copy specified file into a Kraken library
+# Reads multi-FASTA input and for each sequence ID reports a
+# tab-delimited line:
+#   <GI number> <sequence ID>
+# Assumes all sequence IDs actually have GI numbers - lack of these
+# will be problematic.
 
-set -u  # Protect against uninitialized vars.
-set -e  # Stop on error
+use strict;
+use warnings;
+use File::Basename;
 
-LIBRARY_DIR="$KRAKEN_DB_NAME/library"
+my $PROG = basename $0;
 
-if [ ! -e "$1" ]
-then
-  echo "Can't add \"$1\": file does not exist"
-  exit 1
-fi
-if [ ! -f "$1" ]
-then
-  echo "Can't add \"$1\": not a regular file"
-  exit 1
-fi
-
-if ! verify_gi_numbers.pl "$1"
-then
-  echo "Can't add \"$1\": sequence is missing GI number"
-  exit 1
-fi
-
-add_dir="$LIBRARY_DIR/added"
-mkdir -p "$add_dir"
-
-filename=$(cp_into_tempfile.pl -t "XXXXXXXXXX" -d "$add_dir" -s fna "$1")
-
-echo "Added \"$1\" to library ($KRAKEN_DB_NAME)"
+while (<>) {
+  next unless /^>(\S+)/;
+  my $seq_id = $1;
+  if ($seq_id !~ /(^|\|)gi\|(\d+)/) {
+    die "$PROG: sequence ID $seq_id lacks GI number, aborting.\n";
+  }
+  print "$2\t$seq_id\n";
+}

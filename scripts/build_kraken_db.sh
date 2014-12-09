@@ -67,11 +67,12 @@ else
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
-    KRAKEN_HASH_SIZE=$(find library/ -name '*.fna' -printf '%s\n' | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
+    KRAKEN_HASH_SIZE=$(find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -printf '%s\n' | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  find library/ -name '*.fna' -print0 | xargs -0 cat | \
+  find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
+    xargs -0 cat | \
     jellyfish count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
       -o database /dev/fd/0
 
@@ -149,31 +150,29 @@ else
   echo "K-mer set sorted. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "gi2file.map" ]
+if [ -e "gi2seqid.map" ]
 then
-  echo "Skipping step 4, GI number to file map already complete."
+  echo "Skipping step 4, GI number to seqID map already complete."
 else
-  echo "Creating GI number to file map (step 4 of 6)..."
+  echo "Creating GI number to seqID map (step 4 of 6)..."
   start_time1=$(date "+%s.%N")
-  find library/ -name '*.fna' -print0 | \
-    xargs -0 grep -m1 -H '^>' | \
-    awk -F '\\|' '{ sub(/:>gi$/, "", $1); print $2 "|" $1 }' \
-    > gi2file.map.tmp
-  mv gi2file.map.tmp gi2file.map
+  find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
+    xargs -0 cat | report_gi_numbers.pl > gi2seqid.map.tmp
+  mv gi2seqid.map.tmp gi2seqid.map
 
-  echo "GI number to file map created. [$(report_time_elapsed $start_time1)]"
+  echo "GI number to seqID map created. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "file2taxon.map" ]
+if [ -e "seqid2taxid.map" ]
 then
-  echo "Skipping step 5, file to taxon map already complete."
+  echo "Skipping step 5, seqID to taxID map already complete."
 else
-  echo "Creating file to taxon map (step 5 of 6)..."
+  echo "Creating seqID to taxID map (step 5 of 6)..."
   start_time1=$(date "+%s.%N")
-  make_file_to_taxon_map taxonomy/gi_taxid_nucl.dmp gi2file.map \
-    > file2taxon.map.tmp
-  mv file2taxon.map.tmp file2taxon.map
-  line_ct=$(wc -l file2taxon.map | awk '{print $1}')
+  make_seqid_to_taxid_map taxonomy/gi_taxid_nucl.dmp gi2seqid.map \
+    > seqid2taxid.map.tmp
+  mv seqid2taxid.map.tmp seqid2taxid.map
+  line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
   echo "$line_ct files mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
@@ -184,8 +183,10 @@ then
 else
   echo "Setting LCAs in database (step 6 of 6)..."
   start_time1=$(date "+%s.%N")
-  set_lcas $MEMFLAG -x -d database.kdb -i database.idx \
-    -n taxonomy/nodes.dmp -t $KRAKEN_THREAD_CT -f file2taxon.map
+  find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
+    xargs -0 cat | \
+    set_lcas $MEMFLAG -x -d database.kdb -i database.idx \
+    -n taxonomy/nodes.dmp -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
   touch "lca.complete"
 
   echo "Database LCAs set. [$(report_time_elapsed $start_time1)]"
