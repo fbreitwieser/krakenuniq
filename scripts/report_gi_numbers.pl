@@ -20,8 +20,13 @@
 # Reads multi-FASTA input and for each sequence ID reports a
 # tab-delimited line:
 #   <GI number> <sequence ID>
-# Assumes all sequence IDs actually have GI numbers - lack of these
-# will be problematic.
+# 
+#   or in the case of a sequence with Kraken taxid information:
+#
+#   TAXID <taxonomy ID> <sequence ID>
+#
+# Assumes all sequence IDs actually have GI numbers or Kraken
+# taxid information.
 
 use strict;
 use warnings;
@@ -32,6 +37,11 @@ my $PROG = basename $0;
 while (<>) {
   next unless /^>(\S+)/;
   my $seq_id = $1;
+  if ($seq_id =~ /(^|\|)kraken:taxid\|(\d+)/) {
+    print "TAXID\t$2\t$seq_id\n";
+    next;
+  }
+
   if ($seq_id !~ /(^|\|)gi\|(\d+)/) {
     die "$PROG: sequence ID $seq_id lacks GI number, aborting.\n";
   }

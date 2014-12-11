@@ -30,6 +30,9 @@
 using namespace std;
 using namespace kraken;
 
+#define USER_SPECIFIED_FLAG "TAXID"
+
+map<string, uint64_t> user_specified_taxids;
 map<uint64_t, set<string> > requests;
 uint64_t request_count = 0;
 
@@ -75,8 +78,15 @@ void report_taxo_numbers(char *filename) {
 
     fptr = nl_ptr + 1;
   }
-
   file.close_file();
+
+  // Same as before - just doing the user specified sequences now
+  // Output line format: <sequence ID><tab><taxon ID>
+  map<string, uint64_t>::iterator mit = user_specified_taxids.begin();
+  while (mit != user_specified_taxids.end()) {
+    cout << mit->first << "\t" << mit->second << endl;
+    mit++;
+  }
 }
 
 void fill_request_map(char *filename) {
@@ -87,12 +97,22 @@ void fill_request_map(char *filename) {
   size_t file_size = file.size();
 
   // Line format: <gi num><tab><sequence ID>
+  // OR: TAXID<tab><taxonomy ID><tab><sequence ID>        (user spec'ed)
   while ((size_t)(fptr - fptr_start) < file_size) {
     char *nl_ptr = strchr(fptr, '\n');
     char *sep_ptr = strchr(fptr, '\t');
-    uint64_t gi = atoll(fptr);
-    requests[gi].insert(string(sep_ptr + 1, nl_ptr - sep_ptr - 1));
-    request_count++;
+    if (strncmp(fptr, USER_SPECIFIED_FLAG, strlen(USER_SPECIFIED_FLAG)) == 0) {
+      char *sep_ptr = strchr(fptr, '\t');
+      uint64_t taxid = atoll(sep_ptr + 1);
+      sep_ptr = strchr(sep_ptr + 1, '\t');
+      string seqid(sep_ptr + 1, nl_ptr - sep_ptr - 1);
+      user_specified_taxids[seqid] = taxid;
+    }
+    else {
+      uint64_t gi = atoll(fptr);
+      requests[gi].insert(string(sep_ptr + 1, nl_ptr - sep_ptr - 1));
+      request_count++;
+    }
     fptr = nl_ptr + 1;
   }
 
