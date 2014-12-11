@@ -174,7 +174,7 @@ else
   mv seqid2taxid.map.tmp seqid2taxid.map
   line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
-  echo "$line_ct files mapped to taxa. [$(report_time_elapsed $start_time1)]"
+  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
 if [ -e "lca.complete" ]
