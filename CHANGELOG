@@ -2,6 +2,8 @@ v0.10.5-beta:
 * fix bug in GRCh38 download to handle multi-fasta files
 * add --header-line and --intermediate-ranks options to kraken-mpa-report
 * improved support for adding multi-FASTA files with --add-to-library
+* allow assigning taxon IDs in reference sequences w/o GI numbers
+  using "kraken:taxid" code
 
 v0.10.4-beta:
 * use GRCh38 for human genome library

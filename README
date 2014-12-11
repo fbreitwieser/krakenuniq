@@ -332,15 +332,24 @@ To build a custom database:
 
      Other genomes can also be added, but such genomes must meet certain
      requirements:
-     - Each sequence must be in a FASTA file
-     - Each sequence's FASTA header must contain a GI number,
-       to allow Kraken to lookup the correct taxa.
+     - Sequences must be in a FASTA file (multi-FASTA is allowed)
+     - Each sequence's ID (the string between the '>' and the first
+       whitespace character on the header line) must contain either
+       a GI number to allow Kraken to lookup the correct taxa, or an
+       explicit assignment of the taxonomy ID using "kraken:taxid" (see below).
 
-     In practice, this means replicons must be downloaded from NCBI.
-     Replicons without assigned GI numbers will require modifying the
-     replicons' FASTA files (to assign a "fake" GI number) and then
-     modifying the $DBNAME/taxonomy/gi_taxid_nucl.dmp file to provide
-     your desired taxonomy information.
+     Replicons not downloaded from NCBI may need their taxonomy information
+     assigned explicitly.  This can be done using the string "kraken:taxid|XXX"
+     in the sequence ID, with "XXX" replaced by the desired taxon ID.  For
+     example, to put a known adapter sequence in taxon 32630 ("synthetic
+     construct"), you could use the following:
+
+       >sequence16|kraken:taxid|32630  Adapter sequence
+       CAAGCAGAAGACGGCATACGAGATCTTCGAGTGACTGGAGTTCCTTGGCACCCGAGAATTCCA
+
+     The "kraken:taxid" string must begin the sequence ID or be immediately
+     preceded by a pipe character ('|').  Explicit assignment of taxonomy IDs
+     in this manner will override the GI number mapping provided by NCBI.
 
      If your genomes meet the requirements above, then you can add each
      replicon to your database's genomic library using the "--add-to-library"
@@ -361,6 +370,9 @@ To build a custom database:
 
        find genomes/ -name '*.fa' -print0 | \
          xargs -0 -I{} -n1 kraken-build --add-to-library {} --db $DBNAME
+
+     (You may also find the -P option to xargs useful to add many files in
+     parallel if you have multiple processors.)
 
   3) Once your library is finalized, you need to build the database.
      Depending on your size requirements, you may want to adjust the
