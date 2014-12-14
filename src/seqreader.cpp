@@ -53,7 +53,8 @@ namespace kraken {
       valid = false;
       return dna;
     }
-    istringstream seq_id(line.substr(1));
+    dna.header_line = line.substr(1);
+    istringstream seq_id(dna.header_line);
     seq_id >> dna.id;
     
     ostringstream seq_ss;
@@ -111,7 +112,8 @@ namespace kraken {
       valid = false;
       return dna;
     }
-    istringstream line_ss(line.substr(1));
+    dna.header_line = line.substr(1);
+    istringstream line_ss(dna.header_line);
     
     line_ss >> dna.id;
     getline(file, dna.seq);

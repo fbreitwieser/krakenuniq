@@ -25,6 +25,7 @@
 namespace kraken {
   typedef struct {
     std::string id;
+    std::string header_line;  // id + optional description
     std::string seq;
     std::string quals;
   } DNASequence;

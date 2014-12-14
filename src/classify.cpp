@@ -254,13 +254,13 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
     bool print = call ? Print_classified : Print_unclassified;
     if (print) {
       if (Fastq_input) {
-        (*oss_ptr) << "@" << dna.id << endl
+        (*oss_ptr) << "@" << dna.header_line << endl
             << dna.seq << endl
             << "+" << endl
             << dna.quals << endl;
       }
       else {
-        (*oss_ptr) << ">" << dna.id << endl
+        (*oss_ptr) << ">" << dna.header_line << endl
             << dna.seq << endl;
       }
     }
