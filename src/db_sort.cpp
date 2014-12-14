@@ -29,10 +29,13 @@ uint8_t Bin_key_nt = 15;
 int Num_threads = 1;
 bool Zero_vals = false;
 bool Operate_in_RAM = false;
+// Global until I can find a way to pass this to the sorting function
+size_t Key_len = 8;
 #ifdef _OPENMP
 omp_lock_t *Locks;
 #endif
 
+static int pair_cmp(const void *a, const void *b);
 static void parse_command_line(int argc, char **argv);
 static void bin_and_sort_data(KrakenDB &in, KrakenDB &out);
 static void usage(int exit_code=EX_USAGE);
@@ -46,6 +49,7 @@ int main(int argc, char **argv) {
 
   QuickFile input_db_file(Input_DB_filename);
   KrakenDB input_db(input_db_file.ptr());
+  Key_len = input_db.get_key_len();
 
   input_db.make_index(Index_filename, Bin_key_nt);
   QuickFile index_file(Index_filename);
@@ -100,7 +104,9 @@ static void bin_and_sort_data(KrakenDB &in, KrakenDB &out) {
   vector<uint64_t> pos(offsets, offsets + entries);
   #pragma omp parallel for schedule(dynamic,400)
   for (uint64_t i = 0; i < in.get_key_ct(); i++) {
-    uint64_t bin_key = in.bin_key(* (uint64_t *)(in_ptr + i * in.pair_size()));
+    uint64_t kmer = 0;
+    memcpy(&kmer, in_ptr + i * in.pair_size(), Key_len);
+    uint64_t bin_key = in.bin_key(kmer);
     #ifdef _OPENMP
     omp_set_lock(&Locks[bin_key]);
     #endif
@@ -128,8 +134,20 @@ static void bin_and_sort_data(KrakenDB &in, KrakenDB &out) {
   for (uint64_t i = 0; i < entries; i++) {
     qsort(out_ptr + offsets[i] * out.pair_size(),
           offsets[i+1] - offsets[i], out.pair_size(),
-          KrakenDB::pair_cmp);
+          pair_cmp);
   }
+}
+
+static int pair_cmp(const void *a, const void *b) {
+  uint64_t aval = 0, bval = 0;
+  memcpy(&aval, a, Key_len);
+  memcpy(&bval, b, Key_len);
+  if (aval < bval)
+    return -1;
+  else if (aval == bval)
+    return 0;
+  else
+    return 1;
 }
 
 void parse_command_line(int argc, char **argv) {

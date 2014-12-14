@@ -42,8 +42,6 @@ namespace kraken {
 
   class KrakenDB {
     public:
-    // Compares key/value pairs in DB, - => a<b, 0 => a=b, + => a>b
-    static int pair_cmp(const void *a, const void *b);
 
     char *get_ptr();            // Return the file pointer
     char *get_pair_ptr();       // Return pointer to start of pairs

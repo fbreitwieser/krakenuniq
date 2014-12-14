@@ -76,7 +76,9 @@ void KrakenDB::make_index(string index_filename, uint8_t nt) {
   char *ptr = get_pair_ptr();
   #pragma omp parallel for schedule(dynamic,400)
   for (uint64_t i = 0; i < key_ct; i++) {
-    uint64_t b_key = bin_key(* (uint64_t *) (ptr + i * pair_size()), nt);
+    uint64_t kmer = 0;
+    memcpy(&kmer, ptr + i * pair_size(), key_len);
+    uint64_t b_key = bin_key(kmer, nt);
     #pragma omp atomic
     bin_counts[b_key]++;
   }
@@ -113,15 +115,6 @@ KrakenDBIndex *KrakenDB::get_index() {
 // Associates the index with this database
 void KrakenDB::set_index(KrakenDBIndex *i_ptr) {
   index_ptr = i_ptr;
-}
-
-// Used for sorting pairs within a bin
-// Compares k-mers at a and b by simple numeric (as well as lexico.) value
-int KrakenDB::pair_cmp(const void *a, const void *b) {
-  return * ((uint64_t *) a) < * ((uint64_t *) b) 
-         ? -1
-         : * ((uint64_t *) a) > * ((uint64_t *) b) 
-           ? 1 : 0;
 }
 
 // Simple accessors/convenience methods
@@ -236,7 +229,8 @@ uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
   // Binary search with large window
   while (min + 15 <= max) {
     mid = min + (max - min) / 2;
-    comp_kmer = * (uint64_t *) (ptr + pair_sz * mid);
+    comp_kmer = 0;
+    memcpy(&comp_kmer, ptr + pair_sz * mid, key_len);
     comp_kmer &= (1ull << key_bits) - 1;  // trim any excess
     if (kmer > comp_kmer)
       min = mid + 1;
@@ -247,7 +241,8 @@ uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
   }
   // Linear search once window shrinks
   for (mid = min; mid <= max; mid++) {
-    comp_kmer = * (uint64_t *) (ptr + pair_sz * mid);
+    comp_kmer = 0;
+    memcpy(&comp_kmer, ptr + pair_sz * mid, key_len);
     comp_kmer &= (1ull << key_bits) - 1;  // trim any excess
     if (kmer == comp_kmer)
       return (uint32_t *) (ptr + pair_sz * mid + key_len);
