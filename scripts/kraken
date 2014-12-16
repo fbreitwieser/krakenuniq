@@ -26,6 +26,8 @@ use Getopt::Long;
 
 my $PROG = basename $0;
 my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+my @KRAKEN_DB_PATH = (".");
+my $DEBUG = 0;  # NOT currently useful, sorry
 
 # Test to see if the executables got moved, try to recover if we can
 if (! -e "$KRAKEN_DIR/classify") {
@@ -72,13 +74,42 @@ GetOptions(
   "bzip2-compressed" => \$bunzip2
 );
 
-if (! defined $db_prefix) {
-  die "$PROG: must specify database name with --db\n";
-}
-
 if (! @ARGV) {
   print STDERR "Need to specify input filenames!\n";
   usage();
+}
+
+if (exists $ENV{"KRAKEN_DB_PATH"}) {
+  @KRAKEN_DB_PATH = split /:/, $ENV{"KRAKEN_DB_PATH"};
+}
+if (! defined $db_prefix) {
+  if (! defined $ENV{"KRAKEN_DEFAULT_DB"}) {
+    die "$PROG: must specify database name with --db or in \$KRAKEN_DEFAULT_DB\n";
+  }
+  else {
+    $db_prefix = $ENV{"KRAKEN_DEFAULT_DB"};
+  }
+}
+my $actual_db_prefix;
+if ($db_prefix =~ /^\//) {
+  $actual_db_prefix = $db_prefix;
+}
+else {
+  for my $dir (@KRAKEN_DB_PATH) {
+    if (-e "$dir/$db_prefix" && -d _ ) {
+      $actual_db_prefix = "$dir/$db_prefix";
+      last;
+    }
+  }
+}
+if (! defined $actual_db_prefix) {
+  die "$PROG: can't locate $db_prefix directory in \$KRAKEN_DB_PATH (@{[join(':', @KRAKEN_DB_PATH)]})\n";
+}
+else {
+  if ($DEBUG) {
+    print STDERR "$PROG: using DB $actual_db_prefix\n";
+  }
+  $db_prefix = $actual_db_prefix;
 }
 
 my $taxonomy = "$db_prefix/taxonomy/nodes.dmp";
