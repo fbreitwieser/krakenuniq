@@ -200,8 +200,7 @@ Task options (exactly one must be selected):
                              (requires taxonomy d/l'ed and at least one file
                              in library)
   --clean                    Remove unneeded files from a built database
-  --shrink PCT               Shrink an existing DB to PCT % of its original
-                             size.
+  --shrink NEW_CT            Shrink an existing DB to have only NEW_CT k-mers
   --standard                 Download and create default database
   --upgrade                  Upgrade an existing older database to use scrambled
                              minimizer ordering (see README for details)
@@ -258,17 +257,14 @@ sub add_to_library {
 }
 
 sub shrink_db {
-  my $percentage = shift;
-  if ($percentage <= 0) {
-    die "Can't use shrink percentage of $percentage (must be > 0)\n";
-  }
-  if ($percentage >= 100) {
-    die "Can't use shrink percentage of $percentage (must be < 100)\n";
+  my $new_count = shift;
+  if ($new_count <= 0) {
+    die "New DB must have at least 1 k-mer\n";
   }
   if (! defined($new_db)) {
     die "Must specify new database name to perform shrink task\n";
   }
-  exec "shrink_db.sh", $percentage, $new_db;
+  exec "shrink_db.sh", $new_count, $new_db;
 }
 
 sub standard_installation {

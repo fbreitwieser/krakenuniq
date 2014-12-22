@@ -24,7 +24,7 @@ set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
-percentage="$1"
+new_ct="$1"
 new_db="$2"
 
 OLD_DB_DIR="$KRAKEN_DB_NAME"
@@ -40,7 +40,7 @@ fi
 
 cp "$OLD_DB_DIR/taxonomy/nodes.dmp" "$NEW_DB_DIR/taxonomy"
 cp "$OLD_DB_DIR/taxonomy/names.dmp" "$NEW_DB_DIR/taxonomy"
-db_shrink -p $percentage -d "$OLD_DB_DIR/database.kdb" \
+db_shrink -n $new_ct -d "$OLD_DB_DIR/database.kdb" \
   -o "$NEW_DB_DIR/database.jdb.tmp"
 mv "$NEW_DB_DIR/database.jdb.tmp" "$NEW_DB_DIR/database.jdb"
 echo "Reduced database created, now sorting..."
