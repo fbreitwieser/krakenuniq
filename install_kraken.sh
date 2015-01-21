@@ -38,17 +38,19 @@ fi
 # on OS X.
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
-(cd src && make)
 mkdir -p "$KRAKEN_DIR"
+make -C src install
 for file in scripts/*
 do
   perl -pl -e 'BEGIN { while (@ARGV) { $_ = shift; ($k,$v) = split /=/, $_, 2; $H{$k} = $v } }'\
            -e 's/#####=(\w+)=#####/$H{$1}/g' \
            "KRAKEN_DIR=$KRAKEN_DIR" "VERSION=$VERSION" \
            < "$file" > "$KRAKEN_DIR/$(basename $file)"
+  if [ -x "$file" ]
+  then
+    chmod +x "$KRAKEN_DIR/$(basename $file)"
+  fi
 done
-make -C src install
-chmod -R +x "$KRAKEN_DIR"
 
 echo
 echo "Kraken installation complete."
