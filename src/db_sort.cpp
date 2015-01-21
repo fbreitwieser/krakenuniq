@@ -31,13 +31,10 @@ bool Zero_vals = false;
 bool Operate_in_RAM = false;
 // Global until I can find a way to pass this to the sorting function
 size_t Key_len = 8;
-#ifdef _OPENMP
-omp_lock_t *Locks;
-#endif
 
 static int pair_cmp(const void *a, const void *b);
 static void parse_command_line(int argc, char **argv);
-static void bin_and_sort_data(KrakenDB &in, KrakenDB &out);
+static void bin_and_sort_data(KrakenDB &kdb, char *data, KrakenDBIndex &idx);
 static void usage(int exit_code=EX_USAGE);
 
 int main(int argc, char **argv) {
@@ -48,92 +45,67 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
   QuickFile input_db_file(Input_DB_filename);
-  KrakenDB input_db(input_db_file.ptr());
-  Key_len = input_db.get_key_len();
-
-  input_db.make_index(Index_filename, Bin_key_nt);
+  KrakenDB *input_db = new KrakenDB(input_db_file.ptr());
+  Key_len = input_db->get_key_len();
+  uint64_t val_len = input_db->get_val_len();
+  uint64_t key_ct = input_db->get_key_ct();
+  input_db->make_index(Index_filename, Bin_key_nt);
   QuickFile index_file(Index_filename);
   KrakenDBIndex db_index(index_file.ptr());
-  input_db.set_index(&db_index);
 
-  // Copy header from input DB to output DB, reopen output DB in R/W
-  // open/reopen necessary due to "feature" of QuickFile/KrakenDB code
-  //   (could be skipped if we didn't want to use KrakenDB features in basd()
-  QuickFile output_file;
-  char *temp_file;
-  if (Operate_in_RAM) {
-    temp_file = new char[ input_db_file.size() ];
-  }
-  else {
-    output_file.open_file(Output_DB_filename, "w", input_db_file.size());
-    temp_file = output_file.ptr();
-  }
-  memcpy(temp_file, input_db_file.ptr(), input_db.header_size());
-  if (! Operate_in_RAM) {
-    output_file.close_file();
-    output_file.open_file(Output_DB_filename, "rw");
-    temp_file = output_file.ptr();
-  }
-  KrakenDB output_db(temp_file);
+  uint64_t skip_len = input_db->header_size();
+  char *header = new char[ skip_len ];
+  memcpy(header, input_db_file.ptr(), skip_len);
 
-  bin_and_sort_data(input_db, output_db);
+  delete input_db;
+  // No longer legit for traversal, but allows access to KDB functions
+  input_db = new KrakenDB(header);
+  input_db_file.close_file();  // Stop using memory-mapped file
+
+  char *data = new char[ key_ct * (Key_len + val_len) ];
+  // Populate data w/ pairs from DB and sort bins in parallel
+  bin_and_sort_data(*input_db, data, db_index);
+
+  ofstream output_file(Output_DB_filename.c_str(), std::ofstream::binary);
+  output_file.write(header, skip_len);
+  output_file.write(data, key_ct * (Key_len + val_len));
+  output_file.close();
   
-  if (Operate_in_RAM) {
-    size_t filesize = input_db_file.size();
-    input_db_file.close_file();
-    output_file.open_file(Output_DB_filename, "w", filesize);
-    memcpy(output_file.ptr(), temp_file, filesize);
-  }
   return 0;
 }
 
-static void bin_and_sort_data(KrakenDB &in, KrakenDB &out) {
-  char *in_ptr = in.get_pair_ptr();
-  char *out_ptr = out.get_pair_ptr();
-  uint8_t nt = in.get_index()->indexed_nt();
-  uint64_t *offsets = in.get_index()->get_array();
+static void bin_and_sort_data(KrakenDB &kdb, char *data, KrakenDBIndex &idx) {
+  uint8_t nt = idx.indexed_nt();
+  uint64_t *offsets = idx.get_array();
   uint64_t entries = 1ull << (nt * 2);
+  uint64_t key_len = kdb.get_key_len();
+  uint64_t val_len = kdb.get_val_len();
+  uint64_t pair_size = key_len + val_len;
+  char pair[pair_size];
 
-  #ifdef _OPENMP
-  Locks = new omp_lock_t[entries];
-  for (uint64_t i = 0; i < entries; i++)
-    omp_init_lock(&Locks[i]);
-  #endif
+  ifstream input_file(Input_DB_filename.c_str(), std::ifstream::binary);
+  input_file.seekg(kdb.header_size(), ios_base::beg);
 
   // Create a copy of the offsets array for use as insertion positions
   vector<uint64_t> pos(offsets, offsets + entries);
-  #pragma omp parallel for schedule(dynamic,400)
-  for (uint64_t i = 0; i < in.get_key_ct(); i++) {
+  for (uint64_t i = 0; i < kdb.get_key_ct(); i++) {
+    input_file.read(pair, pair_size);
     uint64_t kmer = 0;
-    memcpy(&kmer, in_ptr + i * in.pair_size(), Key_len);
-    uint64_t bin_key = in.bin_key(kmer);
-    #ifdef _OPENMP
-    omp_set_lock(&Locks[bin_key]);
-    #endif
-    #pragma omp flush(pos)
-    char *pair_pos = out_ptr + in.pair_size() * pos[bin_key];
+    memcpy(&kmer, pair, key_len);
+    uint64_t b_key = kdb.bin_key(kmer, nt);
+    char *pair_pos = data + pair_size * pos[b_key]++;
     // Copy pair into correct bin (but not final position)
-    memcpy(pair_pos, in_ptr + i * in.pair_size(), in.pair_size());
+    memcpy(pair_pos, pair, pair_size);
     if (Zero_vals)
-      memset(pair_pos + in.get_key_len(), 0, in.get_val_len());
-    #pragma omp flush(pos)
-    pos[bin_key]++;
-    #ifdef _OPENMP
-    omp_unset_lock(&Locks[bin_key]);
-    #endif
+      memset(pair_pos + key_len, 0, val_len);
   }
-
-  #ifdef _OPENMP
-  for (uint64_t i = 0; i < entries; i++)
-    omp_destroy_lock(&Locks[i]);
-  delete Locks;
-  #endif
+  input_file.close();
 
   // Sort all bins
   #pragma omp parallel for schedule(dynamic)
   for (uint64_t i = 0; i < entries; i++) {
-    qsort(out_ptr + offsets[i] * out.pair_size(),
-          offsets[i+1] - offsets[i], out.pair_size(),
+    qsort(data + offsets[i] * pair_size,
+          offsets[i+1] - offsets[i], pair_size,
           pair_cmp);
   }
 }

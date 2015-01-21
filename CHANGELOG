@@ -4,6 +4,9 @@ v0.10.5-beta:
 * improved support for adding multi-FASTA files with --add-to-library
 * allow assigning taxon IDs in reference sequences w/o GI numbers
   using "kraken:taxid" code
+* Included full sequence descriptions when using "--[un]classified-out"
+* Reduced memory usage of db_shrink (Build step 2 / kraken-build --shrink)
+* Reduced memory usage of db_sort (Build step 3)
 
 v0.10.4-beta:
 * use GRCh38 for human genome library
