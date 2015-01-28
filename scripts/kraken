@@ -46,7 +46,7 @@ my $min_hits = 1;
 my $fasta_input = 0;
 my $fastq_input = 0;
 my $db_prefix;
-my $threads = 1;
+my $threads;
 my $preload = 0;
 my $gunzip = 0;
 my $bunzip2 = 0;
@@ -72,6 +72,10 @@ GetOptions(
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2
 );
+
+if (! defined $threads) {
+  $threads = $ENV{"KRAKEN_NUM_THREADS"} || 1;
+}
 
 if (! @ARGV) {
   print STDERR "Need to specify input filenames!\n";
