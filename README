@@ -601,6 +601,72 @@ in sensitivity that must be taken into account when deciding on the
 threshold to use for your own project.
 
 
+DATABASE ENVIRONMENT VARIABLES
+==============================
+
+The Kraken programs (with the exception of kraken-build) support the
+use of two environment variables to help in reducing command line
+lengths:
+
+  - KRAKEN_DB_PATH: much like the PATH variable is used for executables
+    by your shell, KRAKEN_DB_PATH is a colon-separated list of directories
+    that will be searched for the database you name if the named database
+    does not have a slash ('/') character.  By default, Kraken assumes the
+    value of this variable is "." (i.e., the current working directory).
+    This variable can be used to create one (or more) central repositories
+    of Kraken databases in a multi-user system.  Example usage in bash:
+
+      export KRAKEN_DB_PATH="/home/user/my_kraken_dbs:/data/kraken_dbs:"
+
+    This will cause three directories to be searched, in this order:
+
+      1) /home/user/my_kraken_dbs
+      2) /data/kraken_dbs
+      3) the current working directory (caused by the empty string as
+         the third colon-separated field in the KRAKEN_DB_PATH string)
+
+    The search for a database will stop when a name match is found; if
+    two directories in the KRAKEN_DB_PATH have databases with the same
+    name, the directory of the two that is searched first will have its
+    database selected.
+
+    If the above variable and value are used, and the databases
+    /data/kraken_dbs/mainDB and ./mainDB are present, then
+
+      kraken --db mainDB sequences.fa
+
+    will classify sequences.fa using /data/kraken_dbs/mainDB; if instead
+    you wanted to use the "mainDB" present in the current directory,
+    you would need to specify a directory path to that database in order
+    to circumvent searching, e.g.:
+
+      kraken --db ./mainDB sequences.fa
+
+    Note that the KRAKEN_DB_PATH directory list can be skipped by the use
+    of any absolute (beginning with '/') or relative pathname (including
+    at least one '/') as the database name.
+
+  - KRAKEN_DEFAULT_DB: if no database is supplied with the --db option,
+    the database named in this variable will be used instead.  Using this
+    variable, you can avoid using --db if you only have a single database
+    that you usually use, e.g. in bash:
+
+      export KRAKEN_DEFAULT_DB="/home/user/krakendb"
+      kraken sequences.fa | kraken-report > sequences.kreport
+
+    This will classify sequences.fa using the /home/user/krakendb directory.
+
+    Note that the value of KRAKEN_DEFAULT_DB will also be interpreted in
+    the context of the value of KRAKEN_DB_PATH if you don't set
+    KRAKEN_DEFAULT_DB to an absolute or relative pathname.  Given the earlier
+    example in this section, the following:
+
+      export KRAKEN_DEFAULT_DB="mainDB"
+      kraken sequences.fa
+
+    will use /data/kraken_dbs/mainDB to classify sequences.fa.
+
+
 UPGRADING DATABASES TO v0.10+
 =============================
 

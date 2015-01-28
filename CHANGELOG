@@ -7,6 +7,7 @@ v0.10.5-beta:
 * Included full sequence descriptions when using "--[un]classified-out"
 * Reduced memory usage of db_shrink (Build step 2 / kraken-build --shrink)
 * Reduced memory usage of db_sort (Build step 3)
+* Support added for KRAKEN_DB_PATH and KRAKEN_DEFAULT_DB env. variables
 
 v0.10.4-beta:
 * use GRCh38 for human genome library

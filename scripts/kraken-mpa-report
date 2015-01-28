@@ -25,6 +25,16 @@ use File::Basename;
 use Getopt::Long;
 
 my $PROG = basename $0;
+my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+
+# Test to see if the executables got moved, try to recover if we can
+if (! -e "$KRAKEN_DIR/classify") {
+  use Cwd 'abs_path';
+  $KRAKEN_DIR = dirname abs_path($0);
+}
+
+require "$KRAKEN_DIR/krakenlib.pm";
+
 my $show_zeros = 0;
 my $header_line = 0;
 my $intermediate = 0;
@@ -40,14 +50,15 @@ GetOptions(
   "db=s" => \$db_prefix,
 );
 
-if (! defined $db_prefix) {
-  die "$PROG: must specify database name\n";
+eval { $db_prefix = krakenlib::find_db($db_prefix); };
+if ($@) {
+  die "$PROG: $@";
 }
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
   print STDERR <<__EOF__;
-Usage: $PROG --db KRAKEN_DB_NAME [options] <kraken output file(s)>
+Usage: $PROG [--db KRAKEN_DB_NAME] [options] <kraken output file(s)>
 
 Options:
   --show-zeros          Display taxa even if they lack a read in any sample

@@ -25,8 +25,18 @@ use File::Basename;
 use Getopt::Long;
 
 my $PROG = basename $0;
+my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+
+# Test to see if the executables got moved, try to recover if we can
+if (! -e "$KRAKEN_DIR/classify") {
+  use Cwd 'abs_path';
+  $KRAKEN_DIR = dirname abs_path($0);
+}
+
+require "$KRAKEN_DIR/krakenlib.pm";
+
 my $show_zeros = 0;
-my $db_prefix = "";
+my $db_prefix;
 
 GetOptions(
   "help" => \&display_help,
@@ -35,8 +45,13 @@ GetOptions(
   "db=s" => \$db_prefix,
 );
 
+eval { $db_prefix = krakenlib::find_db($db_prefix); };
+if ($@) {
+  die "$PROG: $@";
+}
+
 sub display_help {
-  print STDERR "Usage: $PROG --db KRAKEN_DB_NAME [--show-zeros] <kraken output file(s)>\n";
+  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] [--show-zeros] <kraken output file(s)>\n";
   exit 0;
 }
 
