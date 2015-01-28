@@ -1,0 +1,147 @@
+#!/usr/bin/perl
+
+# Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
+#
+# This file is part of the Kraken taxonomic sequence classification system.
+#
+# Kraken is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Kraken is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
+
+# For each classified read, prints sequence ID and full taxonomy
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long;
+
+my $PROG = basename $0;
+my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+
+# Test to see if the executables got moved, try to recover if we can
+if (! -e "$KRAKEN_DIR/classify") {
+  use Cwd 'abs_path';
+  $KRAKEN_DIR = dirname abs_path($0);
+}
+
+require "$KRAKEN_DIR/krakenlib.pm";
+
+my $db_prefix;
+my $mpa_format = 0;
+
+GetOptions(
+  "help" => \&display_help,
+  "version" => \&display_version,
+  "db=s" => \$db_prefix,
+  "mpa-format" => \$mpa_format
+);
+
+eval { $db_prefix = krakenlib::find_db($db_prefix); };
+if ($@) {
+  die "$PROG: $@";
+}
+
+sub display_help {
+  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] <kraken output file(s)>\n";
+  exit 0;
+}
+
+sub display_version {
+  print "Kraken version #####=VERSION=#####\n";
+  print "Copyright 2013-2015, Derrick Wood (dwood\@cs.jhu.edu)\n";
+  exit 0;
+}
+
+my (%parent_map, %name_map, %rank_map);
+load_taxonomy($db_prefix);
+my %known_taxonomy_strings;
+
+while (<>) {
+  next unless /^C/;
+  chomp;
+  my @fields = split;
+  my ($seqid, $taxid) = @fields[1,2];
+  my $taxonomy_str = get_taxonomy_str($taxid);
+  print "$seqid\t$taxonomy_str\n";
+}
+
+sub get_taxonomy_str {
+  my $taxid = shift;
+  if (! exists $known_taxonomy_strings{$taxid}) {
+    my @nodes;
+    while ($taxid > 0) {
+      if ($mpa_format) {
+        my $rank_code = rank_code($rank_map{$taxid});
+        my $name = $name_map{$taxid};
+        $name =~ tr/ /_/;
+        unshift @nodes, lc($rank_code) . "__" . $name if $rank_code ne "-";
+      }
+      else {
+        unshift @nodes, $name_map{$taxid};
+      }
+      $taxid = $parent_map{$taxid};
+    }
+    if ($mpa_format) {
+      $known_taxonomy_strings{$taxid} = @nodes ? join("|", @nodes) : "root";
+    }
+    else {
+      $known_taxonomy_strings{$taxid} = join(";", @nodes);
+    }
+  }
+  return $known_taxonomy_strings{$taxid};
+}
+
+sub rank_code {
+  my $rank = shift;
+  for ($rank) {
+    $_ eq "species" and return "S";
+    $_ eq "genus" and return "G";
+    $_ eq "family" and return "F";
+    $_ eq "order" and return "O";
+    $_ eq "class" and return "C";
+    $_ eq "phylum" and return "P";
+    $_ eq "kingdom" and return "K";
+    $_ eq "superkingdom" and return "D";
+  }
+  return "-";
+}
+
+sub load_taxonomy {
+  my $prefix = shift;
+
+  open NAMES, "<", "$prefix/taxonomy/names.dmp"
+    or die "$PROG: can't open names file: $!\n";
+  while (<NAMES>) {
+    chomp;
+    s/\t\|$//;
+    my @fields = split /\t\|\t/;
+    my ($node_id, $name, $type) = @fields[0,1,3];
+    if ($type eq "scientific name") {
+      $name_map{$node_id} = $name;
+    }
+  }
+  close NAMES;
+
+  open NODES, "<", "$prefix/taxonomy/nodes.dmp"
+    or die "$PROG: can't open nodes file: $!\n";
+  while (<NODES>) {
+    chomp;
+    my @fields = split /\t\|\t/;
+    my ($node_id, $parent_id, $rank) = @fields[0,1,2];
+    if ($node_id == 1) {
+      $parent_id = 0;
+    }
+    $parent_map{$node_id} = $parent_id;
+    $rank_map{$node_id} = $rank;
+  }
+  close NODES;
+}
