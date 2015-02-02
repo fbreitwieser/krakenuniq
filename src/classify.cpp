@@ -201,6 +201,11 @@ void process_file(char *filename) {
   delete reader;
 }
 
+typedef struct {
+  uint64_t minimizer;
+  uint64_t pos;
+} minimizer_pos_pair_t;
+
 void classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss) {
   vector<uint32_t> taxa;
@@ -210,9 +215,13 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   uint32_t taxon = 0;
   uint32_t hits = 0;  // only maintained if in quick mode
 
-  uint64_t current_bin_key;
-  int64_t current_min_pos = 1;
-  int64_t current_max_pos = 0;
+  // Fields in support of sliding window min. calculation of minimizers (bin keys)
+  uint8_t minimizer_len = Database.get_index()->indexed_nt();
+  uint64_t minimizer_mask = (1u << (minimizer_len * 2)) - 1;
+  deque<minimizer_pos_pair_t> minimizer_queue;
+  uint64_t candidate_pos = 0;  // position in sequence since start/last ambig. nucl.
+  uint8_t k = KmerScanner::get_k();
+  uint64_t xor_mask = Database.get_xor_mask() & minimizer_mask;
 
   if (dna.seq.size() >= Database.get_k()) {
     KmerScanner scanner(dna.seq);
@@ -220,13 +229,39 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
       taxon = 0;
       if (scanner.ambig_kmer()) {
         ambig_list.push_back(1);
+        minimizer_queue.clear();
       }
       else {
         ambig_list.push_back(0);
+        if (minimizer_queue.empty()) {
+          candidate_pos = 0;
+          while (candidate_pos < k - minimizer_len + 1u) {
+            uint64_t candidate = Database.canonical_representation( 
+              ((*kmer_ptr) >> (2 * (k - minimizer_len - candidate_pos))) & minimizer_mask, minimizer_len
+            ) ^ xor_mask;
+            while (! minimizer_queue.empty() && minimizer_queue.back().minimizer > candidate) {
+              minimizer_queue.pop_back();
+            }
+            minimizer_pos_pair_t data = { candidate, candidate_pos++ };
+            minimizer_queue.push_back(data);
+          }
+        }
+        else {
+          uint64_t candidate = Database.canonical_representation( 
+            *kmer_ptr & minimizer_mask, minimizer_len
+          ) ^ xor_mask;
+          while (! minimizer_queue.empty() && minimizer_queue.back().minimizer > candidate) {
+            minimizer_queue.pop_back();
+          }
+          minimizer_pos_pair_t data = { candidate, candidate_pos++ };
+          minimizer_queue.push_back(data);
+          if (minimizer_queue.front().pos < candidate_pos - k + minimizer_len - 1u) {
+            minimizer_queue.pop_front();
+          }
+        }
         uint32_t *val_ptr = Database.kmer_query(
                               Database.canonical_representation(*kmer_ptr),
-                              &current_bin_key,
-                              &current_min_pos, &current_max_pos
+                              minimizer_queue.front().minimizer
                             );
         taxon = val_ptr ? *val_ptr : 0;
         if (taxon) {

@@ -164,6 +164,10 @@ uint64_t KrakenDB::bin_key(uint64_t kmer) {
   return min_bin_key;
 }
 
+uint64_t KrakenDB::get_xor_mask() {
+  return index_ptr->index_type() == 1 ? 0 : INDEX2_XOR_MASK;
+}
+
 // Code mostly from Jellyfish 1.6 source
 uint64_t KrakenDB::reverse_complement(uint64_t kmer, uint8_t n) {
   kmer = ((kmer >> 2)  & 0x3333333333333333UL) | ((kmer & 0x3333333333333333UL) << 2);
@@ -195,36 +199,15 @@ uint64_t KrakenDB::canonical_representation(uint64_t kmer) {
   return kmer < revcom ? kmer : revcom;
 }
 
-// perform search over last range to speed up queries
-// NOTE: retry_on_failure implies all pointer params are non-NULL
-uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
-                               int64_t *min_pos, int64_t *max_pos,
-                               bool retry_on_failure)
+uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t b_key)
 {
   int64_t min, max, mid;
   uint64_t comp_kmer;
-  uint64_t b_key;
   char *ptr = get_pair_ptr();
   size_t pair_sz = pair_size();
 
-  // Use provided values if they exist and are valid
-  if (retry_on_failure && *min_pos <= *max_pos) {
-    b_key = *last_bin_key;
-    min = *min_pos;
-    max = *max_pos;
-  }
-  else {
-    b_key = bin_key(kmer);
-    min = index_ptr->at(b_key);
-    max = index_ptr->at(b_key + 1) - 1;
-    // Invalid min/max values + retry_on_failure means min/max need to be
-    // initialized and set in caller
-    if (retry_on_failure) {
-      *last_bin_key = b_key;
-      *min_pos = min;
-      *max_pos = max;
-    }
-  }
+  min = index_ptr->at(b_key);
+  max = index_ptr->at(b_key + 1) - 1;
 
   // Binary search with large window
   while (min + 15 <= max) {
@@ -248,31 +231,12 @@ uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
       return (uint32_t *) (ptr + pair_sz * mid + key_len);
   }
 
-  uint32_t *answer = NULL;
-  // ROF implies the provided values might be out of date
-  // If they are, we'll update them and search again
-  if (retry_on_failure) {
-    b_key = bin_key(kmer);
-    // If bin key hasn't changed, search fails
-    if (b_key == *last_bin_key)
-      return NULL;
-    min = index_ptr->at(b_key);
-    max = index_ptr->at(b_key + 1) - 1;
-    // Recursive call w/ adjusted search params and w/o retry
-    answer = kmer_query(kmer, &b_key, &min, &max, false);
-    // Update caller's search params due to bin key change
-    if (last_bin_key != NULL) {
-      *last_bin_key = b_key;
-      *min_pos = min;
-      *max_pos = max;
-    }
-  }
-  return answer;
+  return NULL;
 }
 
 // Binary search w/in the k-mer's bin
 uint32_t *KrakenDB::kmer_query(uint64_t kmer) {
-  return kmer_query(kmer, NULL, NULL, NULL, false);
+  return kmer_query(kmer, bin_key(kmer));
 }
 
 KrakenDBIndex::KrakenDBIndex() {
