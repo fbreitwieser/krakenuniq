@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
   pair_size = key_len + val_len;
 
   if (Output_count > key_count) {
-    errx(EX_DATAERR, "Requested new key count %lu larger than old key count %lu, aborting...",
+    errx(EX_DATAERR, "Requested new key count %llu larger than old key count %llu, aborting...",
                       Output_count, key_count);
   }
 
