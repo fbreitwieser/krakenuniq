@@ -50,9 +50,19 @@ if ($@) {
   die "$PROG: $@";
 }
 
+sub usage {
+  my $exit_code = @_ ? shift : 64;
+  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] [--mpa-format] <kraken output file(s)>\n";
+  my $default_db;
+  eval { $default_db = krakenlib::find_db(); };
+  if (defined $default_db) {
+    print STDERR "\n   Default database is \"$default_db\"\n";
+  }
+  exit $exit_code;
+}
+
 sub display_help {
-  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] <kraken output file(s)>\n";
-  exit 0;
+  usage(0);
 }
 
 sub display_version {

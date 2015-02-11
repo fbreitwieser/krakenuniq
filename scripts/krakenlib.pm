@@ -54,12 +54,13 @@ sub find_db {
     for my $dir (@db_path) {
       my $checked_db = "$dir/$supplied_db_prefix";
       if (-e $checked_db && -d _) {
-	$db_prefix = $checked_db;
-	last;
+        $db_prefix = $checked_db;
+        last;
       }
     }
     if (! defined $db_prefix) {
-      die "unable to find $supplied_db_prefix in \$KRAKEN_DB_PATH ($ENV{'KRAKEN_DB_PATH'})\n";
+      my $printed_path = exists $ENV{"KRAKEN_DB_PATH"} ? qq|"$ENV{'KRAKEN_DB_PATH'}"| : "undefined";
+      die "unable to find $supplied_db_prefix in \$KRAKEN_DB_PATH ($printed_path)\n";
     }
   }
 

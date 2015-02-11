@@ -57,10 +57,15 @@ if ($@) {
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
+  my $default_db = "none";
+  eval { $default_db = '"' . krakenlib::find_db() . '"'; };
+
   print STDERR <<__EOF__;
 Usage: $PROG [--db KRAKEN_DB_NAME] [options] <kraken output file(s)>
 
 Options:
+  --db NAME             Name of Kraken database
+                        (default: $default_db)
   --show-zeros          Display taxa even if they lack a read in any sample
   --header-line         Display a header line indicating sample IDs
                         (sample IDs are the filenames)

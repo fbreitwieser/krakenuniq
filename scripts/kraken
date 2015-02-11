@@ -192,12 +192,16 @@ die "$PROG: exec error: $!\n";
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
+  my $default_db = "none";
+  eval { $default_db = '"' . krakenlib::find_db() . '"'; };
+  my $def_thread_ct = exists $ENV{"KRAKEN_NUM_THREADS"} ? (0 + $ENV{"KRAKEN_NUM_THREADS"}) : 1;
   print STDERR <<EOF;
 Usage: $PROG [options] <filename(s)>
 
 Options:
   --db NAME               Name for Kraken DB
-  --threads NUM           Number of threads
+                          (default: $default_db)
+  --threads NUM           Number of threads (default: $def_thread_ct)
   --fasta-input           Input is FASTA format
   --fastq-input           Input is FASTQ format
   --gzip-compressed       Input is gzip compressed
@@ -209,7 +213,7 @@ Options:
                           Print unclassified sequences to filename
   --classified-out FILENAME
                           Print classified sequences to filename
-  --output FILENAME       Print output to filename (def. is stdout); "-" will
+  --output FILENAME       Print output to filename (default: stdout); "-" will
                           suppress normal output
   --preload               Loads DB into memory before classification
   --paired                The two filenames provided are paired-end reads
