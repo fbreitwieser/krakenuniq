@@ -56,6 +56,11 @@ else
   echo "Kraken build set to minimize RAM usage."
 fi
 
+if [ -n "$KRAKEN_REBUILD_DATABASE" ]
+then
+  rm -f database.* *.map lca.complete
+fi
+
 if [ -e "database.jdb" ]
 then
   echo "Skipping step 1, k-mer set already exists."

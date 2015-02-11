@@ -57,6 +57,7 @@ my (
   $dl_library,
   $add_to_library,
   $build,
+  $rebuild,
   $shrink,
   $standard,
   $upgrade,
@@ -76,6 +77,7 @@ my @TASK_LIST = (
   \$dl_library,
   \$add_to_library,
   \$build,
+  \$rebuild,
   \$shrink,
   \$standard,
   \$upgrade,
@@ -99,6 +101,7 @@ GetOptions(
   "download-library=s" => \$dl_library,
   "add-to-library=s" => \$add_to_library,
   "build" => \$build,
+  "rebuild" => \$rebuild,
   "shrink=i" => \$shrink,
   "upgrade" => \$upgrade,
   "standard" => \$standard,
@@ -170,7 +173,7 @@ elsif (defined($shrink)) {
 elsif ($standard) {
   standard_installation();
 }
-elsif ($build) {
+elsif ($build || $rebuild) {
   build_database();
 }
 elsif ($clean) {
@@ -199,6 +202,8 @@ Task options (exactly one must be selected):
   --build                    Create DB from library
                              (requires taxonomy d/l'ed and at least one file
                              in library)
+  --rebuild                  Create DB from library like --build, but remove
+                             existing non-library/taxonomy files before build
   --clean                    Remove unneeded files from a built database
   --shrink NEW_CT            Shrink an existing DB to have only NEW_CT k-mers
   --standard                 Download and create default database
@@ -272,6 +277,7 @@ sub standard_installation {
 }
 
 sub build_database {
+  $ENV{"KRAKEN_REBUILD_DATABASE"} = $rebuild;
   exec "build_kraken_db.sh";
 }
 
