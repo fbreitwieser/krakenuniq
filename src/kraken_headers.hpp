@@ -27,7 +27,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <deque>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>

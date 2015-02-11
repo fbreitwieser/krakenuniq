@@ -56,14 +56,15 @@ namespace kraken {
     size_t header_size();  // Jellyfish uses variable header sizes
     uint32_t *kmer_query(uint64_t kmer);  // return ptr to pair w/ kmer
 
-    // Assume correct bin key has been calculated and provided
-    uint32_t *kmer_query(uint64_t kmer, uint64_t bin_key);
-
+    // perform search over last range to speed up queries
+    uint32_t *kmer_query(uint64_t kmer, uint64_t *last_bin_key,
+                         int64_t *min_pos, int64_t *max_pos,
+                         bool retry_on_failure=true);
+    
     // return "bin key" for kmer, based on index
     // If idx_nt not specified, use index's value
     uint64_t bin_key(uint64_t kmer, uint64_t idx_nt);
     uint64_t bin_key(uint64_t kmer);
-    uint64_t get_xor_mask();
 
     // Code from Jellyfish, rev. comp. of a k-mer with n nt.
     // If n is not specified, use k in DB, otherwise use first n nt in kmer
