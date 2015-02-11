@@ -59,9 +59,13 @@ int main(int argc, char **argv) {
   KmerScanner::set_k(Database.get_k());
 
   char *temp_ptr = NULL;
+  size_t db_file_size = db_file.size();
   if (Operate_in_RAM) {
-    temp_ptr = new char[ db_file.size() ];
-    memcpy(temp_ptr, db_file.ptr(), db_file.size());
+    db_file.close_file();
+    temp_ptr = new char[ db_file_size ];
+    ifstream ifs(DB_filename.c_str(), ifstream::binary);
+    ifs.read(temp_ptr, db_file_size);
+    ifs.close();
     Database = KrakenDB(temp_ptr);
   }
 
@@ -75,7 +79,9 @@ int main(int argc, char **argv) {
     process_files();
 
   if (Operate_in_RAM) {
-    memcpy(db_file.ptr(), temp_ptr, db_file.size());
+    ofstream ofs(DB_filename.c_str(), ofstream::binary);
+    ofs.write(temp_ptr, db_file_size);
+    ofs.close();
     delete temp_ptr;
   }
 
