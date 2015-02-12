@@ -64,7 +64,8 @@ int main(int argc, char **argv) {
 
   if (Output_count > key_count) {
     errx(EX_DATAERR, "Requested new key count %llu larger than old key count %llu, aborting...",
-                      Output_count, key_count);
+                      (long long unsigned int) Output_count,
+                      (long long unsigned int) key_count);
   }
 
   // Change key count
