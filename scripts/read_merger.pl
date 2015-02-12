@@ -31,12 +31,14 @@ my $fasta_input = 0;
 my $fastq_input = 0;
 my $gunzip = 0;
 my $bunzip2 = 0;
+my $check_names = 0;
 
 GetOptions(
   "fa" => \$fasta_input,
   "fq" => \$fastq_input,
   "gz" => \$gunzip,
-  "bz2" => \$bunzip2
+  "bz2" => \$bunzip2,
+  "check-names" => \$check_names
 );
 
 if (@ARGV != 2) {
@@ -88,7 +90,7 @@ while (defined($seq1 = read_sequence($fh1))) {
   if (! defined $seq2) {
     die "$PROG: mismatched sequence counts\n";
   }
-  if ($seq1->{id} ne $seq2->{id}) {
+  if ($check_names && $seq1->{id} ne $seq2->{id}) {
     die "$PROG: mismatched mate pair names ('$seq1->{id}' & '$seq2->{id}')\n";
   }
   print_merged_sequence($seq1, $seq2);

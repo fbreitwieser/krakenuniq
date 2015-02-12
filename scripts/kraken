@@ -51,6 +51,7 @@ my $preload = 0;
 my $gunzip = 0;
 my $bunzip2 = 0;
 my $paired = 0;
+my $check_names = 0;
 my $unclassified_out;
 my $classified_out;
 my $outfile;
@@ -69,6 +70,7 @@ GetOptions(
   "output=s" => \$outfile,
   "preload" => \$preload,
   "paired" => \$paired,
+  "check-names" => \$check_names,
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2
 );
@@ -149,6 +151,7 @@ if ($paired) {
   push @merge_flags, "--fq" if $fastq_input;
   push @merge_flags, "--gz" if $gunzip;
   push @merge_flags, "--bz2" if $bunzip2;
+  push @merge_flags, "--check-names" if $check_names;
   @pipe_argv = ("read_merger.pl", @merge_flags, @ARGV);
 }
 elsif ($compressed) {
@@ -217,6 +220,8 @@ Options:
                           suppress normal output
   --preload               Loads DB into memory before classification
   --paired                The two filenames provided are paired-end reads
+  --check-names           Ensure each pair of reads have names that agree
+                          with each other; ignored if --paired is not specified
   --help                  Print this message
   --version               Print version information
 
