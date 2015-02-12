@@ -525,6 +525,12 @@ two mate pair files on the command line.  We have found this to raise
 sensitivity by about 3 percentage points over classifying the sequences
 as single-end reads.
 
+Note that when using the --paired option, Kraken will not (by default)
+make any attempt to ensure that the two files you specify are indeed
+matching sets of paired-end reads.  To verify that the names of each
+read do indeed match, you can use the --check-names option in
+combination with the --paired option.
+
 
 SAMPLE REPORTS
 ==============
