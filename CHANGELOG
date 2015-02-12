@@ -11,6 +11,8 @@ v0.10.5-beta:
 * support added for KRAKEN_NUM_THREADS, KRAKEN_DB_PATH, and KRAKEN_DEFAULT_DB
   env. variables
 * added kraken-translate for getting taxonomic names for each sequence
+* added a --rebuild option to kraken-build
+* turned off default name checking for PE reads; added --check-names option
 
 v0.10.4-beta:
 * use GRCh38 for human genome library
