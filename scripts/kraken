@@ -52,6 +52,7 @@ my $gunzip = 0;
 my $bunzip2 = 0;
 my $paired = 0;
 my $check_names = 0;
+my $only_classified_output = 0;
 my $unclassified_out;
 my $classified_out;
 my $outfile;
@@ -72,7 +73,8 @@ GetOptions(
   "paired" => \$paired,
   "check-names" => \$check_names,
   "gzip-compressed" => \$gunzip,
-  "bzip2-compressed" => \$bunzip2
+  "bzip2-compressed" => \$bunzip2,
+  "only-classified-output" => \$only_classified_output,
 );
 
 if (! defined $threads) {
@@ -141,6 +143,7 @@ push @flags, "-f" if $fastq_input && ! $paired;  # merger always outputs FASTA
 push @flags, "-U", $unclassified_out if defined $unclassified_out;
 push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
+push @flags, "-c", if $only_classified_output;
 push @flags, "-M" if $preload;
 
 # handle piping for decompression/merging
@@ -218,6 +221,8 @@ Options:
                           Print classified sequences to filename
   --output FILENAME       Print output to filename (default: stdout); "-" will
                           suppress normal output
+  --only-classified-output
+                          Print no Kraken output for unclassified sequences
   --preload               Loads DB into memory before classification
   --paired                The two filenames provided are paired-end reads
   --check-names           Ensure each pair of reads have names that agree

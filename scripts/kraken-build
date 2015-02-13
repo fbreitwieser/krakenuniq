@@ -52,6 +52,7 @@ my (
   $hash_size,
   $max_db_size,
   $work_on_disk,
+  $shrink_block_offset,
 
   $dl_taxonomy,
   $dl_library,
@@ -96,6 +97,7 @@ GetOptions(
   "jellyfish-hash-size=s", \$hash_size,
   "max-db-size=s", \$max_db_size,
   "work-on-disk", \$work_on_disk,
+  "shrink-block-offset=i", \$shrink_block_offset,
 
   "download-taxonomy" => \$dl_taxonomy,
   "download-library=s" => \$dl_library,
@@ -227,6 +229,9 @@ Options:
   --max-db-size SIZE         Shrink the DB before full build, making sure
                              database and index together use <= SIZE gigabytes
                              (build task only)
+  --shrink-block-offset NUM  When shrinking, select the k-mer that is NUM
+                             positions from the end of a block of k-mers
+                             (default: 1)
   --work-on-disk             Perform most operations on disk rather than in
                              RAM (will slow down build in most cases)
 EOF
@@ -269,7 +274,7 @@ sub shrink_db {
   if (! defined($new_db)) {
     die "Must specify new database name to perform shrink task\n";
   }
-  exec "shrink_db.sh", $new_count, $new_db;
+  exec "shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
 }
 
 sub standard_installation {

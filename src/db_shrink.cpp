@@ -26,6 +26,7 @@ using namespace kraken;
 
 string Input_DB_filename, Output_DB_filename;
 uint64_t Output_count = 0;
+size_t Offset = 1;
 bool Operate_in_RAM = false;
 
 static void parse_command_line(int argc, char **argv);
@@ -80,6 +81,11 @@ int main(int argc, char **argv) {
   // Prep buffer for scan/select loop
   // We select one pair (the last) per "block"
   size_t block_size = key_count / Output_count;
+  if (block_size < Offset) {
+    errx(EX_DATAERR, "offset %llu larger than block size %llu, aborting.",
+         (long long unsigned int) Offset,
+         (long long unsigned int) block_size);
+  }
   // Some blocks have an extra element
   size_t odd_block_count = key_count % Output_count;
   buffer = new char[pair_size * (block_size + 1)];
@@ -99,7 +105,7 @@ int main(int argc, char **argv) {
     input_file.read(buffer, pairs_to_read * pair_size);
     remaining_input_pairs -= pairs_to_read;
 
-    output_file.write(buffer + pair_size * (pairs_to_read - 1), pair_size);
+    output_file.write(buffer + pair_size * (pairs_to_read - Offset), pair_size);
     current_output_count++;
     if (current_output_count % 10000 == 0) {
       cerr << "\rWritten " << current_output_count << "/" << Output_count << " k-mers to new file";
@@ -119,7 +125,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:o:n:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:o:n:O:")) != -1) {
     switch (opt) {
       case 'n' :
         sig = atoi(optarg);
@@ -133,6 +139,12 @@ void parse_command_line(int argc, char **argv) {
       case 'o' :
         Output_DB_filename = optarg;
         break;
+      case 'O' :
+        sig = atoi(optarg);
+        if (sig < 1)
+          errx(EX_USAGE, "offset count cannot be negative");
+        Offset = sig;
+        break;
       default:
         usage();
         break;
@@ -144,6 +156,6 @@ void parse_command_line(int argc, char **argv) {
 }
 
 void usage(int exit_code) {
-  cerr << "Usage: db_shrink <-d input db> <-o output db> <-n output count>\n";
+  cerr << "Usage: db_shrink [-O offset] <-d input db> <-o output db> <-n output count>\n";
   exit(exit_code);
 }

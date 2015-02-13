@@ -45,6 +45,7 @@ bool Print_classified = false;
 bool Print_unclassified = false;
 bool Print_kraken = true;
 bool Populate_memory = false;
+bool Only_classified_kraken_output = false;
 uint32_t Minimum_hit_count = 1;
 map<uint32_t, uint32_t> Parent_map;
 KrakenDB Database;
@@ -273,6 +274,8 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
     koss << "C\t";
   }
   else {
+    if (Only_classified_kraken_output)
+      return;
     koss << "U\t";
   }
   koss << dna.id << "\t" << call << "\t" << dna.seq.size() << "\t";
@@ -343,7 +346,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfC:U:M")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:M")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filename = optarg;
@@ -374,6 +377,9 @@ void parse_command_line(int argc, char **argv) {
         break;
       case 'f' :
         Fastq_input = true;
+        break;
+      case 'c' :
+        Only_classified_kraken_output = true;
         break;
       case 'C' :
         Print_classified = true;
@@ -433,6 +439,7 @@ void usage(int exit_code) {
        << "  -C filename      Print classified sequences" << endl
        << "  -U filename      Print unclassified sequences" << endl
        << "  -f               Input is in FASTQ format" << endl
+       << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
        << "  -h               Print this message" << endl
        << endl

@@ -26,6 +26,7 @@ set -o pipefail  # Stop on failures in non-final pipeline commands
 
 new_ct="$1"
 new_db="$2"
+offset="$3"
 
 OLD_DB_DIR="$KRAKEN_DB_NAME"
 NEW_DB_DIR="$new_db"
@@ -41,7 +42,7 @@ fi
 cp "$OLD_DB_DIR/taxonomy/nodes.dmp" "$NEW_DB_DIR/taxonomy"
 cp "$OLD_DB_DIR/taxonomy/names.dmp" "$NEW_DB_DIR/taxonomy"
 db_shrink -n $new_ct -d "$OLD_DB_DIR/database.kdb" \
-  -o "$NEW_DB_DIR/database.jdb.tmp"
+  -o "$NEW_DB_DIR/database.jdb.tmp" -O "$offset"
 mv "$NEW_DB_DIR/database.jdb.tmp" "$NEW_DB_DIR/database.jdb"
 echo "Reduced database created, now sorting..."
 db_sort -M -t $KRAKEN_THREAD_CT -n $KRAKEN_MINIMIZER_LEN \
