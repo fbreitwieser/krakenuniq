@@ -13,6 +13,8 @@ v0.10.5-beta:
 * added kraken-translate for getting taxonomic names for each sequence
 * added a --rebuild option to kraken-build
 * turned off default name checking for PE reads; added --check-names option
+* added plasmids to --download-library options
+* added HTML manual, redirecting README to that
 
 v0.10.4-beta:
 * use GRCh38 for human genome library
