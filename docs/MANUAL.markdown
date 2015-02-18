@@ -587,6 +587,7 @@ they were queried against the database).  Consider the example of the
 LCA mappings in Kraken's output given earlier:
 
 "562:13 561:4 A:31 0:1 562:3" would indicate that:
+
 * the first 13 $k$-mers mapped to taxonomy ID #562
 * the next 4 $k$-mers mapped to taxonomy ID #561
 * the next 31 $k$-mers contained an ambiguous nucleotide
