@@ -20,6 +20,7 @@
 # Download specific genomic libraries for use with Kraken.
 # Supported choices are:
 #   bacteria - NCBI RefSeq complete bacterial/archaeal genomes
+#   plasmids - NCBI RefSeq plasmid sequences
 #   viruses - NCBI RefSeq complete viral DNA and RNA genomes
 #   human - NCBI RefSeq GRCh38 human reference genome
 
@@ -47,6 +48,22 @@ case "$1" in
       touch "lib.complete"
     else
       echo "Skipping download of bacterial genomes, already downloaded here."
+    fi
+    ;;
+  "plasmids")
+    mkdir -p $LIBRARY_DIR/Plasmids
+    cd $LIBRARY_DIR/Plasmids
+    if [ ! -e "lib.complete" ]
+    then
+      rm -f plasmids.all.fna.tar.gz
+      wget $FTP_SERVER/genomes/Plasmids/plasmids.all.fna.tar.gz
+      echo -n "Unpacking..."
+      tar zxf plasmids.all.fna.tar.gz
+      rm plasmids.all.fna.tar.gz
+      echo " complete."
+      touch "lib.complete"
+    else
+      echo "Skipping download of plasmids, already downloaded here."
     fi
     ;;
   "viruses")
@@ -97,6 +114,6 @@ case "$1" in
     ;;
   *)
     echo "Unsupported library.  Valid options are: "
-    echo "  bacteria virus human"
+    echo "  bacteria plasmids virus human"
     ;;
 esac

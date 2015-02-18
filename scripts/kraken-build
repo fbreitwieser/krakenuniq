@@ -40,7 +40,7 @@ my $DEF_MINIMIZER_LEN = 15;
 my $DEF_KMER_LEN = 31;
 my $DEF_THREAD_CT = 1;
 
-my @VALID_LIBRARY_TYPES = qw/bacteria viruses human/;
+my @VALID_LIBRARY_TYPES = qw/bacteria plasmids viruses human/;
 
 # Option/task option variables
 my (
@@ -199,7 +199,8 @@ Usage: $PROG [task option] [options]
 Task options (exactly one must be selected):
   --download-taxonomy        Download NCBI taxonomic information
   --download-library TYPE    Download partial library
-                             (TYPE = one of "bacteria", "viruses", "human")
+                             (TYPE = one of "bacteria", "plasmids", 
+                             "viruses", "human")
   --add-to-library FILE      Add FILE to library
   --build                    Create DB from library
                              (requires taxonomy d/l'ed and at least one file
