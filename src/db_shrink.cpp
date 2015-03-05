@@ -130,7 +130,7 @@ void parse_command_line(int argc, char **argv) {
       case 'n' :
         sig = atoll(optarg);
         if (sig < 1)
-          errx(EX_USAGE, "output count cannot be negative");
+          errx(EX_USAGE, "output count must be positive");
         Output_count = sig;
         break;
       case 'd' :
