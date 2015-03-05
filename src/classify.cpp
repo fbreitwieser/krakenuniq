@@ -342,7 +342,7 @@ set<uint32_t> get_ancestry(uint32_t taxon) {
 
 void parse_command_line(int argc, char **argv) {
   int opt;
-  int sig;
+  long long sig;
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
@@ -355,10 +355,12 @@ void parse_command_line(int argc, char **argv) {
         Index_filename = optarg;
         break;
       case 't' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig <= 0)
           errx(EX_USAGE, "can't use nonpositive thread count");
         #ifdef _OPENMP
+        if (sig > omp_get_num_procs())
+          errx(EX_USAGE, "thread count exceeds number of processors");
         Num_threads = sig;
         omp_set_num_threads(Num_threads);
         #endif
@@ -370,7 +372,7 @@ void parse_command_line(int argc, char **argv) {
         Quick_mode = true;
         break;
       case 'm' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig <= 0)
           errx(EX_USAGE, "can't use nonpositive minimum hit count");
         Minimum_hit_count = sig;
@@ -393,7 +395,7 @@ void parse_command_line(int argc, char **argv) {
         Kraken_output_file = optarg;
         break;
       case 'u' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig <= 0)
           errx(EX_USAGE, "can't use nonpositive work unit size");
         Work_unit_size = sig;

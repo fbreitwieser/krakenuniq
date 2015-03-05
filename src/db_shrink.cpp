@@ -121,14 +121,14 @@ int main(int argc, char **argv) {
 
 void parse_command_line(int argc, char **argv) {
   int opt;
-  int sig;
+  long long sig;
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
   while ((opt = getopt(argc, argv, "d:o:n:O:")) != -1) {
     switch (opt) {
       case 'n' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig < 1)
           errx(EX_USAGE, "output count cannot be negative");
         Output_count = sig;
@@ -140,7 +140,7 @@ void parse_command_line(int argc, char **argv) {
         Output_DB_filename = optarg;
         break;
       case 'O' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig < 1)
           errx(EX_USAGE, "offset count cannot be negative");
         Offset = sig;

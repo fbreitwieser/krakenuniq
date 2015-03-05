@@ -124,14 +124,14 @@ static int pair_cmp(const void *a, const void *b) {
 
 void parse_command_line(int argc, char **argv) {
   int opt;
-  int sig;
+  long long sig;
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
   while ((opt = getopt(argc, argv, "n:d:o:i:t:zM")) != -1) {
     switch (opt) {
       case 'n' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig < 1 || sig > 31)
           errx(EX_USAGE, "bin key length out of range");
         Bin_key_nt = (uint8_t) sig;
@@ -149,10 +149,12 @@ void parse_command_line(int argc, char **argv) {
         Operate_in_RAM = true;
         break;
       case 't' :
-        sig = atoi(optarg);
+        sig = atoll(optarg);
         if (sig <= 0)
           errx(EX_USAGE, "can't use nonpositive thread count");
         #ifdef _OPENMP
+        if (sig > omp_get_num_procs())
+          errx(EX_USAGE, "thread count exceeds number of processors");
         Num_threads = sig;
         omp_set_num_threads(Num_threads);
         #endif
