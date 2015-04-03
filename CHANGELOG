@@ -1,3 +1,7 @@
+v0.10.6-beta:
+* fixed overflow bug in command line parsing
+* fixed GRCh38.p2 bug in human genome downloads
+
 v0.10.5-beta:
 * fix bug in GRCh38 download to handle multi-fasta files
 * add --header-line and --intermediate-ranks options to kraken-mpa-report

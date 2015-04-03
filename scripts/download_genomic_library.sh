@@ -100,7 +100,7 @@ case "$1" in
       for directory in $directories
       do
         wget --spider --no-remove-listing $FTP_SERVER/genomes/H_sapiens/$directory/
-        file=$(perl -nle '/^-/ and /\b(hs_ref_GRCh\w+\.fa\.gz)\s*$/ and print $1' .listing)
+        file=$(perl -nle '/^-/ and /\b(hs_ref_GRCh\S+\.fa\.gz)\s*$/ and print $1' .listing)
         [ -z "$file" ] && exit 1
         rm .listing
         wget $FTP_SERVER/genomes/H_sapiens/$directory/$file
