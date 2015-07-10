@@ -39,7 +39,10 @@ int Num_threads = 1;
 string DB_filename, Index_filename, Nodes_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
+bool force_taxid = false;
+
 bool Allow_extra_kmers = false;
+bool verbose = false;
 bool Operate_in_RAM = false;
 bool One_FASTA_file = false;
 map<uint32_t, uint32_t> Parent_map;
@@ -52,11 +55,12 @@ int main(int argc, char **argv) {
   #endif
 
   parse_command_line(argc, argv);
-  Parent_map = build_parent_map(Nodes_filename);
+
+  if (!force_taxid) {
+    Parent_map = build_parent_map(Nodes_filename);
+  }
 
   QuickFile db_file(DB_filename, "rw");
-  Database = KrakenDB(db_file.ptr());
-  KmerScanner::set_k(Database.get_k());
 
   char *temp_ptr = NULL;
   size_t db_file_size = db_file.size();
@@ -67,7 +71,11 @@ int main(int argc, char **argv) {
     ifs.read(temp_ptr, db_file_size);
     ifs.close();
     Database = KrakenDB(temp_ptr);
+  } else {
+    Database = KrakenDB(db_file.ptr());
   }
+
+  KmerScanner::set_k(Database.get_k());
 
   QuickFile idx_file(Index_filename);
   KrakenDBIndex db_index(idx_file.ptr());
@@ -127,11 +135,18 @@ void process_single_file() {
       #pragma omp parallel for schedule(dynamic)
       for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
         set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
+
+        ++seqs_processed;
+    } else {
+        if (verbose) 
+            cerr << "Skipping sequence with header [" << dna.header_line << "] - no taxid" << endl;
+
+        ++seqs_no_taxid
     }
-    cerr << "\rProcessed " << ++seqs_processed << " sequences";
+    cerr << "\rProcessed " << seqs_processed << " sequences";
   }
-  cerr << "\r                                                       ";
-  cerr << "\rFinished processing " << seqs_processed << " sequences" << endl;
+  cerr << "\r                                                                            ";
+  cerr << "\rFinished processing " << seqs_processed << " sequences (skipping "<< skipped_seqs <<" empty sequences, and " << seqs_no_taxid<<" sequences with no taxonomy mapping)" << endl;
 }
 
 void process_files() {
@@ -186,9 +201,13 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
       if (! Allow_extra_kmers)
         errx(EX_DATAERR, "kmer found in sequence that is not in database");
       else
+        cerr << "kmer found in sequence w/ taxid " << taxid << " that is not in database" << endl;
         continue;
     }
-    *val_ptr = lca(Parent_map, taxid, *val_ptr);
+    if (!force_taxid)
+        *val_ptr = lca(Parent_map, taxid, *val_ptr);
+    else
+        *val_ptr = taxid;
   }
 }
 
@@ -198,7 +217,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xM")) != -1) {
+  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTv")) != -1) {
     switch (opt) {
       case 'f' :
         File_to_taxon_map_filename = optarg;
@@ -226,8 +245,14 @@ void parse_command_line(int argc, char **argv) {
         omp_set_num_threads(Num_threads);
         #endif
         break;
+      case 'T' :
+        force_taxid = true;
+        break;
       case 'n' :
         Nodes_filename = optarg;
+        break;
+      case 'v' :
+        verbose = true;
         break;
       case 'x' :
         Allow_extra_kmers = true;
@@ -267,6 +292,8 @@ void usage(int exit_code) {
        << "  -f filename      File to taxon map" << endl
        << "  -F filename      Multi-FASTA file with sequence data" << endl
        << "  -m filename      Sequence ID to taxon map" << endl
+       << "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
+       << "  -v               Verbose output" << endl
        << "  -h               Print this message" << endl
        << endl
        << "-F and -m must be specified together.  If -f is given, "
