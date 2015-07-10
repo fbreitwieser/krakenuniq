@@ -1,0 +1,6 @@
+*.o
+/db_sort
+/classify
+/db_shrink
+/set_lcas
+/make_seqid_to_taxid_map
