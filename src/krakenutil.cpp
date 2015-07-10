@@ -53,11 +53,14 @@ namespace kraken {
     if (a == 0 || b == 0)
       return a ? a : b;
 
+    // create a path from a to the root
     set<uint32_t> a_path;
     while (a > 0) {
       a_path.insert(a);
       a = parent_map[a];
     }
+
+    // search for b in the path from a to the root
     while (b > 0) {
       if (a_path.count(b) > 0)
         return b;
