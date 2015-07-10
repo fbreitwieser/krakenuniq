@@ -109,11 +109,19 @@ void process_single_file() {
   FastaReader reader(Multi_fasta_filename);
   DNASequence dna;
   uint32_t seqs_processed = 0;
+  uint32_t seqs_skipped = 0;
+  uint32_t seqs_no_taxid = 0;
 
   while (reader.is_valid()) {
     dna = reader.next_sequence();
     if (! reader.is_valid())
       break;
+
+    if ( dna.seq.empty() ) {
+      ++seq_skipped;
+      continue;
+    }
+
     uint32_t taxid = ID_to_taxon_map[dna.id];
     if (taxid) {
       #pragma omp parallel for schedule(dynamic)

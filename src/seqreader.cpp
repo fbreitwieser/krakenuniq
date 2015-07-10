@@ -72,9 +72,7 @@ namespace kraken {
     dna.seq = seq_ss.str();
 
     if (dna.seq.empty()) {
-      warnx("malformed fasta file - zero-length record (%s)", dna.id.c_str());
-      valid = false;
-      return dna;
+      valid = true; // set_lcas handles empty sequences
     }
 
     return dna;
