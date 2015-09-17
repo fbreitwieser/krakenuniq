@@ -65,12 +65,14 @@ int main(int argc, char **argv) {
   char *temp_ptr = NULL;
   size_t db_file_size = db_file.size();
   if (Operate_in_RAM) {
+    cerr << "Getting " << DB_filename << " into memory ... ";
     db_file.close_file();
     temp_ptr = new char[ db_file_size ];
     ifstream ifs(DB_filename.c_str(), ifstream::binary);
     ifs.read(temp_ptr, db_file_size);
     ifs.close();
     Database = KrakenDB(temp_ptr);
+    cerr << "done" << endl;
   } else {
     Database = KrakenDB(db_file.ptr());
   }
@@ -97,6 +99,7 @@ int main(int argc, char **argv) {
 }
 
 void process_single_file() {
+  cerr << "Processing multiple FASTA files" << endl;
   ifstream map_file(ID_to_taxon_map_filename.c_str());
   if (map_file.rdstate() & ifstream::failbit) {
     err(EX_NOINPUT, "can't open %s", ID_to_taxon_map_filename.c_str());
@@ -126,7 +129,7 @@ void process_single_file() {
       break;
 
     if ( dna.seq.empty() ) {
-      ++seq_skipped;
+      ++seqs_skipped;
       continue;
     }
 
@@ -141,15 +144,16 @@ void process_single_file() {
         if (verbose) 
             cerr << "Skipping sequence with header [" << dna.header_line << "] - no taxid" << endl;
 
-        ++seqs_no_taxid
+        ++seqs_no_taxid;
     }
     cerr << "\rProcessed " << seqs_processed << " sequences";
   }
   cerr << "\r                                                                            ";
-  cerr << "\rFinished processing " << seqs_processed << " sequences (skipping "<< skipped_seqs <<" empty sequences, and " << seqs_no_taxid<<" sequences with no taxonomy mapping)" << endl;
+  cerr << "\rFinished processing " << seqs_processed << " sequences (skipping "<< seqs_skipped <<" empty sequences, and " << seqs_no_taxid<<" sequences with no taxonomy mapping)" << endl;
 }
 
 void process_files() {
+  cerr << "Processing files in " << File_to_taxon_map_filename.c_str() << endl;
   ifstream map_file(File_to_taxon_map_filename.c_str());
   if (map_file.rdstate() & ifstream::failbit) {
     err(EX_NOINPUT, "can't open %s", File_to_taxon_map_filename.c_str());

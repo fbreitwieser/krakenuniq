@@ -39,6 +39,7 @@ function report_time_elapsed() {
 start_time=$(date "+%s.%N")
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
+FIND_OPTS=-L
 
 if [ ! -d "$DATABASE_DIR" ]
 then
@@ -72,11 +73,11 @@ else
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
-    KRAKEN_HASH_SIZE=$(find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -printf '%s\n' | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
+    KRAKEN_HASH_SIZE=$(find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -printf '%s\n' | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
+  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
     xargs -0 cat | \
     jellyfish count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
       -o database /dev/fd/0
@@ -160,7 +161,7 @@ then
 else
   echo "Creating GI number to seqID map (step 4 of 6)..."
   start_time1=$(date "+%s.%N")
-  find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
+  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
     xargs -0 cat | report_gi_numbers.pl > gi2seqid.map.tmp
   mv gi2seqid.map.tmp gi2seqid.map
 
@@ -187,7 +188,7 @@ then
 else
   echo "Setting LCAs in database (step 6 of 6)..."
   start_time1=$(date "+%s.%N")
-  find library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
+  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
     xargs -0 cat | \
     set_lcas $MEMFLAG -x -d database.kdb -i database.idx \
     -n taxonomy/nodes.dmp -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
