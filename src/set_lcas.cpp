@@ -133,7 +133,15 @@ void process_single_file() {
       continue;
     }
 
-    uint32_t taxid = ID_to_taxon_map[dna.id];
+    // Get the taxid. If the header specifies kraken:taxid, use that
+    uint32_t taxid;
+    string prefix = "kraken:taxid|";
+    if (dna.id.substr(0,prefix.size()) == prefix) {
+        taxid = std::atoi(dna.id.substr(prefix.size()).c_str());
+    } else {
+        taxid = ID_to_taxon_map[dna.id];
+    }
+
     if (taxid) {
       #pragma omp parallel for schedule(dynamic)
       for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
