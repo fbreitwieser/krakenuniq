@@ -210,11 +210,13 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
                 Database.canonical_representation(*kmer_ptr)
               );
     if (val_ptr == NULL) {
-      if (! Allow_extra_kmers)
+      if (! Allow_extra_kmers) {
         errx(EX_DATAERR, "kmer found in sequence that is not in database");
-      else
+      } 
+      else if (verbose) {
         cerr << "kmer found in sequence w/ taxid " << taxid << " that is not in database" << endl;
-        continue;
+      }
+      continue;
     }
     if (!force_taxid)
         *val_ptr = lca(Parent_map, taxid, *val_ptr);
