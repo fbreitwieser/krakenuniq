@@ -77,8 +77,7 @@ else
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
-    xargs -0 cat | \
+  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
     jellyfish count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
       -o database /dev/fd/0
 
@@ -114,9 +113,10 @@ else
     else
       echo "Reducing database size (step 2 of 6)..."
       max_kdb_size=$(echo "$KRAKEN_MAX_DB_SIZE*2^30 - $idx_size" | bc)
+      idx_size_gb=$(printf %.2f $(echo "$idx_size/2^30" | bc) )
       if (( $(echo "$max_kdb_size < 0" | bc) == 1 ))
       then
-        echo "Maximum database size too small, aborting reduction."
+        echo "Maximum database size too small - index alone needs $idx_size_gb GB.  Aborting reduction."
         exit 1
       fi
       # Key ct is 8 byte int stored 48 bytes from start of file
@@ -161,8 +161,8 @@ then
 else
   echo "Creating GI number to seqID map (step 4 of 6)..."
   start_time1=$(date "+%s.%N")
-  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
-    xargs -0 cat | report_gi_numbers.pl > gi2seqid.map.tmp
+  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
+    report_gi_numbers.pl > gi2seqid.map.tmp
   mv gi2seqid.map.tmp gi2seqid.map
 
   echo "GI number to seqID map created. [$(report_time_elapsed $start_time1)]"
@@ -188,8 +188,7 @@ then
 else
   echo "Setting LCAs in database (step 6 of 6)..."
   start_time1=$(date "+%s.%N")
-  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -print0 | \
-    xargs -0 cat | \
+  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
     set_lcas $MEMFLAG -x -d database.kdb -i database.idx \
     -n taxonomy/nodes.dmp -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
   touch "lca.complete"
