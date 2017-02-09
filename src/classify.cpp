@@ -22,6 +22,7 @@
 #include "krakenutil.hpp"
 #include "quickfile.hpp"
 #include "seqreader.hpp"
+#include "hyperloglogplus.h"
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 
@@ -37,8 +38,18 @@ string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig);
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
 
+struct ReadCounts {
+	uint32_t n_reads;
+	uint32_t n_kmers;
+    HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
+};
+
+map<uint64_t, ReadCounts> taxon_counts; // stats per taxon
+
 int Num_threads = 1;
-string DB_filename, Index_filename, Nodes_filename;
+vector<string> DB_filenames;
+vector<string> Index_filenames;
+string Nodes_filename;
 bool Quick_mode = false;
 bool Fastq_input = false;
 bool Print_classified = false;
@@ -46,9 +57,10 @@ bool Print_unclassified = false;
 bool Print_kraken = true;
 bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
+bool Print_sequence = true;
 uint32_t Minimum_hit_count = 1;
 map<uint32_t, uint32_t> Parent_map;
-KrakenDB Database;
+vector<KrakenDB*> KrakenDatabases;
 string Classified_output_file, Unclassified_output_file, Kraken_output_file;
 ostream *Classified_output;
 ostream *Unclassified_output;
@@ -59,34 +71,62 @@ uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
 uint64_t total_bases = 0;
 
+void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename) {
+	QuickFile db_file;
+	db_file.open_file(DB_filename);
+	if (Populate_memory) {
+		db_file.load_file();
+	}
+	database = KrakenDB(db_file.ptr());
+	QuickFile idx_file;
+	idx_file.open_file(Index_filename);
+	if (Populate_memory)
+		idx_file.load_file();
+
+	KrakenDBIndex db_index(idx_file.ptr());
+	database.set_index(&db_index);
+}
+
 int main(int argc, char **argv) {
   #ifdef _OPENMP
   omp_set_num_threads(1);
   #endif
 
   parse_command_line(argc, argv);
-  if (! Nodes_filename.empty())
+  if (! Nodes_filename.empty()) {
+    cerr << "Building parent node map " << endl;
     Parent_map = build_parent_map(Nodes_filename);
+  }
 
   if (Populate_memory)
-    cerr << "Loading database... ";
+    cerr << "Loading database(s)... " << endl;
 
-  QuickFile db_file;
-  db_file.open_file(DB_filename);
-  if (Populate_memory)
-    db_file.load_file();
-  Database = KrakenDB(db_file.ptr());
-  KmerScanner::set_k(Database.get_k());
+  // TODO: Check DB_filenames and Index_filesnames have the same length
+  for (size_t i=0; i < DB_filenames.size(); ++i) {
+    cerr << "\t " << DB_filenames[i] << endl;
+    static QuickFile db_file;
+    db_file.open_file(DB_filenames[i]);
+    if (Populate_memory)
+      db_file.load_file();
+    static KrakenDB Database = KrakenDB(db_file.ptr());
+    KmerScanner::set_k(Database.get_k());
+  
+    static QuickFile idx_file;
+    idx_file.open_file(Index_filenames[i]);
+    if (Populate_memory)
+      idx_file.load_file();
+    static KrakenDBIndex db_index(idx_file.ptr());
+    Database.set_index(&db_index);
+    
+  
+    KrakenDatabases.push_back(&Database);
+  }
 
-  QuickFile idx_file;
-  idx_file.open_file(Index_filename);
-  if (Populate_memory)
-    idx_file.load_file();
-  KrakenDBIndex db_index(idx_file.ptr());
-  Database.set_index(&db_index);
+  // TODO: Check all databases have the same k
+  KmerScanner::set_k(KrakenDatabases[0]->get_k());
 
   if (Populate_memory)
-    cerr << "complete." << endl;
+    cerr << "\ncomplete." << endl;
 
   if (Print_classified) {
     if (Classified_output_file == "-")
@@ -147,6 +187,7 @@ void report_stats(struct timeval time1, struct timeval time2) {
 }
 
 void process_file(char *filename) {
+  cerr << "k: " << uint32_t(KrakenDatabases[0]->get_k()) << endl;
   string file_str(filename);
   DNASequenceReader *reader;
   DNASequence dna;
@@ -199,7 +240,24 @@ void process_file(char *filename) {
     }
   }  // end parallel section
 
+  // Write out report - print k-mers and read numbers
+  for (auto& elem : taxon_counts) {
+        //elem.first gives you the key (int)
+        //elem.second gives you the mapped element (vector)
+        cerr << elem.first << "\t" << elem.second.n_reads << "\t" << 
+            elem.second.n_kmers << "\t" << elem.second.kmers.cardinality() << "\n";
+  }
+
   delete reader;
+}
+
+uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& current_bin_key,
+		int64_t& current_min_pos, int64_t& current_max_pos) {
+	uint32_t* val_ptr = database.kmer_query(
+			database.canonical_representation(*kmer_ptr), &current_bin_key,
+			&current_min_pos, &current_max_pos);
+	uint32_t taxon = val_ptr ? *val_ptr : 0;
+	return taxon;
 }
 
 void classify_sequence(DNASequence &dna, ostringstream &koss,
@@ -211,11 +269,9 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   uint32_t taxon = 0;
   uint32_t hits = 0;  // only maintained if in quick mode
 
-  uint64_t current_bin_key;
-  int64_t current_min_pos = 1;
-  int64_t current_max_pos = 0;
+  uint64_t current_bin_key; int64_t current_min_pos = 1;  int64_t current_max_pos = 0;
 
-  if (dna.seq.size() >= Database.get_k()) {
+  if (dna.seq.size() >= KrakenDatabases[0]->get_k()) {
     KmerScanner scanner(dna.seq);
     while ((kmer_ptr = scanner.next_kmer()) != NULL) {
       taxon = 0;
@@ -224,13 +280,15 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
       }
       else {
         ambig_list.push_back(0);
-        uint32_t *val_ptr = Database.kmer_query(
-                              Database.canonical_representation(*kmer_ptr),
-                              &current_bin_key,
-                              &current_min_pos, &current_max_pos
-                            );
-        taxon = val_ptr ? *val_ptr : 0;
+
+        for (auto& db : KrakenDatabases) {
+            taxon = get_taxon_for_kmer(*db, kmer_ptr, current_bin_key, current_min_pos, current_max_pos);
+            if (taxon) break;
+        }
+
         if (taxon) {
+          taxon_counts[taxon].kmers.add(*kmer_ptr);
+          ++taxon_counts[taxon].n_kmers;
           hit_counts[taxon]++;
           if (Quick_mode && ++hits >= Minimum_hit_count)
             break;
@@ -249,6 +307,7 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   if (call)
     #pragma omp atomic
     total_classified++;
+    ++(taxon_counts[call].n_reads);
 
   if (Print_unclassified || Print_classified) {
     ostringstream *oss_ptr = call ? &coss : &uoss;
@@ -289,6 +348,9 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
     else
       koss << hitlist_string(taxa, ambig_list);
   }
+
+  if (Print_sequence)
+      koss << "\t" << dna.seq;
 
   koss << endl;
 }
@@ -349,10 +411,10 @@ void parse_command_line(int argc, char **argv) {
   while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:M")) != -1) {
     switch (opt) {
       case 'd' :
-        DB_filename = optarg;
+        DB_filenames.push_back(optarg);
         break;
       case 'i' :
-        Index_filename = optarg;
+        Index_filenames.push_back(optarg);
         break;
       case 't' :
         sig = atoll(optarg);
@@ -409,11 +471,11 @@ void parse_command_line(int argc, char **argv) {
     }
   }
 
-  if (DB_filename.empty()) {
+  if (DB_filenames.empty()) {
     cerr << "Missing mandatory option -d" << endl;
     usage();
   }
-  if (Index_filename.empty()) {
+  if (Index_filenames.empty()) {
     cerr << "Missing mandatory option -i" << endl;
     usage();
   }
@@ -443,6 +505,7 @@ void usage(int exit_code) {
        << "  -f               Input is in FASTQ format" << endl
        << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
+       << "  -s               Print sequence in Kraken output" << endl
        << "  -h               Print this message" << endl
        << endl
        << "At least one FASTA or FASTQ file must be specified." << endl

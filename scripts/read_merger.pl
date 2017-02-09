@@ -88,7 +88,12 @@ my ($seq1, $seq2);
 while (defined($seq1 = read_sequence($fh1))) {
   $seq2 = read_sequence($fh2);
   if (! defined $seq2) {
-    die "$PROG: mismatched sequence counts\n";
+    print STDERR "$PROG: mismatched sequence counts - file 1 has more reads\n
+  Outputting the further reads unpaired\n";
+    print_sequence($seq1);
+    while (defined($seq1 = read_sequence($fh1))) {
+      print_sequence($seq1);
+    }
   }
   if ($check_names && $seq1->{id} ne $seq2->{id}) {
     die "$PROG: mismatched mate pair names ('$seq1->{id}' & '$seq2->{id}')\n";
@@ -96,7 +101,13 @@ while (defined($seq1 = read_sequence($fh1))) {
   print_merged_sequence($seq1, $seq2);
 }
 if (defined($seq2 = read_sequence($fh2))) {
-  die "$PROG: mismatched sequence counts\n";
+  print STDERR "$PROG: mismatched sequence counts - file 2 has more reads\n
+  Outputting the further reads unpaired\n";
+  print_sequence($seq2);
+  while (defined($seq2 = read_sequence($fh2))) {
+    print_sequence($seq2);
+  }
+
 }
 close $fh1;
 close $fh2;
@@ -161,4 +172,10 @@ sub print_merged_sequence {
   my ($seq1, $seq2) = @_;
   print ">" . $seq1->{id} . "\n";
   print $seq1->{seq} . "N" . $seq2->{seq} . "\n";
+}
+
+sub print_sequence {
+  my ($seq1) = @_;
+  print ">" . $seq1->{id} . "\n";
+  print $seq1->{seq} . "\n";
 }

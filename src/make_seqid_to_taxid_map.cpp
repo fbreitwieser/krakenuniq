@@ -41,12 +41,22 @@ void report_taxo_numbers(char *filename);
 
 int main(int argc, char **argv) {
   if (argc < 3) {
-    cerr << "Usage: make_seqid_to_taxid_map <gi to taxid map> <gi to seqid list>"
+    cerr << "Usage: make_seqid_to_taxid_map <gi to taxid map> <gi to seqid list> [<names.dmp file> <nodes.dmp file>]\n"
+         << "  If nodes.dmp and names.dmp files are provided, then each sequence header is added with a further link\n"
+         << "  to the taxonomy."
          << endl;
     return 1;
   }
   char *map_filename = argv[1];
   char *list_filename = argv[2];
+
+  char *nodes_filename;
+  char *names_filename;
+  if (argc == 5) {
+      nodes_filename = argv[3];
+      names_filename = argv[4];
+  }
+
   fill_request_map(list_filename);
   report_taxo_numbers(map_filename);
 
@@ -96,8 +106,8 @@ void fill_request_map(char *filename) {
   fptr_start = fptr = file.ptr();
   size_t file_size = file.size();
 
-  // Line format: <gi num><tab><sequence ID>
-  // OR: TAXID<tab><taxonomy ID><tab><sequence ID>        (user spec'ed)
+  // Line format: <gi num><tab><sequence ID><tab><full sequence header>
+  // OR: TAXID<tab><taxonomy ID><tab><sequence ID><tab><full sequence header>    (user spec'ed)
   while ((size_t)(fptr - fptr_start) < file_size) {
     char *nl_ptr = strchr(fptr, '\n');
     char *sep_ptr = strchr(fptr, '\t');

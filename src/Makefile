@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -Wall -fopenmp -O3
-PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink
+CXXFLAGS = -Wall -std=c++11 -fopenmp -O3 -fsyntax-only
+PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink get_kmers
 
 .PHONY: all install clean
 
@@ -17,6 +17,8 @@ db_shrink: krakendb.o quickfile.o
 db_sort: krakendb.o quickfile.o
 
 set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o
+
+get_kmers: krakendb.o quickfile.o krakenutil.o seqreader.o
 
 classify: krakendb.o quickfile.o krakenutil.o seqreader.o
 
