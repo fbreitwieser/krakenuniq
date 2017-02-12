@@ -38,6 +38,7 @@ while (<>) {
   next unless /^>(\S+)/;
   my $seq_id = $1;
   if ($seq_id =~ /(^|\|)kraken:taxid\|(\d+)/) {
+
     print "TAXID\t$2\t$seq_id\t$_\n";
     next;
   }
@@ -45,5 +46,6 @@ while (<>) {
   if ($seq_id !~ /(^|\|)gi\|(\d+)/) {
     die "$PROG: sequence ID $seq_id lacks GI number, aborting.\n";
   }
+
   print "$2\t$seq_id\t$_\n";
 }

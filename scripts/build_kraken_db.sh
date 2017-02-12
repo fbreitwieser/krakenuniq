@@ -66,7 +66,7 @@ if [ -e "database.jdb" ]
 then
   echo "Skipping step 1, k-mer set already exists."
 else
-  echo "Creating k-mer set (step 1 of 6)..."
+  echo "Creating k-mer set (step 1 of 5)..."
   start_time1=$(date "+%s.%N")
 
   check_for_jellyfish.sh
@@ -111,7 +111,7 @@ else
     then
       echo "Skipping step 2, database reduction unnecessary."
     else
-      echo "Reducing database size (step 2 of 6)..."
+      echo "Reducing database size (step 2 of 5)..."
       max_kdb_size=$(echo "$KRAKEN_MAX_DB_SIZE*2^30 - $idx_size" | bc)
       idx_size_gb=$(printf %.2f $(echo "$idx_size/2^30" | bc) )
       if (( $(echo "$max_kdb_size < 0" | bc) == 1 ))
@@ -143,7 +143,7 @@ if [ -e "database.kdb" ]
 then
   echo "Skipping step 3, k-mer set already sorted."
 else
-  echo "Sorting k-mer set (step 3 of 6)..."
+  echo "Sorting k-mer set (step 3 of 5)..."
   start_time1=$(date "+%s.%N")
   db_sort -z $MEMFLAG -t $KRAKEN_THREAD_CT -n $KRAKEN_MINIMIZER_LEN \
     -d database.jdb -o database.kdb.tmp \
@@ -155,41 +155,28 @@ else
   echo "K-mer set sorted. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "gi2seqid.map" ]
-then
-  echo "Skipping step 4, GI number to seqID map already complete."
-else
-  echo "Creating GI number to seqID map (step 4 of 6)..."
-  start_time1=$(date "+%s.%N")
-  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
-    report_gi_numbers.pl > gi2seqid.map.tmp
-  mv gi2seqid.map.tmp gi2seqid.map
-
-  echo "GI number to seqID map created. [$(report_time_elapsed $start_time1)]"
-fi
-
 if [ -e "seqid2taxid.map" ]
 then
-  echo "Skipping step 5, seqID to taxID map already complete."
+  echo "Skipping step 4, seqID to taxID map already complete."
 else
-  echo "Creating seqID to taxID map (step 5 of 6)..."
-  start_time1=$(date "+%s.%N")
-  make_seqid_to_taxid_map taxonomy/gi_taxid_nucl.dmp gi2seqid.map \
-    > seqid2taxid.map.tmp
-  mv seqid2taxid.map.tmp seqid2taxid.map
-  line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
+  echo "Creating seqID to taxID map (step 4 of 5)... [blu]"
+#  start_time1=$(date "+%s.%N")
+#  make_seqid_to_taxid_map taxonomy/gi_taxid_nucl.dmp gi2seqid.map \
+#    > seqid2taxid.map.tmp
+#  mv seqid2taxid.map.tmp seqid2taxid.map
+#  line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
-  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
+#  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
 if [ -e "lca.complete" ]
 then
-  echo "Skipping step 6, LCAs already set."
+  echo "Skipping step 5, LCAs already set."
 else
-  echo "Setting LCAs in database (step 6 of 6)..."
+  echo "Setting LCAs in database (step 5 of 5)..."
   start_time1=$(date "+%s.%N")
   find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
-    set_lcas $MEMFLAG -x -d database.kdb -i database.idx \
+    set_lcas $MEMFLAG -x -d database.kdb -i database.idx -v \
     -n taxonomy/nodes.dmp -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
   touch "lca.complete"
 
