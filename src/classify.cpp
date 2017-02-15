@@ -58,6 +58,7 @@ bool Print_kraken = true;
 bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = true;
+bool Print_Progress = false;
 uint32_t Minimum_hit_count = 1;
 map<uint32_t, uint32_t> Parent_map;
 vector<KrakenDB*> KrakenDatabases;
@@ -235,7 +236,8 @@ void process_file(char *filename) {
           (*Unclassified_output) << unclassified_output_ss.str();
         total_sequences += work_unit.size();
         total_bases += total_nt;
-        cerr << "\rProcessed " << total_sequences << " sequences (" << total_bases << " bp) ...";
+        if (Print_Progress) 
+          cerr << "\rProcessed " << total_sequences << " sequences (" << total_bases << " bp) ...";
       }
     }
   }  // end parallel section
