@@ -388,6 +388,16 @@ public:
 		}
 	}
 
+	HyperLogLogPlusMinus & operator+=(const HyperLogLogPlusMinus* other) {
+		merge(other);
+		return *this;
+	}
+
+	HyperLogLogPlusMinus & operator+=(const HyperLogLogPlusMinus& other) {
+		merge(&other);
+		return *this;
+	}
+
 	/**
 	 *
 	 * @return cardinality estimate

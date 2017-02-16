@@ -23,11 +23,12 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-    std::string database_dir = argv[0];
+	if (argc != 3) {
+      std::cout << "Provide names.dmp and nodes.dmp\n";
+      return 1;
+    }
     TaxonomyDB taxdb;
     taxdb.writeTaxonomyIndex(
-            std::cout,
-            database_dir + "/taxonomy/nodes.dmp",
-            database_dir + "/taxonomy/names.dmp");
+            std::cout, argv[1], argv[2]);
 
 }

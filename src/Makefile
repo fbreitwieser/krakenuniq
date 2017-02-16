@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -Wall -std=c++11 -fopenmp -O3
-PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink
+CXXFLAGS = -Wall -std=c++11 -fopenmp -O3 -fmax-errors=3
+PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink build_taxdb
 
 .PHONY: all install clean
 
@@ -21,6 +21,9 @@ set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o
 classify: krakendb.o quickfile.o krakenutil.o seqreader.o
 
 make_seqid_to_taxid_map: quickfile.o
+
+build_taxdb: taxdb.h
+	$(CXX) $(CXXFLAGS) -o build_taxdb build_taxdb.cpp
 
 krakenutil.o: krakenutil.cpp krakenutil.hpp
 	$(CXX) $(CXXFLAGS) -c krakenutil.cpp

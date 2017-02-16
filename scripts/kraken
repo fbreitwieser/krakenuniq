@@ -147,6 +147,8 @@ push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-c", if $only_classified_output;
 push @flags, "-M" if $preload;
+push @flags, "-r", $report_file;
+push @flags, "-a", $db_prefix[0]."/taxDB";
 
 # handle piping for decompression/merging
 my @pipe_argv;

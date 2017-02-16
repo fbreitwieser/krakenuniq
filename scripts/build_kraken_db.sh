@@ -169,6 +169,16 @@ else
 #  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
+if [ -e "taxDB" ]
+then
+  echo "Skipping step 4.5, taxDB exists."
+else
+  echo "Creating taxDB (step 4.5 of 5)... "
+  build_taxdb taxonomy/nodes.dmp taxonomy/names.dmp > taxDB
+fi
+
+
+
 if [ -e "lca.complete" ]
 then
   echo "Skipping step 5, LCAs already set."

@@ -2,6 +2,7 @@
  * Modified work copyright 2017 Florian Breitwieser
  *
  * The original file is part of SLAM
+ * The modified file is part of a modified Kraken version
  *
  * SLAM is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +28,17 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "hyperloglogplus.h"
+#include "report-cols.h"
+
+typedef uint32_t TaxId;
+
+struct ReadCounts {
+	uint32_t n_reads;
+	uint32_t n_kmers;
+    HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
+};
+
 
 void log (const std::string& s) {
 	std::cerr << s << "\n";
@@ -64,12 +76,15 @@ class TaxonomyEntry {
   }
   TaxonomyEntry* parent = nullptr;
   std::vector<TaxonomyEntry*> children;
+
   unsigned numReadsAligned = 0;
   unsigned numReadsAlignedToChildren = 0;
   bool used = false;
   uint64_t genomeSize = 0;
   uint64_t genomeSizeOfChildren = 0;
   uint64_t numBelow = 0;
+  uint64_t numKmers;
+  HyperLogLogPlusMinus<uint64_t> kmers;
 };
 
 class TaxonomyDB {
@@ -93,7 +108,9 @@ class TaxonomyDB {
                           const std::string nodesDumpFileName);
   bool isSubSpecies(uint32_t taxonomyID) const;
   int isBelowInTree(uint32_t upper, uint32_t lower) const;
+  void fillCounts(const unordered_map<uint32_t, ReadCounts>& taxon_counts);
   void createPointers();
+  void printReport();
 };
 
 
@@ -364,6 +381,107 @@ bool TaxonomyDB::isSubSpecies(uint32_t taxonomyID) const {
     numLevels++;
   }
   return isSubSpecies;
+}
+
+void TaxonomyDB::fillCounts(const unordered_map<uint32_t, ReadCounts>& taxon_counts) {
+	for (auto& elem : taxon_counts) {
+		TaxonomyEntry* tax = &taxIDsAndEntries.at(elem.first);
+		tax->numReadsAligned += elem.second.n_reads;
+		tax->numKmers += elem.second.n_kmers;
+		tax->kmers += elem.second.kmers;
+
+		while (tax->parent != nullptr) {
+			tax = tax->parent;
+			tax->numReadsAlignedToChildren += elem.second.n_reads;
+			tax->numKmers += elem.second.n_kmers;
+			tax->kmers += elem.second.kmers;
+		}
+	 }
+}
+
+
+class TaxReport {
+private:
+	std::ostream& _reportOfb;
+	TaxonomyDB & _taxdb;
+	std::vector<REPORTCOLS> _report_cols;
+	uint64_t _total_n_reads;
+	bool _show_zeros;
+
+	void printLine(TaxonomyEntry& tax, unsigned depth);
+
+public:
+	TaxReport(std::ostream& _reportOfb, TaxonomyDB & taxdb, bool _show_zeros);
+
+	void printReport(std::string format, std::string rank);
+	void printReport(TaxonomyEntry& tax, unsigned depth);
+};
+
+TaxReport::TaxReport(std::ostream& reportOfb, TaxonomyDB& taxdb, bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
+	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_UNIQUE_KMERS, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
+}
+
+void TaxReport::printReport(std::string format, std::string rank) {
+	_total_n_reads =
+			_taxdb.taxIDsAndEntries.at(0).numReadsAligned +
+			_taxdb.taxIDsAndEntries.at(0).numReadsAlignedToChildren +
+			_taxdb.taxIDsAndEntries.at(1).numReadsAligned +
+			_taxdb.taxIDsAndEntries.at(1).numReadsAlignedToChildren +
+			_taxdb.taxIDsAndEntries.at(-1).numReadsAligned +
+			_taxdb.taxIDsAndEntries.at(-1).numReadsAlignedToChildren; // -1 is a magic number in centrifuge for reads not matched to the taxonomy tree
+
+	if (format == "kraken") {
+		// A: print number of unidentified reads
+		printReport(_taxdb.taxIDsAndEntries.at(0),0u);
+		// B: print normal results
+		printReport(_taxdb.taxIDsAndEntries.at(1),0u);
+		// C: Print Unclassified stuff
+		printReport(_taxdb.taxIDsAndEntries.at(-1),0u);
+	} else {
+		// print stuff at a certain level ..
+		//_uid_abundance;
+		//_taxinfo
+
+	}
+}
+
+void TaxReport::printReport(TaxonomyEntry& tax, unsigned depth) {
+
+	if (_show_zeros || (tax.numReadsAligned+tax.numReadsAlignedToChildren) > 0) {
+		printLine(tax, depth);
+
+		for (auto child : tax.children) {
+			printReport(*child, depth+1);
+		}
+	}
+
+}
+
+void TaxReport::printLine(TaxonomyEntry& tax, unsigned depth) {
+	for (auto& col : _report_cols) {
+		switch (col) {
+		case REPORTCOLS::NAME:        _reportOfb << tax.scientificName ; break;
+		case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
+		case REPORTCOLS::TAX_ID:     _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
+		case REPORTCOLS::DEPTH:     _reportOfb << depth; break;
+		case REPORTCOLS::PERCENTAGE:  _reportOfb << 100*(tax.numReadsAligned + tax.numReadsAlignedToChildren)/_total_n_reads; break;
+		//case REPORTCOLS::ABUNDANCE:  _reportOfb << 100*counts.abundance[0]; break;
+		//case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
+		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (tax.numReadsAligned + tax.numReadsAlignedToChildren); break;
+		case REPORTCOLS::NUM_READS:  _reportOfb << tax.numReadsAligned; break;
+		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.kmers.cardinality(); break;
+		//case REPORTCOLS::GENOME_SIZE: ; break;
+		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;
+		//case REPORTCOLS::SUM_SCORE: ; break;
+		case REPORTCOLS::TAX_RANK: _reportOfb << tax.rank; break;
+		default: _reportOfb << "NA";
+		}
+		if (&col == &_report_cols.back()) {
+			_reportOfb << '\n';
+		} else {
+			_reportOfb << '\t';
+		}
+	}
 }
 
 

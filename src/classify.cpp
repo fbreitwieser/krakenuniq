@@ -23,6 +23,7 @@
 #include "quickfile.hpp"
 #include "seqreader.hpp"
 #include "hyperloglogplus.h"
+#include "taxdb.h"
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 
@@ -38,13 +39,7 @@ string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig);
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
 
-struct ReadCounts {
-	uint32_t n_reads;
-	uint32_t n_kmers;
-    HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
-};
-
-map<uint64_t, ReadCounts> taxon_counts; // stats per taxon
+unordered_map<uint32_t, ReadCounts> taxon_counts; // stats per taxon
 
 int Num_threads = 1;
 vector<string> DB_filenames;
@@ -55,6 +50,7 @@ bool Fastq_input = false;
 bool Print_classified = false;
 bool Print_unclassified = false;
 bool Print_kraken = true;
+bool Print_kraken_report = true;
 bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = true;
@@ -62,11 +58,13 @@ bool Print_Progress = false;
 uint32_t Minimum_hit_count = 1;
 map<uint32_t, uint32_t> Parent_map;
 vector<KrakenDB*> KrakenDatabases;
-string Classified_output_file, Unclassified_output_file, Kraken_output_file;
+string Classified_output_file, Unclassified_output_file, Kraken_output_file, Report_output_file, TaxDB_file;
 ostream *Classified_output;
 ostream *Unclassified_output;
 ostream *Kraken_output;
+ostream *Report_output;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
+TaxonomyDB taxdb;
 
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
@@ -151,6 +149,18 @@ int main(int argc, char **argv) {
   }
   else
     Kraken_output = &cout;
+
+  if (Report_output_file.empty() || Report_output_file == "-") {
+     Print_kraken_report = false;
+  } else {
+     Report_output = new ofstream(Report_output_file.c_str());
+  }
+
+  if (!TaxDB_file.empty() && Print_kraken_report) {
+	  taxdb.readTaxonomyIndex(TaxDB_file);
+  } else {
+     Print_kraken_report = false;
+  }
 
   struct timeval tv1, tv2;
   gettimeofday(&tv1, NULL);
@@ -242,12 +252,11 @@ void process_file(char *filename) {
     }
   }  // end parallel section
 
-  // Write out report - print k-mers and read numbers
-  for (auto& elem : taxon_counts) {
-        //elem.first gives you the key (int)
-        //elem.second gives you the mapped element (vector)
-        cerr << elem.first << "\t" << elem.second.n_reads << "\t" << 
-            elem.second.n_kmers << "\t" << elem.second.kmers.cardinality() << "\n";
+  if (Print_kraken_report) {
+	  // Fill TaxDB with counts
+	  taxdb.fillCounts(taxon_counts);
+	  TaxReport rep = TaxReport(*Report_output, taxdb, false);
+	  rep.printReport("kraken","blu");
   }
 
   delete reader;
@@ -410,7 +419,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:M")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -458,6 +467,12 @@ void parse_command_line(int argc, char **argv) {
       case 'o' :
         Kraken_output_file = optarg;
         break;
+      case 'r' :
+        Report_output_file = optarg;
+        break;
+      case 'a' :
+        TaxDB_file = optarg;
+        break;
       case 'u' :
         sig = atoll(optarg);
         if (sig <= 0)
@@ -498,6 +513,8 @@ void usage(int exit_code) {
        << "* -i filename      Kraken DB index filename" << endl
        << "  -n filename      NCBI Taxonomy nodes file" << endl
        << "  -o filename      Output file for Kraken output" << endl
+       << "  -r filename      Output file for Kraken report output" << endl
+       << "  -a filename      TaxDB" << endl
        << "  -t #             Number of threads" << endl
        << "  -u #             Thread work unit size (in bp)" << endl
        << "  -q               Quick operation" << endl
