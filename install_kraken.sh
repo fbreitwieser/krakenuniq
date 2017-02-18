@@ -39,6 +39,7 @@ fi
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
 mkdir -p "$KRAKEN_DIR"
+make -C src clean
 make -C src install
 for file in scripts/*
 do

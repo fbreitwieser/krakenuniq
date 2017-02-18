@@ -24,6 +24,7 @@
 #include "seqreader.hpp"
 #include "hyperloglogplus.h"
 #include "taxdb.h"
+#include "gzstream.h"
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 
@@ -38,7 +39,6 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
 string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig);
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
-
 unordered_map<uint32_t, ReadCounts> taxon_counts; // stats per taxon
 
 int Num_threads = 1;
@@ -53,22 +53,47 @@ bool Print_kraken = true;
 bool Print_kraken_report = true;
 bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
-bool Print_sequence = true;
-bool Print_Progress = false;
+bool Print_sequence = false;
+bool Print_Progress = true;
 uint32_t Minimum_hit_count = 1;
-map<uint32_t, uint32_t> Parent_map;
+unordered_map<uint32_t, uint32_t> Parent_map;
 vector<KrakenDB*> KrakenDatabases;
 string Classified_output_file, Unclassified_output_file, Kraken_output_file, Report_output_file, TaxDB_file;
 ostream *Classified_output;
 ostream *Unclassified_output;
 ostream *Kraken_output;
 ostream *Report_output;
+vector<ofstream*> Open_fstreams;
+vector<ogzstream*> Open_gzstreams;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
 TaxonomyDB taxdb;
 
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
 uint64_t total_bases = 0;
+
+inline bool ends_with(std::string const & value, std::string const & ending)
+{
+        if (ending.size() > value.size()) return false;
+            return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
+ostream* cout_or_file(string file) {
+    if (file == "-")
+      return &cout;
+
+    if (ends_with(file, ".gz")) {
+      ogzstream* ogzs = new ogzstream(file.c_str());
+      Open_gzstreams.push_back(ogzs);
+      return ogzs;
+    } else {
+      ofstream* ofs = new ofstream(file.c_str());
+      Open_fstreams.push_back(ofs);
+      return ofs;
+    }
+}
+
+
 
 void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename) {
 	QuickFile db_file;
@@ -92,9 +117,21 @@ int main(int argc, char **argv) {
   #endif
 
   parse_command_line(argc, argv);
-  if (! Nodes_filename.empty()) {
-    cerr << "Building parent node map " << endl;
-    Parent_map = build_parent_map(Nodes_filename);
+  //if (! Nodes_filename.empty()) {
+  //  cerr << "Building parent node map " << endl;
+  //  Parent_map = build_parent_map(Nodes_filename);
+  //}
+  
+  if (!TaxDB_file.empty()) {
+	  taxdb = TaxonomyDB(TaxDB_file);
+      for (const auto & tax : taxdb.taxIDsAndEntries) {
+          if (tax.first != 0)
+          Parent_map[tax.first] = tax.second.parentTaxonomyID;
+      }
+      Parent_map[1] = 0;
+  } else {
+      cerr << "TaxDB argument is required!" << endl;
+      return 1;
   }
 
   if (Populate_memory)
@@ -102,7 +139,7 @@ int main(int argc, char **argv) {
 
   // TODO: Check DB_filenames and Index_filesnames have the same length
   for (size_t i=0; i < DB_filenames.size(); ++i) {
-    cerr << "\t " << DB_filenames[i] << endl;
+    //cerr << "\t " << DB_filenames[i] << endl;
     static QuickFile db_file;
     db_file.open_file(DB_filenames[i]);
     if (Populate_memory)
@@ -128,45 +165,53 @@ int main(int argc, char **argv) {
     cerr << "\ncomplete." << endl;
 
   if (Print_classified) {
-    if (Classified_output_file == "-")
-      Classified_output = &cout;
-    else
-      Classified_output = new ofstream(Classified_output_file.c_str());
+    Classified_output = cout_or_file(Classified_output_file);
   }
 
   if (Print_unclassified) {
-    if (Unclassified_output_file == "-")
-      Unclassified_output = &cout;
-    else
-      Unclassified_output = new ofstream(Unclassified_output_file.c_str());
+    Unclassified_output = cout_or_file(Unclassified_output_file);
   }
 
   if (! Kraken_output_file.empty()) {
-    if (Kraken_output_file == "-")
+    if (Kraken_output_file == "off")
       Print_kraken = false;
-    else
-      Kraken_output = new ofstream(Kraken_output_file.c_str());
-  }
-  else
+    else {
+      cerr << "Writing Kraken output to " << Kraken_output_file << endl;
+      Kraken_output = cout_or_file(Kraken_output_file);
+    }
+  } else {
     Kraken_output = &cout;
-
-  if (Report_output_file.empty() || Report_output_file == "-") {
-     Print_kraken_report = false;
-  } else {
-     Report_output = new ofstream(Report_output_file.c_str());
   }
 
-  if (!TaxDB_file.empty() && Print_kraken_report) {
-	  taxdb.readTaxonomyIndex(TaxDB_file);
-  } else {
-     Print_kraken_report = false;
+  if (!Report_output_file.empty()) {
+     Print_kraken_report = true;
+      cerr << "Writing Kraken report output to " << Report_output_file << endl;
+     Report_output = cout_or_file(Report_output_file);
   }
+
+  cerr << "Print_kraken: " << Print_kraken << "; Print_kraken_report: " << Print_kraken_report << "; k: " << uint32_t(KrakenDatabases[0]->get_k()) << endl;
 
   struct timeval tv1, tv2;
   gettimeofday(&tv1, NULL);
   for (int i = optind; i < argc; i++)
     process_file(argv[i]);
   gettimeofday(&tv2, NULL);
+
+  std::cerr << "Finishing up ..\n";
+
+  if (Print_kraken_report) {
+	taxdb.fillCounts(taxon_counts);
+	TaxReport rep = TaxReport(*Report_output, taxdb, false);
+	rep.printReport("kraken","blu");
+  }
+
+  for (ofstream* ofs : Open_fstreams) {
+    ofs->close();
+  }
+  for (ogzstream* ogzs : Open_gzstreams) {
+    ogzs->close();
+  }
+
 
   report_stats(tv1, tv2);
 
@@ -198,7 +243,6 @@ void report_stats(struct timeval time1, struct timeval time2) {
 }
 
 void process_file(char *filename) {
-  cerr << "k: " << uint32_t(KrakenDatabases[0]->get_k()) << endl;
   string file_str(filename);
   DNASequenceReader *reader;
   DNASequence dna;
@@ -246,18 +290,11 @@ void process_file(char *filename) {
           (*Unclassified_output) << unclassified_output_ss.str();
         total_sequences += work_unit.size();
         total_bases += total_nt;
-        if (Print_Progress) 
+        if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
           cerr << "\rProcessed " << total_sequences << " sequences (" << total_bases << " bp) ...";
       }
     }
   }  // end parallel section
-
-  if (Print_kraken_report) {
-	  // Fill TaxDB with counts
-	  taxdb.fillCounts(taxon_counts);
-	  TaxReport rep = TaxReport(*Report_output, taxdb, false);
-	  rep.printReport("kraken","blu");
-  }
 
   delete reader;
 }
@@ -275,7 +312,7 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss) {
   vector<uint32_t> taxa;
   vector<uint8_t> ambig_list;
-  map<uint32_t, uint32_t> hit_counts;
+  unordered_map<uint32_t, uint32_t> hit_counts;
   uint64_t *kmer_ptr;
   uint32_t taxon = 0;
   uint32_t hits = 0;  // only maintained if in quick mode
@@ -297,9 +334,13 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
             if (taxon) break;
         }
 
+        #pragma omp critical
+        {
+        taxon_counts[taxon].kmers.add(*kmer_ptr);
+        ++taxon_counts[taxon].n_kmers;
+        }
+
         if (taxon) {
-          taxon_counts[taxon].kmers.add(*kmer_ptr);
-          ++taxon_counts[taxon].n_kmers;
           hit_counts[taxon]++;
           if (Quick_mode && ++hits >= Minimum_hit_count)
             break;
@@ -318,7 +359,9 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   if (call)
     #pragma omp atomic
     total_classified++;
-    ++(taxon_counts[call].n_reads);
+
+  #pragma omp critical
+  ++(taxon_counts[call].n_reads);
 
   if (Print_unclassified || Print_classified) {
     ostringstream *oss_ptr = call ? &coss : &uoss;
@@ -419,7 +462,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:s")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -469,6 +512,9 @@ void parse_command_line(int argc, char **argv) {
         break;
       case 'r' :
         Report_output_file = optarg;
+        break;
+      case 's' :
+        Print_sequence = true;
         break;
       case 'a' :
         TaxDB_file = optarg;
@@ -524,7 +570,7 @@ void usage(int exit_code) {
        << "  -f               Input is in FASTQ format" << endl
        << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
-       << "  -s               Print sequence in Kraken output" << endl
+       << "  -s               Print read sequence in Kraken output" << endl
        << "  -h               Print this message" << endl
        << endl
        << "At least one FASTA or FASTQ file must be specified." << endl

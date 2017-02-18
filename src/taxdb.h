@@ -34,8 +34,8 @@
 typedef uint32_t TaxId;
 
 struct ReadCounts {
-	uint32_t n_reads;
-	uint32_t n_kmers;
+	uint64_t n_reads = 0;
+	uint64_t n_kmers = 0;
     HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
 };
 
@@ -83,8 +83,14 @@ class TaxonomyEntry {
   uint64_t genomeSize = 0;
   uint64_t genomeSizeOfChildren = 0;
   uint64_t numBelow = 0;
-  uint64_t numKmers;
+  uint64_t numKmers = 0;
   HyperLogLogPlusMinus<uint64_t> kmers;
+};
+
+struct TaxonomyEntryPtr_comp {
+	bool operator() ( const TaxonomyEntry* a, const TaxonomyEntry* b) const { 
+		return ((a->numReadsAligned+a->numReadsAlignedToChildren) > (b->numReadsAligned+b->numReadsAlignedToChildren)); 
+	}
 };
 
 class TaxonomyDB {
@@ -116,11 +122,13 @@ class TaxonomyDB {
 
 void TaxonomyDB::createPointers() {
   for (auto& tax : taxIDsAndEntries) {
+  if (tax.second.parentTaxonomyID != tax.first) {
     auto parentIt = taxIDsAndEntries.find(tax.second.parentTaxonomyID);
     if (parentIt != taxIDsAndEntries.end()) {
       tax.second.parent = &(parentIt->second);
       parentIt->second.children.push_back(&tax.second);
     }
+  }
   }
 }
 TaxonomyDB::TaxonomyDB(const std::string inFileName) {
@@ -209,13 +217,22 @@ void TaxonomyDB::readTaxonomyIndex(const std::string inFileName) {
   uint32_t taxonomyID, parentTaxonomyID;
   std::string scientificName, rank;
 
-  while (inFile >> taxonomyID >> parentTaxonomyID >> rank >> scientificName) {
+  std::string line;
+  while (!inFile.eof()) {
+	inFile >> taxonomyID >> parentTaxonomyID;
+	inFile.get(); // read tab
+	std::getline(inFile, scientificName, '\t');
+	std::getline(inFile, rank, '\n');
     TaxonomyEntry newEntry(taxonomyID, parentTaxonomyID, rank, scientificName);
 
+	//cerr << "inserting " << taxonomyID << ";" << parentTaxonomyID << ";" << rank << ";" << scientificName << endl;
     taxIDsAndEntries.insert({
       taxonomyID, newEntry
     });
   }
+  taxIDsAndEntries.insert({
+	0, {0, 0, "no rank", "unclassified" }
+  });
 }
 
 uint32_t TaxonomyDB::getLowestCommonAncestor(
@@ -385,18 +402,28 @@ bool TaxonomyDB::isSubSpecies(uint32_t taxonomyID) const {
 
 void TaxonomyDB::fillCounts(const unordered_map<uint32_t, ReadCounts>& taxon_counts) {
 	for (auto& elem : taxon_counts) {
+		//cerr << "fill: "<< elem.first << endl;
 		TaxonomyEntry* tax = &taxIDsAndEntries.at(elem.first);
+		//cerr << "fill done: "<< elem.first << endl;
 		tax->numReadsAligned += elem.second.n_reads;
 		tax->numKmers += elem.second.n_kmers;
 		tax->kmers += elem.second.kmers;
 
+		//std::cerr << "adding " << elem.second.n_reads << " to " << tax->scientificName << ": ";
+
 		while (tax->parent != nullptr) {
 			tax = tax->parent;
+			//std::cerr << " >> " << tax->scientificName;
 			tax->numReadsAlignedToChildren += elem.second.n_reads;
 			tax->numKmers += elem.second.n_kmers;
 			tax->kmers += elem.second.kmers;
 		}
+		//std::cerr << endl;
 	 }
+
+	for (auto& tax : taxIDsAndEntries) {
+		std::sort(tax.second.children.begin(), tax.second.children.end(),TaxonomyEntryPtr_comp());
+	}
 }
 
 
@@ -418,7 +445,7 @@ public:
 };
 
 TaxReport::TaxReport(std::ostream& reportOfb, TaxonomyDB& taxdb, bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
-	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_UNIQUE_KMERS, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
+	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_UNIQUE_KMERS, REPORTCOLS::NUM_KMERS, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
 }
 
 void TaxReport::printReport(std::string format, std::string rank) {
@@ -426,9 +453,13 @@ void TaxReport::printReport(std::string format, std::string rank) {
 			_taxdb.taxIDsAndEntries.at(0).numReadsAligned +
 			_taxdb.taxIDsAndEntries.at(0).numReadsAlignedToChildren +
 			_taxdb.taxIDsAndEntries.at(1).numReadsAligned +
-			_taxdb.taxIDsAndEntries.at(1).numReadsAlignedToChildren +
-			_taxdb.taxIDsAndEntries.at(-1).numReadsAligned +
-			_taxdb.taxIDsAndEntries.at(-1).numReadsAlignedToChildren; // -1 is a magic number in centrifuge for reads not matched to the taxonomy tree
+			_taxdb.taxIDsAndEntries.at(1).numReadsAlignedToChildren;// +
+			//_taxdb.taxIDsAndEntries.at(-1).numReadsAligned +
+			//_taxdb.taxIDsAndEntries.at(-1).numReadsAlignedToChildren; // -1 is a magic number in centrifuge for reads not matched to the taxonomy tree
+	if (_total_n_reads == 0) {
+		std::cerr << "total number of reads is zero - not creating a report!" << endl;
+		return;
+	}
 
 	if (format == "kraken") {
 		// A: print number of unidentified reads
@@ -436,7 +467,7 @@ void TaxReport::printReport(std::string format, std::string rank) {
 		// B: print normal results
 		printReport(_taxdb.taxIDsAndEntries.at(1),0u);
 		// C: Print Unclassified stuff
-		printReport(_taxdb.taxIDsAndEntries.at(-1),0u);
+		//printReport(_taxdb.taxIDsAndEntries.at(-1),0u);
 	} else {
 		// print stuff at a certain level ..
 		//_uid_abundance;
@@ -464,12 +495,13 @@ void TaxReport::printLine(TaxonomyEntry& tax, unsigned depth) {
 		case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
 		case REPORTCOLS::TAX_ID:     _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
 		case REPORTCOLS::DEPTH:     _reportOfb << depth; break;
-		case REPORTCOLS::PERCENTAGE:  _reportOfb << 100*(tax.numReadsAligned + tax.numReadsAlignedToChildren)/_total_n_reads; break;
+		case REPORTCOLS::PERCENTAGE:  _reportOfb << 100.0*(tax.numReadsAligned + tax.numReadsAlignedToChildren)/_total_n_reads; break;
 		//case REPORTCOLS::ABUNDANCE:  _reportOfb << 100*counts.abundance[0]; break;
 		//case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
 		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (tax.numReadsAligned + tax.numReadsAlignedToChildren); break;
 		case REPORTCOLS::NUM_READS:  _reportOfb << tax.numReadsAligned; break;
 		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.kmers.cardinality(); break;
+		case REPORTCOLS::NUM_KMERS: _reportOfb << tax.numKmers; break;
 		//case REPORTCOLS::GENOME_SIZE: ; break;
 		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;
 		//case REPORTCOLS::SUM_SCORE: ; break;

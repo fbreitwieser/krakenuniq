@@ -50,12 +50,12 @@ int main(int argc, char **argv) {
   char *map_filename = argv[1];
   char *list_filename = argv[2];
 
-  char *nodes_filename;
-  char *names_filename;
-  if (argc == 5) {
-      nodes_filename = argv[3];
-      names_filename = argv[4];
-  }
+  //char *nodes_filename;
+  //char *names_filename;
+  //if (argc == 5) {
+  //    nodes_filename = argv[3];
+  //    names_filename = argv[4];
+  //}
 
   fill_request_map(list_filename);
   report_taxo_numbers(map_filename);

@@ -22,6 +22,7 @@
 #include "krakendb.hpp"
 #include "krakenutil.hpp"
 #include "seqreader.hpp"
+#include <unordered_map>
 
 #define SKIP_LEN 50000
 
@@ -45,8 +46,8 @@ bool Allow_extra_kmers = false;
 bool verbose = false;
 bool Operate_in_RAM = false;
 bool One_FASTA_file = false;
-map<uint32_t, uint32_t> Parent_map;
-map<string, uint32_t> ID_to_taxon_map;
+unordered_map<uint32_t, uint32_t> Parent_map;
+unordered_map<string, uint32_t> ID_to_taxon_map;
 KrakenDB Database;
 
 int main(int argc, char **argv) {

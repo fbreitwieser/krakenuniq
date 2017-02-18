@@ -23,9 +23,9 @@
 using namespace std;
 
 namespace kraken {
-  // Build a node->parent map from NCBI Taxonomy nodes.dmp file
-  map<uint32_t, uint32_t> build_parent_map(string filename) {
-    map<uint32_t, uint32_t> pmap;
+  // Build a node->parent unordered_map from NCBI Taxonomy nodes.dmp file
+  unordered_map<uint32_t, uint32_t> build_parent_map(string filename) {
+    unordered_map<uint32_t, uint32_t> pmap;
     uint32_t node_id, parent_id;
     string line;
     ifstream ifs(filename.c_str());
@@ -47,7 +47,7 @@ namespace kraken {
   // Return lowest common ancestor of a and b
   // LCA(0,x) = LCA(x,0) = x
   // Default ancestor is 1 (root of tree)
-  uint32_t lca(map<uint32_t, uint32_t> &parent_map,
+  uint32_t lca(unordered_map<uint32_t, uint32_t> &parent_map,
     uint32_t a, uint32_t b)
   {
     if (a == 0 || b == 0)
@@ -71,12 +71,12 @@ namespace kraken {
 
   // Tree resolution: take all hit taxa (plus ancestors), then
   // return leaf of highest weighted leaf-to-root path.
-  uint32_t resolve_tree(map<uint32_t, uint32_t> &hit_counts,
-                        map<uint32_t, uint32_t> &parent_map)
+  uint32_t resolve_tree(unordered_map<uint32_t, uint32_t> &hit_counts,
+                        unordered_map<uint32_t, uint32_t> &parent_map)
   {
     set<uint32_t> max_taxa;
     uint32_t max_taxon = 0, max_score = 0;
-    map<uint32_t, uint32_t>::iterator it = hit_counts.begin();
+    unordered_map<uint32_t, uint32_t>::iterator it = hit_counts.begin();
 
     // Sum each taxon's LTR path
     while (it != hit_counts.end()) {

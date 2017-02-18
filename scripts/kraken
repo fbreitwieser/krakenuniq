@@ -57,6 +57,7 @@ my $unclassified_out;
 my $classified_out;
 my $outfile;
 my $report_file;
+my $print_sequence = 0;
 
 GetOptions(
   "help" => \&display_help,
@@ -69,6 +70,7 @@ GetOptions(
   "min-hits=i" => \$min_hits,
   "unclassified-out=s" => \$unclassified_out,
   "classified-out=s" => \$classified_out,
+  "print-sequence=s" => \$print_sequence,
   "output=s" => \$outfile,
   "report-file=s" => \$report_file,
   "preload" => \$preload,
@@ -77,7 +79,7 @@ GetOptions(
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2,
   "only-classified-output" => \$only_classified_output,
-);
+) or die $!;
 
 if (! defined $threads) {
   $threads = $ENV{"KRAKEN_NUM_THREADS"} || 1;
@@ -147,8 +149,9 @@ push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-c", if $only_classified_output;
 push @flags, "-M" if $preload;
-push @flags, "-r", $report_file;
+push @flags, "-r", $report_file if defined $report_file;
 push @flags, "-a", $db_prefix[0]."/taxDB";
+push @flags, "-s" if $print_sequence;
 
 # handle piping for decompression/merging
 my @pipe_argv;
@@ -197,7 +200,7 @@ if (@pipe_argv) {
   }
 }
 
-print STDERR "$CLASSIFY, @flags, @ARGV\n";
+print STDERR "$CLASSIFY @flags @ARGV\n";
 exec $CLASSIFY, @flags, @ARGV;
 die "$PROG: exec error: $!\n";
 
