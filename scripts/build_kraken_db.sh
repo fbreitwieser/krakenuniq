@@ -169,7 +169,7 @@ else
 #  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "taxDB" ]
+if [ -s "taxDB" ]
 then
   echo "Skipping step 4.5, taxDB exists."
 else

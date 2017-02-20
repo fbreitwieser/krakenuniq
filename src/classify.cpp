@@ -44,7 +44,6 @@ unordered_map<uint32_t, ReadCounts> taxon_counts; // stats per taxon
 int Num_threads = 1;
 vector<string> DB_filenames;
 vector<string> Index_filenames;
-string Nodes_filename;
 bool Quick_mode = false;
 bool Fastq_input = false;
 bool Print_classified = false;
@@ -117,10 +116,6 @@ int main(int argc, char **argv) {
   #endif
 
   parse_command_line(argc, argv);
-  //if (! Nodes_filename.empty()) {
-  //  cerr << "Building parent node map " << endl;
-  //  Parent_map = build_parent_map(Nodes_filename);
-  //}
   
   if (!TaxDB_file.empty()) {
 	  taxdb = TaxonomyDB(TaxDB_file);
@@ -481,9 +476,6 @@ void parse_command_line(int argc, char **argv) {
         omp_set_num_threads(Num_threads);
         #endif
         break;
-      case 'n' :
-        Nodes_filename = optarg;
-        break;
       case 'q' :
         Quick_mode = true;
         break;
@@ -542,10 +534,6 @@ void parse_command_line(int argc, char **argv) {
     cerr << "Missing mandatory option -i" << endl;
     usage();
   }
-  if (Nodes_filename.empty() && ! Quick_mode) {
-    cerr << "Must specify one of -q or -n" << endl;
-    usage();
-  }
   if (optind == argc) {
     cerr << "No sequence data files specified" << endl;
   }
@@ -557,7 +545,6 @@ void usage(int exit_code) {
        << "Options: (*mandatory)" << endl
        << "* -d filename      Kraken DB filename" << endl
        << "* -i filename      Kraken DB index filename" << endl
-       << "  -n filename      NCBI Taxonomy nodes file" << endl
        << "  -o filename      Output file for Kraken output" << endl
        << "  -r filename      Output file for Kraken report output" << endl
        << "  -a filename      TaxDB" << endl
