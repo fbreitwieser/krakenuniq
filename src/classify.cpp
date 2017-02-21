@@ -35,8 +35,9 @@ using namespace kraken;
 void parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 void process_file(char *filename);
-void classify_sequence(DNASequence &dna, ostringstream &koss,
-                       ostringstream &coss, ostringstream &uoss);
+bool classify_sequence(DNASequence &dna, ostringstream &koss,
+                       ostringstream &coss, ostringstream &uoss,
+                       unordered_map<uint32_t, ReadCounts>&);
 string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig);
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
@@ -269,15 +270,24 @@ void process_file(char *filename) {
       if (total_nt == 0)
         break;
       
+      unordered_map<uint32_t, ReadCounts> my_taxon_counts;
+      uint64_t my_total_classified = 0;
       kraken_output_ss.str("");
       classified_output_ss.str("");
       unclassified_output_ss.str("");
       for (size_t j = 0; j < work_unit.size(); j++)
-        classify_sequence( work_unit[j], kraken_output_ss,
-                           classified_output_ss, unclassified_output_ss );
+        my_total_classified += 
+            classify_sequence( work_unit[j], kraken_output_ss,
+                           classified_output_ss, unclassified_output_ss,
+                           my_taxon_counts);
 
       #pragma omp critical(write_output)
       {
+        total_classified += my_total_classified;
+        for (auto &it : my_taxon_counts) {
+            taxon_counts[it.first] += it.second;
+        }
+
         if (Print_kraken)
           (*Kraken_output) << kraken_output_ss.str();
         if (Print_classified)
@@ -286,8 +296,9 @@ void process_file(char *filename) {
           (*Unclassified_output) << unclassified_output_ss.str();
         total_sequences += work_unit.size();
         total_bases += total_nt;
+        //if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
         if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
-          cerr << "\rProcessed " << total_sequences << " sequences (" << total_bases << " bp) ...";
+          cerr << "\rProcessed " << total_sequences << " sequences (" << total_classified << " classified) ...";
       }
     }
   }  // end parallel section
@@ -304,8 +315,9 @@ uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& cu
 	return taxon;
 }
 
-void classify_sequence(DNASequence &dna, ostringstream &koss,
-                       ostringstream &coss, ostringstream &uoss) {
+bool classify_sequence(DNASequence &dna, ostringstream &koss,
+                       ostringstream &coss, ostringstream &uoss,
+                       unordered_map<uint32_t, ReadCounts>& my_taxon_counts) {
   vector<uint32_t> taxa;
   vector<uint8_t> ambig_list;
   unordered_map<uint32_t, uint32_t> hit_counts;
@@ -330,11 +342,7 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
             if (taxon) break;
         }
 
-        #pragma omp critical
-        {
-        taxon_counts[taxon].kmers.add(*kmer_ptr);
-        ++taxon_counts[taxon].n_kmers;
-        }
+        my_taxon_counts[taxon].add_kmer(*kmer_ptr);
 
         if (taxon) {
           hit_counts[taxon]++;
@@ -352,12 +360,7 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   else
     call = resolve_tree(hit_counts, Parent_map);
 
-  if (call)
-    #pragma omp atomic
-    total_classified++;
-
-  #pragma omp critical
-  ++(taxon_counts[call].n_reads);
+  ++(my_taxon_counts[call].n_reads);
 
   if (Print_unclassified || Print_classified) {
     ostringstream *oss_ptr = call ? &coss : &uoss;
@@ -377,14 +380,14 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   }
 
   if (! Print_kraken)
-    return;
+    return call;
 
   if (call) {
     koss << "C\t";
   }
   else {
     if (Only_classified_kraken_output)
-      return;
+      return false;
     koss << "U\t";
   }
   koss << dna.id << "\t" << call << "\t" << dna.seq.size() << "\t";
@@ -402,7 +405,8 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   if (Print_sequence)
       koss << "\t" << dna.seq;
 
-  koss << endl;
+  koss << "\n";
+  return call;
 }
 
 string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig)
