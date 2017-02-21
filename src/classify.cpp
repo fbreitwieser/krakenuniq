@@ -27,6 +27,7 @@
 #include "gzstream.h"
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
+int New_taxid_start = 1000000000;
 
 using namespace std;
 using namespace kraken;
@@ -65,7 +66,7 @@ ostream *Report_output;
 vector<ofstream*> Open_fstreams;
 vector<ogzstream*> Open_gzstreams;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
-TaxonomyDB taxdb;
+TaxonomyDB<uint32_t> taxdb;
 
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
@@ -118,7 +119,7 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
   
   if (!TaxDB_file.empty()) {
-	  taxdb = TaxonomyDB(TaxDB_file);
+	  taxdb = TaxonomyDB<uint32_t>(TaxDB_file);
       for (const auto & tax : taxdb.taxIDsAndEntries) {
           if (tax.first != 0)
           Parent_map[tax.first] = tax.second.parentTaxonomyID;
@@ -196,7 +197,7 @@ int main(int argc, char **argv) {
 
   if (Print_kraken_report) {
 	taxdb.fillCounts(taxon_counts);
-	TaxReport rep = TaxReport(*Report_output, taxdb, false);
+	TaxReport<uint32_t> rep = TaxReport<uint32_t>(*Report_output, taxdb, false);
 	rep.printReport("kraken","blu");
   }
 

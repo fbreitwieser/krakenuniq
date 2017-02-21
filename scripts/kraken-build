@@ -63,6 +63,8 @@ my (
   $standard,
   $upgrade,
   $clean,
+
+  $add_taxonomy_ids_for_seq
 );
 
 $threads = $DEF_THREAD_CT;
@@ -71,6 +73,8 @@ $kmer_len = $DEF_KMER_LEN;
 $work_on_disk = "";
 $hash_size = "";
 $max_db_size = "";
+$add_taxonomy_ids_for_seq = 0;
+$rebuild = 0;
 
 # variables corresponding to task options
 my @TASK_LIST = (
@@ -108,6 +112,8 @@ GetOptions(
   "upgrade" => \$upgrade,
   "standard" => \$standard,
   "clean" => \$clean,
+
+  "generate-taxonomy-ids-for-sequences" => \$add_taxonomy_ids_for_seq
 ) or usage();
 
 if (@ARGV) {
@@ -235,6 +241,10 @@ Options:
                              (default: 1)
   --work-on-disk             Perform most operations on disk rather than in
                              RAM (will slow down build in most cases)
+  --generate-taxonomy-ids-for-sequences 
+                             Generate taxonomy IDs for sequences, starting with 1000000000.
+							 Can be useful to resolve classifications with multiple genomes
+							 for one taxonomy ID.
 EOF
   exit $exit_code;
 }
@@ -284,6 +294,7 @@ sub standard_installation {
 
 sub build_database {
   $ENV{"KRAKEN_REBUILD_DATABASE"} = $rebuild;
+  $ENV{"KRAKEN_ADD_TAXIDS_FOR_SEQ"} = $add_taxonomy_ids_for_seq;
   exec "build_kraken_db.sh";
 }
 
