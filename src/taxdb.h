@@ -42,7 +42,7 @@ struct ReadCounts {
     ReadCounts& operator+=(const ReadCounts& b) {
         n_reads += b.n_reads;
         n_kmers += b.n_kmers;
-		kmers += kmers;
+		kmers += b.kmers;
         return *this;
     }
 };

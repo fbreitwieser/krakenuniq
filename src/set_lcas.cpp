@@ -313,6 +313,7 @@ void parse_command_line(int argc, char **argv) {
         break;
       case 'a' :
         Add_taxIds_for_Sequences = true;
+        break;
       case 'b' :
         TaxDB_filename = optarg;
         break;

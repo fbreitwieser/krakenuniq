@@ -51,14 +51,13 @@ bool Fastq_input = false;
 bool Print_classified = false;
 bool Print_unclassified = false;
 bool Print_kraken = true;
-bool Print_kraken_report = true;
+bool Print_kraken_report = false;
 bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
 uint32_t Minimum_hit_count = 1;
 unordered_map<uint32_t, uint32_t> Parent_map;
-vector<KrakenDB*> KrakenDatabases;
 string Classified_output_file, Unclassified_output_file, Kraken_output_file, Report_output_file, TaxDB_file;
 ostream *Classified_output;
 ostream *Unclassified_output;
@@ -68,6 +67,7 @@ vector<ofstream*> Open_fstreams;
 vector<ogzstream*> Open_gzstreams;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
 TaxonomyDB<uint32_t> taxdb;
+static vector<KrakenDB*> KrakenDatabases (DB_filenames.size());
 
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
@@ -134,25 +134,24 @@ int main(int argc, char **argv) {
   if (Populate_memory)
     cerr << "Loading database(s)... " << endl;
 
+  static vector<QuickFile> idx_files (DB_filenames.size());
+  static vector<QuickFile> db_files (DB_filenames.size());
+  static vector<KrakenDBIndex> db_indices (DB_filenames.size());
+
+
   // TODO: Check DB_filenames and Index_filesnames have the same length
   for (size_t i=0; i < DB_filenames.size(); ++i) {
-    //cerr << "\t " << DB_filenames[i] << endl;
-    static QuickFile db_file;
-    db_file.open_file(DB_filenames[i]);
+    cerr << " Database " << DB_filenames[i] << endl;
+    db_files[i].open_file(DB_filenames[i]);
     if (Populate_memory)
-      db_file.load_file();
-    static KrakenDB Database = KrakenDB(db_file.ptr());
-    KmerScanner::set_k(Database.get_k());
-  
-    static QuickFile idx_file;
-    idx_file.open_file(Index_filenames[i]);
+      db_files[i].load_file();
+
+    KrakenDatabases.push_back(new KrakenDB(db_files[i].ptr()));
+    idx_files[i].open_file(Index_filenames[i]);
     if (Populate_memory)
-      idx_file.load_file();
-    static KrakenDBIndex db_index(idx_file.ptr());
-    Database.set_index(&db_index);
-    
-  
-    KrakenDatabases.push_back(&Database);
+      idx_files[i].load_file();
+    db_indices[i] = KrakenDBIndex(idx_files[i].ptr());
+    KrakenDatabases[i]->set_index(&db_indices[i]);
   }
 
   // TODO: Check all databases have the same k
@@ -325,7 +324,14 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   uint32_t taxon = 0;
   uint32_t hits = 0;  // only maintained if in quick mode
 
-  uint64_t current_bin_key; int64_t current_min_pos = 1;  int64_t current_max_pos = 0;
+
+  struct db_status {
+    uint64_t current_bin_key;
+    int64_t current_min_pos = 1;
+    int64_t current_max_pos = 0;
+  };
+
+  vector<db_status> db_statuses(KrakenDatabases.size());
 
   if (dna.seq.size() >= KrakenDatabases[0]->get_k()) {
     KmerScanner scanner(dna.seq);
@@ -337,8 +343,9 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
       else {
         ambig_list.push_back(0);
 
-        for (auto& db : KrakenDatabases) {
-            taxon = get_taxon_for_kmer(*db, kmer_ptr, current_bin_key, current_min_pos, current_max_pos);
+        for (size_t i=0; i<KrakenDatabases.size(); ++i) {
+            taxon = get_taxon_for_kmer(*KrakenDatabases[i], kmer_ptr, 
+                    db_statuses[i].current_bin_key, db_statuses[i].current_min_pos, db_statuses[i].current_max_pos);
             if (taxon) break;
         }
 

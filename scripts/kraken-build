@@ -67,6 +67,8 @@ my (
   $add_taxonomy_ids_for_seq
 );
 
+my $verbose = 0;
+
 $threads = $DEF_THREAD_CT;
 $minimizer_len = $DEF_MINIMIZER_LEN;
 $kmer_len = $DEF_KMER_LEN;
@@ -74,7 +76,6 @@ $work_on_disk = "";
 $hash_size = "";
 $max_db_size = "";
 $add_taxonomy_ids_for_seq = 0;
-$rebuild = 0;
 
 # variables corresponding to task options
 my @TASK_LIST = (
@@ -112,6 +113,7 @@ GetOptions(
   "upgrade" => \$upgrade,
   "standard" => \$standard,
   "clean" => \$clean,
+  "verbose" => \$verbose,
 
   "generate-taxonomy-ids-for-sequences" => \$add_taxonomy_ids_for_seq
 ) or usage();
@@ -293,9 +295,10 @@ sub standard_installation {
 }
 
 sub build_database {
-  $ENV{"KRAKEN_REBUILD_DATABASE"} = $rebuild;
+  $ENV{"KRAKEN_REBUILD_DATABASE"} = (defined $rebuild? 1 : 0);
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_SEQ"} = $add_taxonomy_ids_for_seq;
-  exec "build_kraken_db.sh";
+  my $opt = ($verbose? "-x" : "");
+  exec "build_kraken_db.sh $opt";
 }
 
 sub clean_database {
