@@ -22,6 +22,7 @@
 #include "krakendb.hpp"
 #include "krakenutil.hpp"
 #include "seqreader.hpp"
+#include "taxdb.h"
 #include <unordered_map>
 
 #define SKIP_LEN 50000
@@ -37,18 +38,23 @@ void process_file(string filename, uint32_t taxid);
 void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish);
 
 int Num_threads = 1;
-string DB_filename, Index_filename, Nodes_filename,
+string DB_filename, Index_filename, TaxDB_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
 bool force_taxid = false;
+int New_taxid_start = 1000000000;
 
 bool Allow_extra_kmers = false;
 bool verbose = false;
 bool Operate_in_RAM = false;
 bool One_FASTA_file = false;
+bool Add_taxIds_for_Sequences = false;
+
 unordered_map<uint32_t, uint32_t> Parent_map;
 unordered_map<string, uint32_t> ID_to_taxon_map;
+unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
+TaxonomyDB<uint32_t> taxdb;
 
 int main(int argc, char **argv) {
   #ifdef _OPENMP
@@ -57,8 +63,16 @@ int main(int argc, char **argv) {
 
   parse_command_line(argc, argv);
 
-  if (!force_taxid) {
-    Parent_map = build_parent_map(Nodes_filename);
+  if (!TaxDB_filename.empty() && !force_taxid) {
+	  taxdb = TaxonomyDB<uint32_t>(TaxDB_filename);
+      for (const auto & tax : taxdb.taxIDsAndEntries) {
+          if (tax.first != 0)
+          Parent_map[tax.first] = tax.second.parentTaxonomyID;
+      }
+      Parent_map[1] = 0;
+  } else {
+      cerr << "TaxDB argument is required!" << endl;
+      return 1;
   }
 
   QuickFile db_file(DB_filename, "rw");
@@ -96,25 +110,43 @@ int main(int argc, char **argv) {
     delete temp_ptr;
   }
 
+
+  if (Add_taxIds_for_Sequences && !TaxDB_filename.empty()) {
+    ofstream ofs(TaxDB_filename.c_str());
+    taxdb.writeTaxonomyIndex(ofs);
+    ofs.close();
+  }
+
   return 0;
 }
 
 void process_single_file() {
-  cerr << "Processing multiple FASTA files" << endl;
+  cerr << "Processing FASTA files" << endl;
   ifstream map_file(ID_to_taxon_map_filename.c_str());
   if (map_file.rdstate() & ifstream::failbit) {
     err(EX_NOINPUT, "can't open %s", ID_to_taxon_map_filename.c_str());
   }
-  string line;
+  string line, seq_id;
+  uint32_t parent_taxid, taxid;
   while (map_file.good()) {
     getline(map_file, line);
     if (line.empty())
       break;
-    string seq_id;
-    uint32_t taxid;
     istringstream iss(line);
     iss >> seq_id;
-    iss >> taxid;
+    if (ID_to_taxon_map.find(seq_id) != ID_to_taxon_map.end()) 
+        continue;
+
+    if (Add_taxIds_for_Sequences) {
+      iss >> parent_taxid;
+      taxid = ++New_taxid_start;
+      Parent_map[taxid] = parent_taxid;
+      auto itEntry = taxdb.taxIDsAndEntries.insert({taxid, TaxonomyEntry<uint32_t>(taxid, parent_taxid, "sequence")});
+      if (!itEntry.second)
+          cerr << "Taxonomy ID " << taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the XXX option." << endl;
+    } else {
+      iss >> taxid;
+    }
     ID_to_taxon_map[seq_id] = taxid;
   }
 
@@ -142,6 +174,15 @@ void process_single_file() {
     } else {
         taxid = ID_to_taxon_map[dna.id];
     }
+    
+    if (Add_taxIds_for_Sequences) {
+      auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
+	  if (entryIt == taxdb.taxIDsAndEntries.end()) {
+        cerr << "Error! Didn't find " << taxid << " in TaxonomyDB!!" << endl;
+	  } else {
+        entryIt->second.scientificName = dna.header_line;
+      }
+    }
 
     if (taxid) {
       #pragma omp parallel for schedule(dynamic)
@@ -155,6 +196,7 @@ void process_single_file() {
 
         ++seqs_no_taxid;
     }
+
     cerr << "\rProcessed " << seqs_processed << " sequences";
   }
   cerr << "\r                                                                            ";
@@ -232,7 +274,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTv")) != -1) {
+  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:a")) != -1) {
     switch (opt) {
       case 'f' :
         File_to_taxon_map_filename = optarg;
@@ -263,18 +305,22 @@ void parse_command_line(int argc, char **argv) {
       case 'T' :
         force_taxid = true;
         break;
-      case 'n' :
-        Nodes_filename = optarg;
-        break;
       case 'v' :
         verbose = true;
         break;
       case 'x' :
         Allow_extra_kmers = true;
         break;
+      case 'a' :
+        Add_taxIds_for_Sequences = true;
+        break;
+      case 'b' :
+        TaxDB_filename = optarg;
+        break;
       case 'M' :
         Operate_in_RAM = true;
         break;
+
       default:
         usage();
         break;
@@ -282,7 +328,7 @@ void parse_command_line(int argc, char **argv) {
   }
 
   if (DB_filename.empty() || Index_filename.empty() ||
-      Nodes_filename.empty())
+      TaxDB_filename.empty())
     usage();
   if (File_to_taxon_map_filename.empty() &&
       (Multi_fasta_filename.empty() || ID_to_taxon_map_filename.empty()))
@@ -300,13 +346,14 @@ void usage(int exit_code) {
        << "Options: (*mandatory)" << endl
        << "* -d filename      Kraken DB filename" << endl
        << "* -i filename      Kraken DB index filename" << endl
-       << "* -n filename      NCBI Taxonomy nodes file" << endl
+       << "* -b filename      Taxonomy DB file" << endl
        << "  -t #             Number of threads" << endl
        << "  -M               Copy DB to RAM during operation" << endl
        << "  -x               K-mers not found in DB do not cause errors" << endl
        << "  -f filename      File to taxon map" << endl
        << "  -F filename      Multi-FASTA file with sequence data" << endl
        << "  -m filename      Sequence ID to taxon map" << endl
+       << "  -a               Add taxonomy IDs (starting with "<<New_taxid_start<<") for sequences to Taxonomy DB" << endl
        << "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
        << "  -v               Verbose output" << endl
        << "  -h               Print this message" << endl

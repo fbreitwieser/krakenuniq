@@ -57,7 +57,7 @@ else
   echo "Kraken build set to minimize RAM usage."
 fi
 
-if [ -n "$KRAKEN_REBUILD_DATABASE" ]
+if [ "$KRAKEN_REBUILD_DATABASE" == "1" ]
 then
   rm -f database.* *.map lca.complete
 fi
@@ -169,12 +169,12 @@ else
 #  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "taxDB" ]
+if [ -s "taxDB" ]
 then
   echo "Skipping step 4.5, taxDB exists."
 else
   echo "Creating taxDB (step 4.5 of 5)... "
-  build_taxdb taxonomy/nodes.dmp taxonomy/names.dmp > taxDB
+  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp > taxDB
 fi
 
 
@@ -184,10 +184,15 @@ then
   echo "Skipping step 5, LCAs already set."
 else
   echo "Setting LCAs in database (step 5 of 5)..."
+  PARAM=""
+  if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
+	echo " Adding taxonomy IDs for sequences"
+	PARAM=" -a"
+  fi
   start_time1=$(date "+%s.%N")
   find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
     set_lcas $MEMFLAG -x -d database.kdb -i database.idx -v \
-    -n taxonomy/nodes.dmp -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
+    -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
   touch "lca.complete"
 
   echo "Database LCAs set. [$(report_time_elapsed $start_time1)]"

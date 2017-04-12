@@ -27,6 +27,7 @@
 #include "gzstream.h"
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
+int New_taxid_start = 1000000000;
 
 using namespace std;
 using namespace kraken;
@@ -34,8 +35,9 @@ using namespace kraken;
 void parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 void process_file(char *filename);
-void classify_sequence(DNASequence &dna, ostringstream &koss,
-                       ostringstream &coss, ostringstream &uoss);
+bool classify_sequence(DNASequence &dna, ostringstream &koss,
+                       ostringstream &coss, ostringstream &uoss,
+                       unordered_map<uint32_t, ReadCounts>&);
 string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig);
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
@@ -49,14 +51,13 @@ bool Fastq_input = false;
 bool Print_classified = false;
 bool Print_unclassified = false;
 bool Print_kraken = true;
-bool Print_kraken_report = true;
+bool Print_kraken_report = false;
 bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
 uint32_t Minimum_hit_count = 1;
 unordered_map<uint32_t, uint32_t> Parent_map;
-vector<KrakenDB*> KrakenDatabases;
 string Classified_output_file, Unclassified_output_file, Kraken_output_file, Report_output_file, TaxDB_file;
 ostream *Classified_output;
 ostream *Unclassified_output;
@@ -65,7 +66,8 @@ ostream *Report_output;
 vector<ofstream*> Open_fstreams;
 vector<ogzstream*> Open_gzstreams;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
-TaxonomyDB taxdb;
+TaxonomyDB<uint32_t> taxdb;
+static vector<KrakenDB*> KrakenDatabases (DB_filenames.size());
 
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
@@ -118,7 +120,7 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
   
   if (!TaxDB_file.empty()) {
-	  taxdb = TaxonomyDB(TaxDB_file);
+	  taxdb = TaxonomyDB<uint32_t>(TaxDB_file);
       for (const auto & tax : taxdb.taxIDsAndEntries) {
           if (tax.first != 0)
           Parent_map[tax.first] = tax.second.parentTaxonomyID;
@@ -132,25 +134,24 @@ int main(int argc, char **argv) {
   if (Populate_memory)
     cerr << "Loading database(s)... " << endl;
 
+  static vector<QuickFile> idx_files (DB_filenames.size());
+  static vector<QuickFile> db_files (DB_filenames.size());
+  static vector<KrakenDBIndex> db_indices (DB_filenames.size());
+
+
   // TODO: Check DB_filenames and Index_filesnames have the same length
   for (size_t i=0; i < DB_filenames.size(); ++i) {
-    //cerr << "\t " << DB_filenames[i] << endl;
-    static QuickFile db_file;
-    db_file.open_file(DB_filenames[i]);
+    cerr << " Database " << DB_filenames[i] << endl;
+    db_files[i].open_file(DB_filenames[i]);
     if (Populate_memory)
-      db_file.load_file();
-    static KrakenDB Database = KrakenDB(db_file.ptr());
-    KmerScanner::set_k(Database.get_k());
-  
-    static QuickFile idx_file;
-    idx_file.open_file(Index_filenames[i]);
+      db_files[i].load_file();
+
+    KrakenDatabases.push_back(new KrakenDB(db_files[i].ptr()));
+    idx_files[i].open_file(Index_filenames[i]);
     if (Populate_memory)
-      idx_file.load_file();
-    static KrakenDBIndex db_index(idx_file.ptr());
-    Database.set_index(&db_index);
-    
-  
-    KrakenDatabases.push_back(&Database);
+      idx_files[i].load_file();
+    db_indices[i] = KrakenDBIndex(idx_files[i].ptr());
+    KrakenDatabases[i]->set_index(&db_indices[i]);
   }
 
   // TODO: Check all databases have the same k
@@ -196,7 +197,7 @@ int main(int argc, char **argv) {
 
   if (Print_kraken_report) {
 	taxdb.fillCounts(taxon_counts);
-	TaxReport rep = TaxReport(*Report_output, taxdb, false);
+	TaxReport<uint32_t> rep = TaxReport<uint32_t>(*Report_output, taxdb, false);
 	rep.printReport("kraken","blu");
   }
 
@@ -268,15 +269,24 @@ void process_file(char *filename) {
       if (total_nt == 0)
         break;
       
+      unordered_map<uint32_t, ReadCounts> my_taxon_counts;
+      uint64_t my_total_classified = 0;
       kraken_output_ss.str("");
       classified_output_ss.str("");
       unclassified_output_ss.str("");
       for (size_t j = 0; j < work_unit.size(); j++)
-        classify_sequence( work_unit[j], kraken_output_ss,
-                           classified_output_ss, unclassified_output_ss );
+        my_total_classified += 
+            classify_sequence( work_unit[j], kraken_output_ss,
+                           classified_output_ss, unclassified_output_ss,
+                           my_taxon_counts);
 
       #pragma omp critical(write_output)
       {
+        total_classified += my_total_classified;
+        for (auto &it : my_taxon_counts) {
+            taxon_counts[it.first] += it.second;
+        }
+
         if (Print_kraken)
           (*Kraken_output) << kraken_output_ss.str();
         if (Print_classified)
@@ -285,8 +295,9 @@ void process_file(char *filename) {
           (*Unclassified_output) << unclassified_output_ss.str();
         total_sequences += work_unit.size();
         total_bases += total_nt;
+        //if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
         if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
-          cerr << "\rProcessed " << total_sequences << " sequences (" << total_bases << " bp) ...";
+          cerr << "\rProcessed " << total_sequences << " sequences (" << total_classified << " classified) ...";
       }
     }
   }  // end parallel section
@@ -303,8 +314,9 @@ uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& cu
 	return taxon;
 }
 
-void classify_sequence(DNASequence &dna, ostringstream &koss,
-                       ostringstream &coss, ostringstream &uoss) {
+bool classify_sequence(DNASequence &dna, ostringstream &koss,
+                       ostringstream &coss, ostringstream &uoss,
+                       unordered_map<uint32_t, ReadCounts>& my_taxon_counts) {
   vector<uint32_t> taxa;
   vector<uint8_t> ambig_list;
   unordered_map<uint32_t, uint32_t> hit_counts;
@@ -312,7 +324,14 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   uint32_t taxon = 0;
   uint32_t hits = 0;  // only maintained if in quick mode
 
-  uint64_t current_bin_key; int64_t current_min_pos = 1;  int64_t current_max_pos = 0;
+
+  struct db_status {
+    uint64_t current_bin_key;
+    int64_t current_min_pos = 1;
+    int64_t current_max_pos = 0;
+  };
+
+  vector<db_status> db_statuses(KrakenDatabases.size());
 
   if (dna.seq.size() >= KrakenDatabases[0]->get_k()) {
     KmerScanner scanner(dna.seq);
@@ -324,16 +343,13 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
       else {
         ambig_list.push_back(0);
 
-        for (auto& db : KrakenDatabases) {
-            taxon = get_taxon_for_kmer(*db, kmer_ptr, current_bin_key, current_min_pos, current_max_pos);
+        for (size_t i=0; i<KrakenDatabases.size(); ++i) {
+            taxon = get_taxon_for_kmer(*KrakenDatabases[i], kmer_ptr, 
+                    db_statuses[i].current_bin_key, db_statuses[i].current_min_pos, db_statuses[i].current_max_pos);
             if (taxon) break;
         }
 
-        #pragma omp critical
-        {
-        taxon_counts[taxon].kmers.add(*kmer_ptr);
-        ++taxon_counts[taxon].n_kmers;
-        }
+        my_taxon_counts[taxon].add_kmer(*kmer_ptr);
 
         if (taxon) {
           hit_counts[taxon]++;
@@ -351,12 +367,7 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   else
     call = resolve_tree(hit_counts, Parent_map);
 
-  if (call)
-    #pragma omp atomic
-    total_classified++;
-
-  #pragma omp critical
-  ++(taxon_counts[call].n_reads);
+  ++(my_taxon_counts[call].n_reads);
 
   if (Print_unclassified || Print_classified) {
     ostringstream *oss_ptr = call ? &coss : &uoss;
@@ -376,14 +387,14 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   }
 
   if (! Print_kraken)
-    return;
+    return call;
 
   if (call) {
     koss << "C\t";
   }
   else {
     if (Only_classified_kraken_output)
-      return;
+      return false;
     koss << "U\t";
   }
   koss << dna.id << "\t" << call << "\t" << dna.seq.size() << "\t";
@@ -401,7 +412,8 @@ void classify_sequence(DNASequence &dna, ostringstream &koss,
   if (Print_sequence)
       koss << "\t" << dna.seq;
 
-  koss << endl;
+  koss << "\n";
+  return call;
 }
 
 string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig)

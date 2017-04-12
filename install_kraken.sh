@@ -62,3 +62,5 @@ for file in $KRAKEN_DIR/kraken*
 do
   [ -x "$file" ] && echo "  $file"
 done
+
+exit 0
