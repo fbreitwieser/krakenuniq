@@ -175,8 +175,6 @@ uint64_t reads(const T read_count) {
 	return(0);
 }
 
-
-
 inline
 uint64_t reads(const uint64_t read_count) {
 	return(read_count);
@@ -679,8 +677,8 @@ void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID,READCOUNTS>& tax
 		//case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
 		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (reads(tax.read_counts) + reads(tax.read_counts_children)); break;
 		case REPORTCOLS::NUM_READS:  _reportOfb << reads(tax.read_counts); break;
-		//case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.kmers.cardinality(); break;
-		//case REPORTCOLS::NUM_KMERS: _reportOfb << tax.numKmers; break;
+		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.read_counts.kmers.cardinality(); break;
+		case REPORTCOLS::NUM_KMERS: _reportOfb << tax.read_counts.n_kmers; break;
 		//case REPORTCOLS::GENOME_SIZE: ; break;
 		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;
 		//case REPORTCOLS::SUM_SCORE: ; break;
