@@ -22,7 +22,7 @@
 #include "krakenutil.hpp"
 #include "quickfile.hpp"
 #include "seqreader.hpp"
-#include "hyperloglogplus.h"
+#include "readcounts.hpp"
 #include "taxdb.h"
 #include "gzstream.h"
 
@@ -66,7 +66,7 @@ ostream *Report_output;
 vector<ofstream*> Open_fstreams;
 vector<ogzstream*> Open_gzstreams;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
-TaxonomyDB<uint32_t> taxdb;
+TaxonomyDB<uint32_t, ReadCounts> taxdb;
 static vector<KrakenDB*> KrakenDatabases (DB_filenames.size());
 
 uint64_t total_classified = 0;
@@ -78,29 +78,6 @@ inline bool ends_with(std::string const & value, std::string const & ending)
         if (ending.size() > value.size()) return false;
             return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
-
-struct ReadCounts {
-	uint64_t n_reads = 0;
-	uint64_t n_kmers = 0;
-    HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
-	void add_kmer(uint64_t kmer) {
-		++ n_kmers;
-		kmers.add(kmer);
-	}
-    ReadCounts& operator+=(const ReadCounts& b) {
-        n_reads += b.n_reads;
-        n_kmers += b.n_kmers;
-		kmers += b.kmers;
-        return *this;
-    }
-};
-
-inline
-uint64_t reads(const ReadCounts& read_count) {
-	return(read_count.n_reads);
-}
-
-
 
 ostream* cout_or_file(string file) {
     if (file == "-")
@@ -143,7 +120,7 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
   
   if (!TaxDB_file.empty()) {
-	  taxdb = TaxonomyDB<uint32_t>(TaxDB_file);
+	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_file);
       for (const auto & tax : taxdb.taxIDsAndEntries) {
           if (tax.first != 0)
           Parent_map[tax.first] = tax.second.parentTaxonomyID;
@@ -220,7 +197,7 @@ int main(int argc, char **argv) {
 
   if (Print_kraken_report) {
 	taxdb.fillCounts(taxon_counts);
-	TaxReport<uint32_t> rep = TaxReport<uint32_t>(*Report_output, taxdb, false);
+	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, false);
 	rep.printReport("kraken","blu");
   }
 

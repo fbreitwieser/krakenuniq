@@ -29,8 +29,6 @@ namespace kraken {
 
   // Return the lowest common ancestor of a and b, according to parent_map
   // NOTE: LCA(0,x) = LCA(x,0) = x
-  uint32_t lca(std::unordered_map<uint32_t, uint32_t> &parent_map,
-    uint32_t a, uint32_t b);
 
   // Resolve classification tree
   uint32_t resolve_tree(std::unordered_map<uint32_t, uint32_t> &hit_counts,

@@ -23,6 +23,7 @@
 #include "krakenutil.hpp"
 #include "seqreader.hpp"
 #include "taxdb.h"
+#include "readcounts.hpp"
 #include <unordered_map>
 
 #define SKIP_LEN 50000
@@ -54,7 +55,7 @@ unordered_map<uint32_t, uint32_t> Parent_map;
 unordered_map<string, uint32_t> ID_to_taxon_map;
 unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
-TaxonomyDB<uint32_t> taxdb;
+TaxonomyDB<uint32_t, ReadCounts> taxdb;
 
 int main(int argc, char **argv) {
   #ifdef _OPENMP
@@ -64,7 +65,7 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
   if (!TaxDB_filename.empty() && !force_taxid) {
-	  taxdb = TaxonomyDB<uint32_t>(TaxDB_filename);
+	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_filename);
       for (const auto & tax : taxdb.taxIDsAndEntries) {
           if (tax.first != 0)
           Parent_map[tax.first] = tax.second.parentTaxonomyID;
@@ -141,7 +142,7 @@ void process_single_file() {
       iss >> parent_taxid;
       taxid = ++New_taxid_start;
       Parent_map[taxid] = parent_taxid;
-      auto itEntry = taxdb.taxIDsAndEntries.insert({taxid, TaxonomyEntry<uint32_t>(taxid, parent_taxid, "sequence")});
+      auto itEntry = taxdb.taxIDsAndEntries.insert({taxid, TaxonomyEntry<uint32_t, ReadCounts>(taxid, parent_taxid, "sequence")});
       if (!itEntry.second)
           cerr << "Taxonomy ID " << taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the XXX option." << endl;
     } else {
