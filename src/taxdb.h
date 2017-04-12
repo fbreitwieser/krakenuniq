@@ -402,8 +402,12 @@ bool TaxonomyDB::isSubSpecies(uint32_t taxonomyID) const {
 
 void TaxonomyDB::fillCounts(const unordered_map<uint32_t, ReadCounts>& taxon_counts) {
 	for (auto& elem : taxon_counts) {
-		//cerr << "fill: "<< elem.first << endl;
-		TaxonomyEntry* tax = &taxIDsAndEntries.at(elem.first);
+		auto it = taxIDsAndEntries.find(elem.first);
+		if (it == taxIDsAndEntries.end()) {
+			cerr << "No taxonomy entry for " << elem.first << "!!" << endl;
+			continue;
+		}
+		TaxonomyEntry* tax = &it->second;
 		//cerr << "fill done: "<< elem.first << endl;
 		tax->numReadsAligned += elem.second.n_reads;
 		tax->numKmers += elem.second.n_kmers;
