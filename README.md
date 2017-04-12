@@ -1,7 +1,7 @@
-Kraken taxonomic sequence classification system with Unique K-mer Counting
+Kraken taxonomic sequence classification system with unique k-mer counting
 ===============================================
 
-[Kraken](https://github.com/DerrickWood/kraken) is a fast taxonomic classifier for metagenomics data. This project, kraken-hll, adds some additional functionality - most notably a unique k-mer count. Spurious identifications due to sequence contamination in the dataset or database often leads to many reads, however they usually cover only a small portion of the genome. 
+[Kraken](https://github.com/DerrickWood/kraken) is a fast taxonomic classifier for metagenomics data. This project, kraken-hll, adds some additional functionality - most notably a unique k-mer count using the HyperLogLog algorithm. Spurious identifications due to sequence contamination in the dataset or database often leads to many reads, however they usually cover only a small portion of the genome. 
 
 kraken-hll adds two additional columns to the Kraken report - total number of k-mers observed for taxon, and the total number of unique k-mers observed for taxon (columns 3 and 4, resp.). 
 
