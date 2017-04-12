@@ -9,6 +9,7 @@
 #define REPORT_COLS_H
 
 #include<map>
+#include<string>
 
 enum class REPORTCOLS : uint8_t {
 	SPACED_NAME,
@@ -29,7 +30,7 @@ enum class REPORTCOLS : uint8_t {
 };
 
 
-static const std::map<string, REPORTCOLS> report_col_name_map = {
+static const std::map<std::string, REPORTCOLS> report_col_name_map = {
 		{"name", REPORTCOLS::NAME},
 		{"spaced_name", REPORTCOLS::SPACED_NAME},
 		{"taxID", REPORTCOLS::TAX_ID},
