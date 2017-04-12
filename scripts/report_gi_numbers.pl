@@ -19,11 +19,11 @@
 
 # Reads multi-FASTA input and for each sequence ID reports a
 # tab-delimited line:
-#   <GI number> <sequence ID>
+#   <GI number> <sequence ID> <full header>
 # 
 #   or in the case of a sequence with Kraken taxid information:
 #
-#   TAXID <taxonomy ID> <sequence ID>
+#   TAXID <taxonomy ID> <sequence ID> <full header>
 #
 # Assumes all sequence IDs actually have GI numbers or Kraken
 # taxid information.
@@ -38,12 +38,14 @@ while (<>) {
   next unless /^>(\S+)/;
   my $seq_id = $1;
   if ($seq_id =~ /(^|\|)kraken:taxid\|(\d+)/) {
-    print "TAXID\t$2\t$seq_id\n";
+
+    print "TAXID\t$2\t$seq_id\t$_\n";
     next;
   }
 
   if ($seq_id !~ /(^|\|)gi\|(\d+)/) {
     die "$PROG: sequence ID $seq_id lacks GI number, aborting.\n";
   }
-  print "$2\t$seq_id\n";
+
+  print "$2\t$seq_id\t$_\n";
 }

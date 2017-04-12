@@ -37,11 +37,13 @@ require "$KRAKEN_DIR/krakenlib.pm";
 
 my $show_zeros = 0;
 my $db_prefix;
+my $is_cnts_table = 0;
 
 GetOptions(
   "help" => \&display_help,
   "version" => \&display_version,
   "show-zeros" => \$show_zeros,
+  "cnts-table" => \$is_cnts_table,
   "db=s" => \$db_prefix,
 );
 
@@ -77,10 +79,18 @@ load_taxonomy($db_prefix);
 my %taxo_counts;
 my $seq_count = 0;
 $taxo_counts{0} = 0;
-while (<>) {
-  my @fields = split;
-  $taxo_counts{$fields[2]}++;
-  $seq_count++;
+if ($is_cnts_table) {
+  while (<>) {
+    my ($taxid,$count) = split;
+    $taxo_counts{$taxid} = $count;
+    $seq_count += $count;
+  }
+} else {
+  while (<>) {
+    my (undef,$taxid) = split;
+    $taxo_counts{$taxid}++;
+    $seq_count++;
+  }
 }
 my $classified_count = $seq_count - $taxo_counts{0};
 
