@@ -19,7 +19,7 @@
 
 set -e
 
-VERSION="0.10.6-unreleased"
+VERSION="0.10.7-kraken-hll"
 
 if [ -z "$1" ] || [ -n "$2" ]
 then
@@ -58,7 +58,7 @@ echo "Kraken installation complete."
 echo
 echo "To make things easier for you, you may want to copy/symlink the following"
 echo "files into a directory in your PATH:"
-for file in $KRAKEN_DIR/kraken*
+for file in $KRAKEN_DIR/kraken_hll*
 do
   [ -x "$file" ] && echo "  $file"
 done
