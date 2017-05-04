@@ -27,8 +27,7 @@ int main(int argc, char **argv) {
       std::cout << "Provide names.dmp and nodes.dmp\n";
       return 1;
     }
-    TaxonomyDB<uint32_t, uint32_t> taxdb;
-    taxdb.writeTaxonomyIndex(
-            std::cout, argv[1], argv[2]);
+    TaxonomyDB<uint32_t, uint32_t> taxdb(argv[1], argv[2]);
+    taxdb.writeTaxonomyIndex(std::cout);
 
 }
