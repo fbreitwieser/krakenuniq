@@ -96,12 +96,10 @@ struct TaxonomyEntryPtr_comp {
 template<typename TAXID, typename READCOUNTS>
 class TaxonomyDB {
  public:
+  TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName);
   TaxonomyDB(const std::string inFileName);
-  TaxonomyDB();
-  //std::unordered_map<std::string, TAXID> seqIDsAndTaxIds;
-  std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > taxIDsAndEntries;
-  void parseNamesDump(const std::string namesDumpFileName);
-  void parseNodesDump(const std::string nodesDumpFileName);
+  void writeTaxonomyIndex(std::ostream & outs) const;
+
   TAXID getTaxIDAtRank(const TAXID taxID, const std::string& rank) const;
   std::string getScientificName(const TAXID taxID) const;
   std::string getRank(const TAXID taxID) const;
@@ -111,18 +109,21 @@ class TaxonomyDB {
   std::unordered_map<std::string, TAXID> getScientificNameMap() const;
   std::string getLineage(TAXID taxonomyID) const;
   std::string getMetaPhlAnLineage(TAXID taxonomyID) const;
-  char* getIndexFileName(const TAXID hostTaxID) const;
-  void readTaxonomyIndex(const std::string inFileName);
-  void writeTaxonomyIndex(std::ostream & outs) const;
-  void writeTaxonomyIndex(std::ostream & outs,
-                          const std::string namesDumpFileName,
-                          const std::string nodesDumpFileName);
+
   bool isSubSpecies(TAXID taxonomyID) const;
   int isBelowInTree(TAXID upper, TAXID lower) const;
+
   void addCounts(const TAXID taxid, const READCOUNTS& read_counts_);
   void fillCounts(const std::unordered_map<TAXID, READCOUNTS>& taxon_counts);
-  void createPointers();
   void printReport();
+
+  std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > taxIDsAndEntries;
+ private:
+  TaxonomyDB();
+  void readTaxonomyIndex(const std::string inFileName);
+  void parseNamesDump(const std::string namesDumpFileName);
+  void parseNodesDump(const std::string nodesDumpFileName);
+  void createPointers();
 };
 
 
@@ -292,11 +293,19 @@ TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB() { }
 
 template<typename TAXID, typename READCOUNTS>
 TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB(const std::string inFileName) {
-  log_msg("Building taxonomy index");
+  log_msg("Building taxonomy index from " + inFileName);
   readTaxonomyIndex(inFileName);
   createPointers();
   log_msg("Built a taxonomy tree with " + std::to_string(taxIDsAndEntries.size()) +
       " nodes");
+}
+
+template<typename TAXID, typename READCOUNTS>
+TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName) {
+  log_msg("Building taxonomy index from " + nodesDumpFileName + " and " + namesDumpFileName);
+  parseNodesDump(nodesDumpFileName);
+  parseNamesDump(namesDumpFileName);
+  log_msg("Built a taxonomy tree with " + std::to_string(taxIDsAndEntries.size()) + " nodes");
 }
 
 template<typename TAXID, typename READCOUNTS>
@@ -356,15 +365,6 @@ void TaxonomyDB<TAXID,READCOUNTS>::parseNamesDump(const std::string namesDumpFil
       entryIt->second.scientificName = scientificName;
     }
   }
-}
-
-template<typename TAXID, typename READCOUNTS>
-void TaxonomyDB<TAXID,READCOUNTS>::writeTaxonomyIndex(std::ostream & outs,
-									const std::string namesDumpFileName,
-                                    const std::string nodesDumpFileName) {
-  parseNodesDump(nodesDumpFileName);
-  parseNamesDump(namesDumpFileName);
-  writeTaxonomyIndex(outs);
 }
 
 template<typename KeyType, typename ValueType>
