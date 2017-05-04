@@ -206,8 +206,8 @@ sub usage {
 Usage: $PROG [options] <filename(s)>
 
 Options:
-  --db NAME               Name for Kraken DB
-                          (default: $default_db)
+  --db NAME               Name for Kraken DB (default: $default_db)
+  --report-file FILENAME  Write Kraken report to FILENAME
   --threads NUM           Number of threads (default: $def_thread_ct)
   --fasta-input           Input is FASTA format
   --fastq-input           Input is FASTQ format

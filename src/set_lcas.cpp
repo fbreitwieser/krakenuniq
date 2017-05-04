@@ -144,7 +144,7 @@ void process_single_file() {
       Parent_map[taxid] = parent_taxid;
       auto itEntry = taxdb.taxIDsAndEntries.insert({taxid, TaxonomyEntry<uint32_t, ReadCounts>(taxid, parent_taxid, "sequence")});
       if (!itEntry.second)
-          cerr << "Taxonomy ID " << taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the XXX option." << endl;
+          cerr << "Taxonomy ID " << taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the -a option." << endl;
     } else {
       iss >> taxid;
     }
@@ -172,6 +172,9 @@ void process_single_file() {
     string prefix = "kraken:taxid|";
     if (dna.id.substr(0,prefix.size()) == prefix) {
         taxid = std::atoi(dna.id.substr(prefix.size()).c_str());
+        const auto strBegin = dna.header_line.find_first_not_of("\t ");
+        if (strBegin != std::string::npos)
+            dna.header_line = dna.header_line.substr(strBegin);
     } else {
         taxid = ID_to_taxon_map[dna.id];
     }

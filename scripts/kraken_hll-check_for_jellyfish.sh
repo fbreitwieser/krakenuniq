@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
+# modified by Florian Breitwieser, 2017
 #
 # This file is part of the Kraken taxonomic sequence classification system.
 #
@@ -24,12 +25,23 @@ set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
-JELLYFISH_VERSION=$(jellyfish --version | awk '{print $2}')
+JELLYFISH_BIN="jellyfish"
+if hash jellyfish1 2>/dev/null; then
+    JELLYFISH_BIN="jellyfish1"
+elif hash jellyfish 2>/dev/null; then
+    JELLYFISH_BIN="jellyfish"
+else 
+    echo "Did not find jellyfish!" 1>&2
+    exit 1
+fi
+
+JELLYFISH_VERSION=$( $JELLYFISH_BIN --version | awk '{print $2}')
 if [[ $JELLYFISH_VERSION =~ ^1\. ]]
 then
-  echo "Found jellyfish v$JELLYFISH_VERSION"
+  echo "Found jellyfish v$JELLYFISH_VERSION" 1>&2
 else
-  echo "Found jellyfish v$JELLYFISH_VERSION"
-  echo "Kraken requires jellyfish version 1"
+  echo "Found jellyfish v$JELLYFISH_VERSION" 1>&2
+  echo "Kraken requires jellyfish version 1" 1>&2
   exit 1
 fi
+echo $JELLYFISH_BIN

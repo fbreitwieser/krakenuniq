@@ -298,7 +298,7 @@ sub build_database {
   $ENV{"KRAKEN_REBUILD_DATABASE"} = (defined $rebuild? 1 : 0);
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_SEQ"} = $add_taxonomy_ids_for_seq;
   my $opt = ($verbose? "-x" : "");
-  exec "build_kraken_db.sh $opt";
+  exec "kraken_hll-build_db.sh $opt";
 }
 
 sub clean_database {

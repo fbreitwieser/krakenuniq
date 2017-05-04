@@ -37,6 +37,7 @@ function report_time_elapsed() {
 }
 
 start_time=$(date "+%s.%N")
+script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
@@ -59,17 +60,26 @@ fi
 
 if [ "$KRAKEN_REBUILD_DATABASE" == "1" ]
 then
-  rm -f database.* *.map lca.complete
+  rm -f database.* *.map lca.complete library/seq-files.txt
 fi
+
+if [ !-f "library/seq-files.txt" ]; then
+    echo "Finding all library files"
+    find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library/seq-files.txt
+fi
+N_FILES=`cat library/seq-files.txt | wc -l`
+echo "Found $N_FILES sequence files (*.{fna,fa,ffn} in the library)"
 
 if [ -e "database.jdb" ]
 then
   echo "Skipping step 1, k-mer set already exists."
 else
-  echo "Creating k-mer set (step 1 of 5)..."
+  echo "Creating k-mer set (step 1 of 6)..."
   start_time1=$(date "+%s.%N")
 
-  check_for_jellyfish.sh
+  JELLYFISH_BIN=`$script_dir/kraken_hll-check_for_jellyfish.sh`
+  echo "Using $JELLYFISH_BIN"
+  [[ "$JELLYFISH_BIN" != "" ]] || exit 1
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
@@ -77,14 +87,14 @@ else
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
-    jellyfish count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
+  cat library/seq-files.txt | tr '\n' '\0' | xargs -0 cat | \
+    $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
       -o database /dev/fd/0
 
   # Merge only if necessary
   if [ -e "database_1" ]
   then
-    jellyfish merge -o database.jdb.tmp database_*
+    $JELLYFISH_BIN merge -o database.jdb.tmp database_*
   else
     mv database_0 database.jdb.tmp
   fi
@@ -111,7 +121,7 @@ else
     then
       echo "Skipping step 2, database reduction unnecessary."
     else
-      echo "Reducing database size (step 2 of 5)..."
+      echo "Reducing database size (step 2 of 6)..."
       max_kdb_size=$(echo "$KRAKEN_MAX_DB_SIZE*2^30 - $idx_size" | bc)
       idx_size_gb=$(printf %.2f $(echo "$idx_size/2^30" | bc) )
       if (( $(echo "$max_kdb_size < 0" | bc) == 1 ))
@@ -143,7 +153,7 @@ if [ -e "database.kdb" ]
 then
   echo "Skipping step 3, k-mer set already sorted."
 else
-  echo "Sorting k-mer set (step 3 of 5)..."
+  echo "Sorting k-mer set (step 3 of 6)..."
   start_time1=$(date "+%s.%N")
   db_sort -z $MEMFLAG -t $KRAKEN_THREAD_CT -n $KRAKEN_MINIMIZER_LEN \
     -d database.jdb -o database.kdb.tmp \
@@ -159,38 +169,37 @@ if [ -e "seqid2taxid.map" ]
 then
   echo "Skipping step 4, seqID to taxID map already complete."
 else
-  echo "Creating seqID to taxID map (step 4 of 5)... [blu]"
-#  start_time1=$(date "+%s.%N")
-#  make_seqid_to_taxid_map taxonomy/gi_taxid_nucl.dmp gi2seqid.map \
-#    > seqid2taxid.map.tmp
-#  mv seqid2taxid.map.tmp seqid2taxid.map
-#  line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
+  echo "Creating seqID to taxID map (step 4 of 6).."
+  start_time1=$(date "+%s.%N")
+  cat library/seq-files.txt | tr '\n' '\0' | xargs -0 grep '^>' | sed 's/.//' | sed 's/ .*//' | sort > library/seq-headers.txt
+  join -t $'\t' nucl_gb.accession2taxid.sorted library/seq-headers.txt > seqid2taxid.map.tmp
+  mv seqid2taxid.map.tmp seqid2taxid.map
+  line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
-#  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
+  echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
 if [ -s "taxDB" ]
 then
-  echo "Skipping step 4.5, taxDB exists."
+  echo "Skipping step 5, taxDB exists."
 else
-  echo "Creating taxDB (step 4.5 of 5)... "
+  echo "Creating taxDB (step 5 of 6)... "
   build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp > taxDB
 fi
 
 
-
 if [ -e "lca.complete" ]
 then
-  echo "Skipping step 5, LCAs already set."
+  echo "Skipping step 6, LCAs already set."
 else
-  echo "Setting LCAs in database (step 5 of 5)..."
+  echo "Setting LCAs in database (step 6 of 6)..."
   PARAM=""
   if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
 	echo " Adding taxonomy IDs for sequences"
 	PARAM=" -a"
   fi
   start_time1=$(date "+%s.%N")
-  find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -exec cat {} + | \
+  cat library/seq-files.txt | tr '\n' '\0' | xargs -0 cat | \
     set_lcas $MEMFLAG -x -d database.kdb -i database.idx -v \
     -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
   touch "lca.complete"
@@ -198,4 +207,5 @@ else
   echo "Database LCAs set. [$(report_time_elapsed $start_time1)]"
 fi
 
-echo "Database construction complete. [Total: $(report_time_elapsed $start_time)]"
+echo "Database construction complete. [Total: $(report_time_elapsed $start_time)]
+You can delete all files but database.{kdb,idx} and taxDB now, if you want"
