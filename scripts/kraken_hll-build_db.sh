@@ -41,6 +41,7 @@ script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
+JELLYFISH_BIN=`$script_dir/kraken_hll-check_for_jellyfish.sh`
 
 if [ ! -d "$DATABASE_DIR" ]
 then
@@ -77,7 +78,6 @@ else
   echo "Creating k-mer set (step 1 of 6)..."
   start_time1=$(date "+%s.%N")
 
-  JELLYFISH_BIN=`$script_dir/kraken_hll-check_for_jellyfish.sh`
   echo "Using $JELLYFISH_BIN"
   [[ "$JELLYFISH_BIN" != "" ]] || exit 1
   # Estimate hash size as 1.15 * chars in library FASTA files
@@ -179,20 +179,11 @@ else
   echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -s "taxDB" ]
-then
-  echo "Skipping step 5, taxDB exists."
-else
-  echo "Creating taxDB (step 5 of 6)... "
-  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp > taxDB
-fi
-
-
 if [ -e "lca.complete" ]
 then
-  echo "Skipping step 6, LCAs already set."
+  echo "Skipping step 5, LCAs already set."
 else
-  echo "Setting LCAs in database (step 6 of 6)..."
+  echo "Setting LCAs in database (step 5 of 6)..."
   PARAM=""
   if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
 	echo " Adding taxonomy IDs for sequences"
@@ -206,6 +197,16 @@ else
 
   echo "Database LCAs set. [$(report_time_elapsed $start_time1)]"
 fi
+
+if [ -s "taxDB" ]
+then
+  echo "Skipping step 6, taxDB exists."
+else
+  echo "Creating taxDB (step 6 of 6)... "
+  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp > taxDB.dmp
+  mv taxDB.tmp taxDB
+fi
+
 
 echo "Database construction complete. [Total: $(report_time_elapsed $start_time)]
 You can delete all files but database.{kdb,idx} and taxDB now, if you want"
