@@ -21,6 +21,7 @@
 #define KRAKENDB_HPP
 
 #include "kraken_headers.hpp"
+#include <unordered_map>
 
 namespace kraken {
   class KrakenDBIndex {
@@ -60,6 +61,10 @@ namespace kraken {
     uint32_t *kmer_query(uint64_t kmer, uint64_t *last_bin_key,
                          int64_t *min_pos, int64_t *max_pos,
                          bool retry_on_failure=true);
+
+
+    // return a count of k-mers for all taxons
+	std::unordered_map<uint32_t,uint64_t> count_taxons();
     
     // return "bin key" for kmer, based on index
     // If idx_nt not specified, use index's value

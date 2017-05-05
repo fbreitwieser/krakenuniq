@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
   std::cerr << "Finishing up ..\n";
 
   if (Print_kraken_report) {
-	taxdb.fillCounts(taxon_counts);
+	taxdb.setReadCounts(taxon_counts);
 	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, false);
 	rep.printReport("kraken","blu");
   }

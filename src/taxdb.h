@@ -65,15 +65,16 @@ class TaxonomyEntry {
   TaxonomyEntry(TAXID taxonomyID_, TAXID parentTaxonomyID_, std::string rank_) :
 	  taxonomyID(taxonomyID_), parentTaxonomyID(parentTaxonomyID_), rank(rank_) {}
 
-  TaxonomyEntry(TAXID taxonomyID_, TAXID parentTaxonomyID_, std::string rank_, std::string scientificName_) :
-	  taxonomyID(taxonomyID_), parentTaxonomyID(parentTaxonomyID_), rank(rank_), scientificName(scientificName_) {}
+  TaxonomyEntry(TAXID taxonomyID_, TAXID parentTaxonomyID_, std::string rank_, std::string scientificName_, uint64_t genomeSize_ = 0, uint64_t genomeSizeOfChildren_ = 0) :
+	  taxonomyID(taxonomyID_), parentTaxonomyID(parentTaxonomyID_), rank(rank_), scientificName(scientificName_),
+      genomeSize(genomeSize_), genomeSizeOfChildren(genomeSizeOfChildren_) {}
 
   inline bool operator==(const TaxonomyEntry& other) const; 
   TaxonomyEntry* parent = nullptr;
   std::vector<TaxonomyEntry*> children;
 
-  READCOUNTS read_counts = READCOUNTS();
-  READCOUNTS read_counts_children = READCOUNTS();
+  READCOUNTS readCounts = READCOUNTS();
+  READCOUNTS readCountsOfChildren = READCOUNTS();
 
   bool used = false;
   uint64_t genomeSize = 0;
@@ -83,8 +84,8 @@ class TaxonomyEntry {
 
 //template<>
 //TaxonomyEntry<uint32_t, uint64_t>::TaxonomyEntry () {
-//	read_counts = 0;
-//	read_counts_children = 0;
+//	readCounts = 0;
+//	readCountsOfChildren = 0;
 //}
 
 template<typename TAXID, typename READCOUNTS>
@@ -97,7 +98,8 @@ template<typename TAXID, typename READCOUNTS>
 class TaxonomyDB {
  public:
   TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName);
-  TaxonomyDB(const std::string inFileName);
+  TaxonomyDB(const std::string inFileName, bool hasGenomeSizes = false);
+  TaxonomyDB();
   void writeTaxonomyIndex(std::ostream & outs) const;
 
   TAXID getTaxIDAtRank(const TAXID taxID, const std::string& rank) const;
@@ -113,17 +115,21 @@ class TaxonomyDB {
   bool isSubSpecies(TAXID taxonomyID) const;
   int isBelowInTree(TAXID upper, TAXID lower) const;
 
-  void addCounts(const TAXID taxid, const READCOUNTS& read_counts_);
-  void fillCounts(const std::unordered_map<TAXID, READCOUNTS>& taxon_counts);
+  void setGenomeSizes(const std::unordered_map<TAXID, uint64_t> & genomeSizes);
+  void setReadCounts(const std::unordered_map<TAXID, READCOUNTS>& readCounts);
+  void setGenomeSize(const TAXID taxid, const uint64_t genomeSize);
+  void addReadCount(const TAXID taxid, const READCOUNTS& readCounts_);
+
   void printReport();
 
   std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > taxIDsAndEntries;
+  bool genomeSizes_are_set = false;
  private:
-  TaxonomyDB();
-  void readTaxonomyIndex(const std::string inFileName);
+  std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > 
+    readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes);
   void parseNamesDump(const std::string namesDumpFileName);
   void parseNodesDump(const std::string nodesDumpFileName);
-  void createPointers();
+  void createPointers(std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >& taxIDsAndEntries);
 };
 
 
@@ -243,15 +249,14 @@ std::vector<std::string> get_fields(const std::string &s, const std::string& del
 }
 
 
-
 //template<>
 //TaxonomyEntry<uint32_t, uint64_t>::TaxonomyEntry () {
-//	read_counts = 0;
-//	read_counts_children = 0;
+//	readCounts = 0;
+//	readCountsOfChildren = 0;
 //}
 template<typename TAXID, typename READCOUNTS>
 bool TaxonomyEntryPtr_comp<TAXID,READCOUNTS>::operator() ( const TaxonomyEntry<TAXID,READCOUNTS>* a, const TaxonomyEntry<TAXID,READCOUNTS>* b) const {
-	        return ((reads(a->read_counts)+reads(a->read_counts_children)) > (reads(b->read_counts)+reads(b->read_counts_children)));
+	        return ((reads(a->readCounts)+reads(a->readCountsOfChildren)) > (reads(b->readCounts)+reads(b->readCountsOfChildren)));
 			    }
 
 
@@ -276,7 +281,7 @@ unordered_map<TAXID, TAXID> TaxonomyDB<TAXID,READCOUNTS>::getParentMap() const {
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxonomyDB<TAXID,READCOUNTS>::createPointers() {
+void TaxonomyDB<TAXID,READCOUNTS>::createPointers(std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >& taxIDsAndEntries) {
   for (auto& tax : taxIDsAndEntries) {
   if (tax.second.parentTaxonomyID != tax.first) {
     auto parentIt = taxIDsAndEntries.find(tax.second.parentTaxonomyID);
@@ -292,20 +297,17 @@ template<typename TAXID, typename READCOUNTS>
 TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB() { }
 
 template<typename TAXID, typename READCOUNTS>
-TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB(const std::string inFileName) {
-  log_msg("Building taxonomy index from " + inFileName);
-  readTaxonomyIndex(inFileName);
-  createPointers();
-  log_msg("Built a taxonomy tree with " + std::to_string(taxIDsAndEntries.size()) +
-      " nodes");
-}
+TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB(const std::string inFileName, bool hasGenomeSizes) :
+  taxIDsAndEntries( readTaxonomyIndex(inFileName, hasGenomeSizes) ), genomeSizes_are_set(hasGenomeSizes)
+ { }
 
 template<typename TAXID, typename READCOUNTS>
 TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName) {
   log_msg("Building taxonomy index from " + nodesDumpFileName + " and " + namesDumpFileName);
   parseNodesDump(nodesDumpFileName);
   parseNamesDump(namesDumpFileName);
-  log_msg("Built a taxonomy tree with " + std::to_string(taxIDsAndEntries.size()) + " nodes");
+  createPointers(taxIDsAndEntries);
+  log_msg("Built a tree with " + std::to_string(taxIDsAndEntries.size()) + " taxa");
 }
 
 template<typename TAXID, typename READCOUNTS>
@@ -382,29 +384,49 @@ template<typename TAXID, typename READCOUNTS>
 void TaxonomyDB<TAXID,READCOUNTS>::writeTaxonomyIndex(std::ostream & outs) const {
   for (TAXID& key : getSortedKeys(taxIDsAndEntries)) {
 	const auto& entry = taxIDsAndEntries.at(key);
-    outs << key << "\t" << entry.parentTaxonomyID << "\t"
-            << entry.scientificName << "\t" << entry.rank << "\n";
+    outs << key << '\t' << entry.parentTaxonomyID << '\t'
+            << entry.scientificName << '\t' << entry.rank;
+    if (genomeSizes_are_set) {
+		outs << '\t' << entry.genomeSize << '\t' << entry.genomeSizeOfChildren;
+	}
+	outs << '\n';
   }
+  outs.flush();
 }
 
-
+template<typename TAXID, typename READCOUNTS>
+void TaxonomyDB<TAXID,READCOUNTS>::setGenomeSizes(const std::unordered_map<TAXID, uint64_t> & genomeSizes) {
+  for (const auto& it : genomeSizes) {
+	setGenomeSize(it.first, it.second);
+  }
+  genomeSizes_are_set = true;
+}
 
 template<typename TAXID, typename READCOUNTS>
-void TaxonomyDB<TAXID,READCOUNTS>::readTaxonomyIndex(const std::string inFileName) {
+std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > 
+ TaxonomyDB<TAXID,READCOUNTS>::readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes) {
+  log_msg("Reading taxonomy index from " + inFileName);
   std::ifstream inFile(inFileName);
   if (!inFile.is_open())
     throw std::runtime_error("unable to open taxonomy index file " + inFileName);
 
+  std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > taxIDsAndEntries;
   TAXID taxonomyID, parentTaxonomyID;
   std::string scientificName, rank;
+  uint64_t genomeSize, genomeSizeOfChildren = 0;
 
   std::string line;
   while (!inFile.eof()) {
 	inFile >> taxonomyID >> parentTaxonomyID;
 	inFile.get(); // read tab
 	std::getline(inFile, scientificName, '\t');
-	std::getline(inFile, rank, '\n');
-    TaxonomyEntry<TAXID,READCOUNTS> newEntry(taxonomyID, parentTaxonomyID, rank, scientificName);
+    if (hasGenomeSizes) {
+  	  std::getline(inFile, rank, '\t');
+	  inFile >> genomeSize >> genomeSizeOfChildren;
+    } else {
+  	  std::getline(inFile, rank, '\n');
+    }
+    TaxonomyEntry<TAXID,READCOUNTS> newEntry(taxonomyID, parentTaxonomyID, rank, scientificName, genomeSize, genomeSizeOfChildren);
 
 	//cerr << "inserting " << taxonomyID << ";" << parentTaxonomyID << ";" << rank << ";" << scientificName << endl;
     taxIDsAndEntries.insert({
@@ -414,6 +436,9 @@ void TaxonomyDB<TAXID,READCOUNTS>::readTaxonomyIndex(const std::string inFileNam
   taxIDsAndEntries.insert({
 	0, {0, 0, "no rank", "unclassified" }
   });
+  createPointers(taxIDsAndEntries);
+  log_msg("Finished, read " + std::to_string(taxIDsAndEntries.size()) + " taxa");
+  return(taxIDsAndEntries);
 }
 
 template<typename TAXID, typename READCOUNTS>
@@ -594,27 +619,46 @@ bool TaxonomyDB<TAXID,READCOUNTS>::isSubSpecies(TAXID taxonomyID) const {
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxonomyDB<TAXID,READCOUNTS>::addCounts(const TAXID taxid, const READCOUNTS& read_counts_) {
+void TaxonomyDB<TAXID,READCOUNTS>::addReadCount(const TAXID taxid, const READCOUNTS& readCounts_) {
 	auto it = taxIDsAndEntries.find(taxid);
 		if (it == taxIDsAndEntries.end()) {
 			cerr << "No taxonomy entry for " << taxid << "!!" << endl;
 			return;
 		}
 		TaxonomyEntry<TAXID,READCOUNTS>* tax = &it->second;
-		//cerr << taxid << " rc before: " << tax->read_counts << endl;
-		tax->read_counts += read_counts_;
-		//cerr << taxid << " rc after:  " << tax->read_counts << endl;
+		//cerr << taxid << " rc before: " << tax->readCounts << endl;
+		tax->readCounts += readCounts_;
+		//cerr << taxid << " rc after:  " << tax->readCounts << endl;
 
 		while (tax->parent != nullptr) {
 			tax = tax->parent;
-			tax->read_counts_children += read_counts_;
+			tax->readCountsOfChildren += readCounts_;
 		}
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxonomyDB<TAXID,READCOUNTS>::fillCounts(const unordered_map<TAXID, READCOUNTS>& taxon_counts) {
-	for (auto& elem : taxon_counts) {
-		addCounts(elem.first, elem.second);
+void TaxonomyDB<TAXID,READCOUNTS>::setGenomeSize(const TAXID taxid, const uint64_t genomeSize) {
+	auto it = taxIDsAndEntries.find(taxid);
+		if (it == taxIDsAndEntries.end()) {
+			cerr << "No taxonomy entry for " << taxid << "!!" << endl;
+			return;
+		}
+		TaxonomyEntry<TAXID,READCOUNTS>* tax = &it->second;
+		tax->genomeSize += genomeSize;
+
+		while (tax->parent != nullptr) {
+			tax = tax->parent;
+			//std::cerr << "setting genomeSizeOfChildren of parent" << std::endl;
+			tax->genomeSizeOfChildren += genomeSize;
+		}
+}
+
+
+
+template<typename TAXID, typename READCOUNTS>
+void TaxonomyDB<TAXID,READCOUNTS>::setReadCounts(const unordered_map<TAXID, READCOUNTS>& readCounts) {
+	for (auto& elem : readCounts) {
+		addReadCount(elem.first, elem.second);
 	 }
 
 	for (auto& tax : taxIDsAndEntries) {
@@ -625,16 +669,16 @@ void TaxonomyDB<TAXID,READCOUNTS>::fillCounts(const unordered_map<TAXID, READCOU
 
 template<typename TAXID, typename READCOUNTS>
 TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID,READCOUNTS>& taxdb, bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
-	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_UNIQUE_KMERS, REPORTCOLS::NUM_KMERS, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
+	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_KMERS, REPORTCOLS::NUM_UNIQUE_KMERS, REPORTCOLS::NUM_KMERS_IN_DATABASE, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
 }
 
 template<typename TAXID, typename READCOUNTS>
 void TaxReport<TAXID,READCOUNTS>::printReport(std::string format, std::string rank) {
 	_total_n_reads =
-			reads(_taxdb.taxIDsAndEntries.at(0).read_counts) +
-			reads(_taxdb.taxIDsAndEntries.at(0).read_counts_children) +
-			reads(_taxdb.taxIDsAndEntries.at(1).read_counts) +
-			reads(_taxdb.taxIDsAndEntries.at(1).read_counts_children);// +
+			reads(_taxdb.taxIDsAndEntries.at(0).readCounts) +
+			reads(_taxdb.taxIDsAndEntries.at(0).readCountsOfChildren) +
+			reads(_taxdb.taxIDsAndEntries.at(1).readCounts) +
+			reads(_taxdb.taxIDsAndEntries.at(1).readCountsOfChildren);// +
 	if (_total_n_reads == 0) {
 		std::cerr << "total number of reads is zero - not creating a report!" << endl;
 		return;
@@ -657,7 +701,7 @@ void TaxReport<TAXID,READCOUNTS>::printReport(std::string format, std::string ra
 
 template<typename TAXID, typename READCOUNTS>
 void TaxReport<TAXID,READCOUNTS>::printReport(TaxonomyEntry<TAXID,READCOUNTS>& tax, unsigned depth) {
-	if (_show_zeros || (reads(tax.read_counts)+reads(tax.read_counts_children)) > 0) {
+	if (_show_zeros || (reads(tax.readCounts)+reads(tax.readCountsOfChildren)) > 0) {
 		printLine(tax, depth);
 		for (auto child : tax.children)
 			printReport(*child, depth+1);
@@ -672,13 +716,14 @@ void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID,READCOUNTS>& tax
 		case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
 		case REPORTCOLS::TAX_ID:     _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
 		case REPORTCOLS::DEPTH:     _reportOfb << depth; break;
-		case REPORTCOLS::PERCENTAGE:  _reportOfb << 100.0*(reads(tax.read_counts) + reads(tax.read_counts_children))/_total_n_reads; break;
+		case REPORTCOLS::PERCENTAGE:  _reportOfb << 100.0*(reads(tax.readCounts) + reads(tax.readCountsOfChildren))/_total_n_reads; break;
 		//case REPORTCOLS::ABUNDANCE:  _reportOfb << 100*counts.abundance[0]; break;
 		//case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
-		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (reads(tax.read_counts) + reads(tax.read_counts_children)); break;
-		case REPORTCOLS::NUM_READS:  _reportOfb << reads(tax.read_counts); break;
-		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.read_counts.kmers.cardinality(); break;
-		case REPORTCOLS::NUM_KMERS: _reportOfb << tax.read_counts.n_kmers; break;
+		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (reads(tax.readCounts) + reads(tax.readCountsOfChildren)); break;
+		case REPORTCOLS::NUM_READS:  _reportOfb << reads(tax.readCounts); break;
+		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.readCounts.kmers.cardinality(); break;
+		case REPORTCOLS::NUM_KMERS: _reportOfb << tax.readCounts.n_kmers; break;
+		case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
 		//case REPORTCOLS::GENOME_SIZE: ; break;
 		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;
 		//case REPORTCOLS::SUM_SCORE: ; break;

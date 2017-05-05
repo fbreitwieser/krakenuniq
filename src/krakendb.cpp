@@ -20,6 +20,7 @@
 #include "kraken_headers.hpp"
 #include "krakendb.hpp"
 #include "quickfile.hpp"
+#include <unordered_map>
 
 using std::string;
 using std::vector;
@@ -67,6 +68,26 @@ KrakenDB::KrakenDB(char *ptr) {
   k = key_bits / 2;
   key_len = key_bits / 8 + !! (key_bits % 8);
 }
+
+std::unordered_map<uint32_t,uint64_t> KrakenDB::count_taxons() {
+  throw std::runtime_error("count_taxons() is not working");
+  // Not working currently!!
+  char *ptr = get_pair_ptr();
+  size_t pair_sz = pair_size();
+
+  std::unordered_map<uint32_t, uint64_t> taxon_counts;
+  for (uint64_t i = 0; i < key_ct; i++) {
+    uint32_t* taxon = (uint32_t *) ptr + pair_sz * i + key_len;
+    if (taxon == NULL) {
+        std::cerr << "taxon is NULL (i is " << i << " and key_ct is " << key_ct << ")" << std::endl;
+    } else {
+        uint32_t taxon_i = *taxon;
+        ++taxon_counts[taxon_i];
+    }
+  }
+  return taxon_counts;
+}
+
 
 // Creates an index, indicating starting positions of each bin
 // Bins contain k-mer/taxon pairs with k-mers that share a bin key

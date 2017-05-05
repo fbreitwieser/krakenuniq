@@ -18,16 +18,26 @@
  */
 
 #include "taxdb.h"
-
+#include "quickfile.hpp"
 #include <iostream>
+#include <fstream>
+#include <unordered_map>
+
 using namespace std;
 
 int main(int argc, char **argv) {
-	if (argc != 3) {
-      std::cout << "Provide names.dmp and nodes.dmp\n";
+	if (argc < 3 || argc > 4) {
+      std::cerr << "Usage: a.out names.dmp nodes.dmp [taxon-counts]\n";
       return 1;
     }
-    TaxonomyDB<uint32_t, uint32_t> taxdb(argv[1], argv[2]);
+    TaxonomyDB<uint32_t, uint32_t> taxdb {(string)argv[1], (string)argv[2]};
+    if (argc == 4) {
+        ifstream ifs(argv[3]);
+        uint32_t taxon; uint64_t count;
+        while (ifs >> taxon >> count) {
+            taxdb.setGenomeSize(taxon, count);
+        }
+        taxdb.genomeSizes_are_set = true;
+    }
     taxdb.writeTaxonomyIndex(std::cout);
-
 }

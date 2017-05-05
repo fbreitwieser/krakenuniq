@@ -203,7 +203,8 @@ then
   echo "Skipping step 6, taxDB exists."
 else
   echo "Creating taxDB (step 6 of 6)... "
-  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp > taxDB.dmp
+  jellyfish1 dump database.kdb | grep '^>' | sed 's/.//' | sort | uniq -c | sort -rn | sed 's/^ *\([0-9]\+\) \+\([0-9]\+\)$/\2\t\1/' > database.taxon_count
+  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp database.taxon_count > taxDB.tmp
   mv taxDB.tmp taxDB
 fi
 
