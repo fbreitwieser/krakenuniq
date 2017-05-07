@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
   
   if (!TaxDB_file.empty()) {
-	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_file);
+	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_file, true);
       for (const auto & tax : taxdb.taxIDsAndEntries) {
           if (tax.first != 0)
           Parent_map[tax.first] = tax.second.parentTaxonomyID;
@@ -198,6 +198,19 @@ int main(int argc, char **argv) {
   if (Print_kraken_report) {
 	taxdb.setReadCounts(taxon_counts);
 	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, false);
+	rep.setReportCols({ 
+		"percReadsClade",
+		"numReadsClade", 
+		"numReadsTaxon", 
+		"numUniqueKmersClade", 
+		"numUniqueKmersTaxon", 
+		"numKmersClade", 
+		"numKmersTaxon", 
+		"numKmersInDatabaseClade", 
+		"numKmersInDatabaseTaxon", 
+		"taxID", 
+		"taxRank", 
+		"indentedName"});
 	rep.printReport("kraken","blu");
   }
 

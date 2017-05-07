@@ -138,17 +138,18 @@ class TaxReport {
 private:
 	std::ostream& _reportOfb;
 	TaxonomyDB<TAXID,READCOUNTS> & _taxdb;
-	std::vector<REPORTCOLS> _report_cols;
 	uint64_t _total_n_reads;
 	bool _show_zeros;
-
 	void printLine(TaxonomyEntry<TAXID,READCOUNTS>& tax, unsigned depth);
 
 public:
 	TaxReport(std::ostream& _reportOfb, TaxonomyDB<TAXID,READCOUNTS> & taxdb, bool _show_zeros);
-
 	void printReport(std::string format, std::string rank);
 	void printReport(TaxonomyEntry<TAXID,READCOUNTS>& tax, unsigned depth);
+	void setReportCols(std::vector<std::string> names);
+
+	std::vector<std::string> _report_col_names;
+	std::vector<REPORTCOLS> _report_cols;
 };
 
 
@@ -668,8 +669,23 @@ void TaxonomyDB<TAXID,READCOUNTS>::setReadCounts(const unordered_map<TAXID, READ
 
 
 template<typename TAXID, typename READCOUNTS>
-TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID,READCOUNTS>& taxdb, bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
-	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_KMERS, REPORTCOLS::NUM_UNIQUE_KMERS, REPORTCOLS::NUM_KMERS_IN_DATABASE, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
+	TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID,READCOUNTS>& taxdb, bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
+	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_KMERS_CLADE, REPORTCOLS::NUM_UNIQUE_KMERS_CLADE, REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
+}
+
+
+template<typename TAXID, typename READCOUNTS>
+void TaxReport<TAXID,READCOUNTS>::setReportCols(std::vector<std::string> names) {
+	_report_cols.clear();
+	for (auto& s : names) {
+		auto it = report_col_name_map.find(s);
+		if (it == report_col_name_map.end()) {
+			throw std::runtime_error(s + " is not a valid report column name");
+		}
+		_report_cols.push_back(it->second);
+	}
+	_report_col_names = names;
+
 }
 
 template<typename TAXID, typename READCOUNTS>
@@ -682,6 +698,19 @@ void TaxReport<TAXID,READCOUNTS>::printReport(std::string format, std::string ra
 	if (_total_n_reads == 0) {
 		std::cerr << "total number of reads is zero - not creating a report!" << endl;
 		return;
+	}
+	if (_report_cols.size() == _report_col_names.size()) {
+		// print header
+		bool first_one = true;
+		for (std::string s : _report_col_names) {
+			if (first_one) {
+				first_one = false;
+			} else {
+				_reportOfb << '\t';
+			}
+			_reportOfb << s;
+		}
+		_reportOfb << endl;
 	}
 
 	if (format == "kraken") {
@@ -712,18 +741,21 @@ template<typename TAXID, typename READCOUNTS>
 void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID,READCOUNTS>& tax, unsigned depth) {
 	for (auto& col : _report_cols) {
 		switch (col) {
-		case REPORTCOLS::NAME:        _reportOfb << tax.scientificName ; break;
+		case REPORTCOLS::NAME:              _reportOfb << tax.scientificName ; break;
 		case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
-		case REPORTCOLS::TAX_ID:     _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
-		case REPORTCOLS::DEPTH:     _reportOfb << depth; break;
-		case REPORTCOLS::PERCENTAGE:  _reportOfb << 100.0*(reads(tax.readCounts) + reads(tax.readCountsOfChildren))/_total_n_reads; break;
-		//case REPORTCOLS::ABUNDANCE:  _reportOfb << 100*counts.abundance[0]; break;
+		case REPORTCOLS::TAX_ID:            _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
+		case REPORTCOLS::DEPTH:             _reportOfb << depth; break;
+		case REPORTCOLS::PERCENTAGE:       _reportOfb << 100.0*(reads(tax.readCounts) + reads(tax.readCountsOfChildren))/_total_n_reads; break;
+		//case REPORTCOLS::ABUNDANCE:      _reportOfb << 100*counts.abundance[0]; break;
 		//case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
+		case REPORTCOLS::NUM_READS:        _reportOfb << reads(tax.readCounts); break;
 		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (reads(tax.readCounts) + reads(tax.readCountsOfChildren)); break;
-		case REPORTCOLS::NUM_READS:  _reportOfb << reads(tax.readCounts); break;
 		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.readCounts.kmers.cardinality(); break;
-		case REPORTCOLS::NUM_KMERS: _reportOfb << tax.readCounts.n_kmers; break;
-		case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
+		case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << (tax.readCounts.kmers.cardinality() + tax.readCountsOfChildren.kmers.cardinality()); break;
+		case REPORTCOLS::NUM_KMERS:        _reportOfb << tax.readCounts.n_kmers; break;
+		case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << tax.readCounts.n_kmers + tax.readCountsOfChildren.n_kmers; break;
+		case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
+		case REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
 		//case REPORTCOLS::GENOME_SIZE: ; break;
 		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;
 		//case REPORTCOLS::SUM_SCORE: ; break;
