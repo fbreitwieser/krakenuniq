@@ -101,16 +101,21 @@ class TaxonomyDB {
   TaxonomyDB(const std::string inFileName, bool hasGenomeSizes = false);
   TaxonomyDB();
   void writeTaxonomyIndex(std::ostream & outs) const;
+  void readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes);
 
   TAXID getTaxIDAtRank(const TAXID taxID, const std::string& rank) const;
   std::string getScientificName(const TAXID taxID) const;
   std::string getRank(const TAXID taxID) const;
   TAXID getLowestCommonAncestor(const std::vector<TAXID>& taxIDs) const;
+
   TAXID getParentTaxID(const TAXID taxID) const;
   std::unordered_map<TAXID, TAXID> getParentMap() const;
   std::unordered_map<std::string, TAXID> getScientificNameMap() const;
   std::string getLineage(TAXID taxonomyID) const;
   std::string getMetaPhlAnLineage(TAXID taxonomyID) const;
+  TaxonomyEntry<TAXID,READCOUNTS> getEntry(TAXID taxID) const;
+
+  size_t distance(TAXID taxID1, TAXID taxID2) const;
 
   bool isSubSpecies(TAXID taxonomyID) const;
   int isBelowInTree(TAXID upper, TAXID lower) const;
@@ -125,8 +130,9 @@ class TaxonomyDB {
   std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > taxIDsAndEntries;
   bool genomeSizes_are_set = false;
  private:
-  std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > 
-    readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes);
+
+  std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
+        readTaxonomyIndex_(const std::string inFileName, bool hasGenomeSizes);
   void parseNamesDump(const std::string namesDumpFileName);
   void parseNodesDump(const std::string nodesDumpFileName);
   void createPointers(std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >& taxIDsAndEntries);
@@ -282,6 +288,17 @@ unordered_map<TAXID, TAXID> TaxonomyDB<TAXID,READCOUNTS>::getParentMap() const {
 }
 
 template<typename TAXID, typename READCOUNTS>
+TaxonomyEntry<TAXID,READCOUNTS> TaxonomyDB<TAXID,READCOUNTS>::getEntry(TAXID taxID) const {
+  auto it = taxIDsAndEntries.find(taxID);
+  if (it == taxIDsAndEntries.end()) {
+    TaxonomyEntry<TAXID, READCOUNTS> ti { 0, 0, "NA"};
+    return ti;
+  } else {
+    return it->second;
+  }
+}
+
+template<typename TAXID, typename READCOUNTS>
 void TaxonomyDB<TAXID,READCOUNTS>::createPointers(std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >& taxIDsAndEntries) {
   for (auto& tax : taxIDsAndEntries) {
   if (tax.second.parentTaxonomyID != tax.first) {
@@ -299,7 +316,7 @@ TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB() { }
 
 template<typename TAXID, typename READCOUNTS>
 TaxonomyDB<TAXID,READCOUNTS>::TaxonomyDB(const std::string inFileName, bool hasGenomeSizes) :
-  taxIDsAndEntries( readTaxonomyIndex(inFileName, hasGenomeSizes) ), genomeSizes_are_set(hasGenomeSizes)
+  taxIDsAndEntries( readTaxonomyIndex_(inFileName, hasGenomeSizes) ), genomeSizes_are_set(hasGenomeSizes)
  { }
 
 template<typename TAXID, typename READCOUNTS>
@@ -404,8 +421,14 @@ void TaxonomyDB<TAXID,READCOUNTS>::setGenomeSizes(const std::unordered_map<TAXID
 }
 
 template<typename TAXID, typename READCOUNTS>
+void TaxonomyDB<TAXID,READCOUNTS>::readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes) {
+  taxIDsAndEntries = readTaxonomyIndex_(inFileName, hasGenomeSizes);
+  genomeSizes_are_set = hasGenomeSizes;
+}
+
+template<typename TAXID, typename READCOUNTS>
 std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > 
- TaxonomyDB<TAXID,READCOUNTS>::readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes) {
+ TaxonomyDB<TAXID,READCOUNTS>::readTaxonomyIndex_(const std::string inFileName, bool hasGenomeSizes) {
   log_msg("Reading taxonomy index from " + inFileName);
   std::ifstream inFile(inFileName);
   if (!inFile.is_open())
@@ -418,12 +441,12 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
 
   std::string line;
   while (!inFile.eof()) {
-	inFile >> taxonomyID >> parentTaxonomyID;
-	inFile.get(); // read tab
-	std::getline(inFile, scientificName, '\t');
+    inFile >> taxonomyID >> parentTaxonomyID;
+    inFile.get(); // read tab
+    std::getline(inFile, scientificName, '\t');
     if (hasGenomeSizes) {
   	  std::getline(inFile, rank, '\t');
-	  inFile >> genomeSize >> genomeSizeOfChildren;
+  	  inFile >> genomeSize >> genomeSizeOfChildren;
     } else {
   	  std::getline(inFile, rank, '\n');
     }
@@ -438,7 +461,7 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
 	0, {0, 0, "no rank", "unclassified" }
   });
   createPointers(taxIDsAndEntries);
-  log_msg("Finished, read " + std::to_string(taxIDsAndEntries.size()) + " taxa");
+  log_msg("done reading TaxDB, read " + std::to_string(taxIDsAndEntries.size()) + " taxa");
   return(taxIDsAndEntries);
 }
 
@@ -469,6 +492,7 @@ TAXID TaxonomyDB<TAXID,READCOUNTS>::getLowestCommonAncestor(
     return i.size() < j.size();
   });
   TAXID consensus = 0;
+  // assumes equal paths lengths??
   for (unsigned i = 0; i < paths[0].size(); i++) {
     TAXID temp = 0;
     for (auto& path : paths) {
@@ -574,12 +598,15 @@ template<typename TAXID, typename READCOUNTS>
 TAXID TaxonomyDB<TAXID,READCOUNTS>::getTaxIDAtRank(const TAXID taxID,
                                     const std::string& rank) const {
   auto entry = taxIDsAndEntries.find(taxID);
+  //cerr << "getTaxIDAtRank(" << taxID << "," << rank << ")" << endl;
   while (entry != taxIDsAndEntries.end() &&
          entry->second.parentTaxonomyID != 1) {
+    //cerr << "Checking rank of " << entry->second.taxonomyID << ": " << entry->second.rank << endl;
     if (entry->second.rank == rank) {
       return entry->second.taxonomyID;
-    } else
+    } else {
       entry = taxIDsAndEntries.find(entry->second.parentTaxonomyID);
+    }
   }
   return 0;
 }

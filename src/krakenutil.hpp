@@ -31,8 +31,18 @@ namespace kraken {
   // NOTE: LCA(0,x) = LCA(x,0) = x
 
   // Resolve classification tree
-  uint32_t resolve_tree(std::unordered_map<uint32_t, uint32_t> &hit_counts,
-                        std::unordered_map<uint32_t, uint32_t> &parent_map);
+  uint32_t resolve_tree(const std::unordered_map<uint32_t, uint32_t> &hit_counts,
+                        const std::unordered_map<uint32_t, uint32_t> &parent_map);
+
+  uint32_t resolve_uids(
+        const std::unordered_map<uint32_t, uint32_t> &uid_hit_counts,
+        const std::unordered_map<uint32_t, uint32_t> &parent_map,
+        const std::vector< std::vector<uint32_t> > &UID_to_taxids_vec);
+
+  uint32_t resolve_uids2(
+        const std::unordered_map<uint32_t, uint32_t> &uid_hit_counts,
+        const std::unordered_map<uint32_t, uint32_t> &parent_map,
+        char* fptr);
 
   class KmerScanner {
     public:

@@ -23,6 +23,7 @@
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
+set -x
 
 function report_time_elapsed() {
   curr_time=$(date "+%s.%N")
@@ -61,14 +62,14 @@ fi
 
 if [ "$KRAKEN_REBUILD_DATABASE" == "1" ]
 then
-  rm -f database.* *.map lca.complete library/seq-files.txt
+  rm -f database.* *.map lca.complete library-files.txt
 fi
 
-if [ !-f "library/seq-files.txt" ]; then
+if [ ! -f "library-files.txt" ]; then
     echo "Finding all library files"
-    find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library/seq-files.txt
+    find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library-files.txt
 fi
-N_FILES=`cat library/seq-files.txt | wc -l`
+N_FILES=`cat library-files.txt | wc -l`
 echo "Found $N_FILES sequence files (*.{fna,fa,ffn} in the library)"
 
 if [ -e "database.jdb" ]
@@ -87,7 +88,7 @@ else
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  cat library/seq-files.txt | tr '\n' '\0' | xargs -0 cat | \
+  cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
     $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
       -o database /dev/fd/0
 
@@ -171,8 +172,8 @@ then
 else
   echo "Creating seqID to taxID map (step 4 of 6).."
   start_time1=$(date "+%s.%N")
-  cat library/seq-files.txt | tr '\n' '\0' | xargs -0 grep '^>' | sed 's/.//' | sed 's/ .*//' | sort > library/seq-headers.txt
-  join -t $'\t' nucl_gb.accession2taxid.sorted library/seq-headers.txt > seqid2taxid.map.tmp
+  cat library-files.txt | tr '\n' '\0' | xargs -0 grep '^>' | sed 's/.//' | sed 's/ .*//' | sort > library-headers.txt
+  join -t $'\t' nucl_gb.accession2taxid.sorted library-headers.txt > seqid2taxid.map.tmp
   mv seqid2taxid.map.tmp seqid2taxid.map
   line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
@@ -190,7 +191,7 @@ else
 	PARAM=" -a"
   fi
   start_time1=$(date "+%s.%N")
-  cat library/seq-files.txt | tr '\n' '\0' | xargs -0 cat | \
+  cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
     set_lcas $MEMFLAG -x -d database.kdb -i database.idx -v \
     -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
   touch "lca.complete"

@@ -27,7 +27,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
 	if (argc < 3 || argc > 4) {
-      std::cerr << "Usage: a.out names.dmp nodes.dmp [taxon-counts]\n";
+      std::cerr << "Usage: build_taxdb names.dmp nodes.dmp [taxon-counts]\n";
       return 1;
     }
     TaxonomyDB<uint32_t, uint32_t> taxdb {(string)argv[1], (string)argv[2]};

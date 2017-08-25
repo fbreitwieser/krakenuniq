@@ -1,3 +1,4 @@
+// vim: noai:ts=2:sw=2:expandtab:smarttab
 /*
  * Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
  *
@@ -25,6 +26,7 @@
 #include "taxdb.h"
 #include "readcounts.hpp"
 #include <unordered_map>
+#include <map>
 
 #define SKIP_LEN 50000
 
@@ -39,7 +41,8 @@ void process_file(string filename, uint32_t taxid);
 void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish);
 
 int Num_threads = 1;
-string DB_filename, Index_filename, TaxDB_filename,
+string DB_filename, Index_filename,
+  Output_DB_filename, TaxDB_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
 bool force_taxid = false;
@@ -50,8 +53,23 @@ bool verbose = false;
 bool Operate_in_RAM = false;
 bool One_FASTA_file = false;
 bool Add_taxIds_for_Sequences = false;
+bool Use_uids_instead_of_taxids = false;
+bool Output_UID_map_to_STDOUT = false;
+bool Pretend = false;
 
+string UID_map_filename;
+ofstream UID_map_file;
+
+uint32_t current_uid = 0;
+uint32_t max_uid = -1;
 unordered_map<uint32_t, uint32_t> Parent_map;
+//unordered_multimap<uint32_t, uint32_t> Children_map;
+//typedef std::_Rb_tree_iterator<std::pair<const std::set<unsigned int>, unsigned int> > map_it;
+//typedef std::_Rb_tree_iterator<std::pair<const std::vector<unsigned int>, unsigned int> > map_it;
+typedef const vector<uint32_t>* map_it;
+vector< map_it > UID_to_taxids_vec;
+map< vector<uint32_t>, uint32_t> Taxids_to_UID_map;
+
 unordered_map<string, uint32_t> ID_to_taxon_map;
 unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
@@ -65,15 +83,26 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
   if (!TaxDB_filename.empty() && !force_taxid) {
-	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_filename);
-      for (const auto & tax : taxdb.taxIDsAndEntries) {
-          if (tax.first != 0)
-          Parent_map[tax.first] = tax.second.parentTaxonomyID;
-      }
-      Parent_map[1] = 0;
+    taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_filename);
+    for (const auto & tax : taxdb.taxIDsAndEntries) {
+      if (tax.first != 0)
+        Parent_map[tax.first] = tax.second.parentTaxonomyID;
+//      Children_map[tax.second.parentTaxonomyID].insert(tax.first);
+    }
+    Parent_map[1] = 0;
   } else {
-      cerr << "TaxDB argument is required!" << endl;
-      return 1;
+    cerr << "TaxDB argument is required!" << endl;
+    return 1;
+  }
+
+  if (Use_uids_instead_of_taxids) {
+    UID_map_file.open(UID_map_filename, ios_base::out | ios_base::binary);
+
+    if (!UID_map_file.is_open()) {
+      cerr << "Something went wrong while creating the file." << endl;
+      exit(1);
+    }
+
   }
 
   QuickFile db_file(DB_filename, "rw");
@@ -90,6 +119,14 @@ int main(int argc, char **argv) {
     Database = KrakenDB(temp_ptr);
     cerr << "done" << endl;
   } else {
+    if (Output_DB_filename.size() > 0) {
+      cerr << "You need to operate in RAM (flag -M) to use output to a different file (flag -o)" << endl;
+      return 1;
+    }
+    //std::ifstream ifs("input.txt", std::ios::binary);
+    //std::ofstream ofs("output.txt", std::ios::binary);
+    //ofs << ifs.rdbuf();
+
     Database = KrakenDB(db_file.ptr());
   }
 
@@ -104,15 +141,22 @@ int main(int argc, char **argv) {
   else
     process_files();
 
-  if (Operate_in_RAM) {
+  if (Operate_in_RAM && !Pretend) {
+    if (Output_DB_filename.size() > 0) {
+      DB_filename = Output_DB_filename;
+    }
+    cerr << "Writing database from RAM back to " << DB_filename << " ..." << endl;
     ofstream ofs(DB_filename.c_str(), ofstream::binary);
     ofs.write(temp_ptr, db_file_size);
     ofs.close();
     delete temp_ptr;
   }
 
+  UID_map_file.close();
 
-  if (Add_taxIds_for_Sequences && !TaxDB_filename.empty()) {
+  // Write new TaxDB file if new taxids were added
+  if (Add_taxIds_for_Sequences && !TaxDB_filename.empty() && !Pretend) {
+    cerr << "Writing new TaxDB ..." << endl;
     ofstream ofs(TaxDB_filename.c_str());
     taxdb.writeTaxonomyIndex(ofs);
     ofs.close();
@@ -171,7 +215,10 @@ void process_single_file() {
     uint32_t taxid;
     string prefix = "kraken:taxid|";
     if (dna.id.substr(0,prefix.size()) == prefix) {
-        taxid = std::atoi(dna.id.substr(prefix.size()).c_str());
+        taxid = std::stol(dna.id.substr(prefix.size()));
+        if (taxid == 0) {
+          cerr << "Error: taxid is zero for the line '" << dna.id << "'?!" << endl;
+        }
         const auto strBegin = dna.header_line.find_first_not_of("\t ");
         if (strBegin != std::string::npos)
             dna.header_line = dna.header_line.substr(strBegin);
@@ -181,9 +228,9 @@ void process_single_file() {
     
     if (Add_taxIds_for_Sequences) {
       auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
-	  if (entryIt == taxdb.taxIDsAndEntries.end()) {
+      if (entryIt == taxdb.taxIDsAndEntries.end()) {
         cerr << "Error! Didn't find " << taxid << " in TaxonomyDB!!" << endl;
-	  } else {
+      } else {
         entryIt->second.scientificName = dna.header_line;
       }
     }
@@ -195,10 +242,9 @@ void process_single_file() {
 
         ++seqs_processed;
     } else {
-        if (verbose) 
-            cerr << "Skipping sequence with header [" << dna.header_line << "] - no taxid" << endl;
-
-        ++seqs_no_taxid;
+      if (verbose) 
+        cerr << "Skipping sequence with header [" << dna.header_line << "] - no taxid" << endl;
+      ++seqs_no_taxid;
     }
 
     cerr << "\rProcessed " << seqs_processed << " sequences";
@@ -255,7 +301,7 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
       continue;
     val_ptr = Database.kmer_query(
                 Database.canonical_representation(*kmer_ptr)
-              );
+    );
     if (val_ptr == NULL) {
       if (! Allow_extra_kmers) {
         errx(EX_DATAERR, "kmer found in sequence that is not in database");
@@ -265,10 +311,69 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
       }
       continue;
     }
-    if (!force_taxid)
-        *val_ptr = lca(Parent_map, taxid, *val_ptr);
-    else
-        *val_ptr = taxid;
+    if (Use_uids_instead_of_taxids) {
+      uint32_t kmer_uid = *val_ptr;
+      bool new_taxid = kmer_uid == 0;
+      vector<uint32_t> taxid_set;
+      if (new_taxid) {
+        taxid_set.push_back(taxid);
+      } else {
+        if (kmer_uid > UID_to_taxids_vec.size()) {
+          // This can happen when set_lcas is called on a database that is not all zeros
+          cerr << "kmer_uid ("<< kmer_uid <<") greater than UID vector size ("<< UID_to_taxids_vec.size()<<")!!" << endl;
+          exit(1);
+        }
+        taxid_set = *(UID_to_taxids_vec.at(kmer_uid-1));
+        auto it = std::lower_bound( taxid_set.begin(), taxid_set.end(), taxid); // find proper position in descending order
+
+        if (it == taxid_set.end() || *it != taxid) {
+          // add the taxid to the set, in the right position
+           taxid_set.insert( it, taxid ); // insert before iterator it
+           new_taxid = true;
+        }
+      }
+
+      if (new_taxid) {
+        if (max_uid <= current_uid) {
+          cerr << "Maxxed out on the UIDs!!" << endl;
+          exit(1);
+        }
+
+        // get a new taxid for this set
+        #pragma omp critical(new_uid)
+        {
+        auto insert_res = Taxids_to_UID_map.insert( { std::move(taxid_set), current_uid + 1 } );
+        if (insert_res.second) {
+          ++current_uid;
+
+          // print result for map:
+          if (Output_UID_map_to_STDOUT) {
+            auto tid_it = insert_res.first->first.begin();
+            cout << current_uid << '\t' << *tid_it++; 
+            while (tid_it != insert_res.first->first.end()) { cout << ' ' << *tid_it++; }
+            cout << '\n';
+          }
+
+          // FORMAT: TAXID<uint32_t> PARENT<uint32_t>
+          // TODO: Consider using mmap here
+          UID_map_file.write((char*)&taxid, sizeof(taxid));
+          UID_map_file.write((char*)&kmer_uid, sizeof(kmer_uid));
+
+          //UID_to_taxids_vec[current_uid] = taxid_set;
+          UID_to_taxids_vec.push_back( &(insert_res.first->first) );
+          *val_ptr = current_uid;
+        } else {
+         *val_ptr = insert_res.first->second;
+        }
+        }
+      }
+    } else if (!force_taxid) {
+      *val_ptr = lca(Parent_map, taxid, *val_ptr);
+    } else {
+      // When force_taxid is set, do not compute lca, but assign the taxid
+      // of the (last) sequence to k-mers
+      *val_ptr = taxid;
+    }
   }
 }
 
@@ -278,10 +383,17 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:a")) != -1) {
+  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:apI:o:S")) != -1) {
     switch (opt) {
       case 'f' :
         File_to_taxon_map_filename = optarg;
+        break;
+      case 'I' :
+        Use_uids_instead_of_taxids = true;
+        UID_map_filename = optarg;
+        break;
+      case 'S' :
+        Output_UID_map_to_STDOUT = true;
         break;
       case 'd' :
         DB_filename = optarg;
@@ -324,7 +436,12 @@ void parse_command_line(int argc, char **argv) {
       case 'M' :
         Operate_in_RAM = true;
         break;
-
+      case 'o' :
+        Output_DB_filename = optarg;
+        break;
+      case 'p' :
+        Pretend = true;
+        break;
       default:
         usage();
         break;
@@ -353,12 +470,16 @@ void usage(int exit_code) {
        << "* -b filename      Taxonomy DB file" << endl
        << "  -t #             Number of threads" << endl
        << "  -M               Copy DB to RAM during operation" << endl
+       << "  -o filename      Output database to filename, instead of overwriting the input database" << endl
        << "  -x               K-mers not found in DB do not cause errors" << endl
        << "  -f filename      File to taxon map" << endl
        << "  -F filename      Multi-FASTA file with sequence data" << endl
        << "  -m filename      Sequence ID to taxon map" << endl
        << "  -a               Add taxonomy IDs (starting with "<<New_taxid_start<<") for sequences to Taxonomy DB" << endl
        << "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
+       << "  -I filename      Write UIDs into database, and output (binary) UID-to-taxid map to filename" << endl
+       << "  -S               Write UID-to-taxid map to STDOUT" << endl
+       << "  -p               Pretend - do not write database back to disk (when working in RAM)" << endl
        << "  -v               Verbose output" << endl
        << "  -h               Print this message" << endl
        << endl
@@ -366,3 +487,4 @@ void usage(int exit_code) {
        << "-F/-m are ignored." << endl;
   exit(exit_code);
 }
+

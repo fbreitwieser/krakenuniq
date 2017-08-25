@@ -17,12 +17,14 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "assert_helpers.h"
 #include "kraken_headers.hpp"
 #include "krakenutil.hpp"
 
 using namespace std;
 
 namespace kraken {
+
   // Build a node->parent unordered_map from NCBI Taxonomy nodes.dmp file
   unordered_map<uint32_t, uint32_t> build_parent_map(string filename) {
     unordered_map<uint32_t, uint32_t> pmap;
@@ -47,7 +49,7 @@ namespace kraken {
   // Return lowest common ancestor of a and b
   // LCA(0,x) = LCA(x,0) = x
   // Default ancestor is 1 (root of tree)
-  uint32_t lca(unordered_map<uint32_t, uint32_t> &parent_map,
+  uint32_t lca(const unordered_map<uint32_t, uint32_t> &parent_map,
     uint32_t a, uint32_t b)
   {
     if (a == 0 || b == 0)
@@ -57,35 +59,41 @@ namespace kraken {
     set<uint32_t> a_path;
     while (a > 0) {
       a_path.insert(a);
-      a = parent_map[a];
+      assert(parent_map.find(a) != parent_map.end());
+      a = parent_map.at(a);
     }
 
     // search for b in the path from a to the root
     while (b > 0) {
       if (a_path.count(b) > 0)
         return b;
-      b = parent_map[b];
+      assert(parent_map.find(b) != parent_map.end());
+      b = parent_map.at(b);
     }
     return 1;
   }
 
   // Tree resolution: take all hit taxa (plus ancestors), then
   // return leaf of highest weighted leaf-to-root path.
-  uint32_t resolve_tree(unordered_map<uint32_t, uint32_t> &hit_counts,
-                        unordered_map<uint32_t, uint32_t> &parent_map)
+  uint32_t resolve_tree(const unordered_map<uint32_t, uint32_t> &hit_counts,
+                        const unordered_map<uint32_t, uint32_t> &parent_map)
   {
     set<uint32_t> max_taxa;
     uint32_t max_taxon = 0, max_score = 0;
-    unordered_map<uint32_t, uint32_t>::iterator it = hit_counts.begin();
 
     // Sum each taxon's LTR path
-    while (it != hit_counts.end()) {
+    for (auto it = hit_counts.begin();
+         it != hit_counts.end(); ++it) {
       uint32_t taxon = it->first;
       uint32_t node = taxon;
       uint32_t score = 0;
       while (node > 0) {
-        score += hit_counts[node];
-        node = parent_map[node];
+        auto it2 = hit_counts.find(node);
+        if (it2 != hit_counts.end()) {
+          score += it2->second;
+        }
+        node = parent_map.at(node);
+
       }
 
       if (score > max_score) {
@@ -98,8 +106,6 @@ namespace kraken {
           max_taxa.insert(max_taxon);
         max_taxa.insert(taxon);
       }
-
-      it++;
     }
 
     // If two LTR paths are tied for max, return LCA of all
@@ -112,6 +118,129 @@ namespace kraken {
 
     return max_taxon;
   }
+
+
+  // Tree resolution: take all hit taxa (plus ancestors), then
+  // return leaf of highest weighted leaf-to-root path.
+  uint32_t resolve_uids(
+      const unordered_map<uint32_t, uint32_t> &uid_hit_counts,
+      const unordered_map<uint32_t, uint32_t> &parent_map,
+      const vector< vector<uint32_t> > &UID_to_taxids_vec) {
+    unordered_map<uint32_t, uint32_t> taxid_counts;
+    unordered_map<uint32_t, double> frac_taxid_counts;
+
+    if (uid_hit_counts.size() == 0) {
+      return(0);
+    }
+
+    for (auto it = uid_hit_counts.begin(); it != uid_hit_counts.end(); ++it) {
+      uint32_t uid = it->first;
+      double frac_count = ((double)it->second / (double)UID_to_taxids_vec[uid-1].size());
+      for (auto taxid : UID_to_taxids_vec[uid-1]) {
+        taxid_counts[taxid] += it->second;
+        frac_taxid_counts[taxid] += frac_count;
+      }
+    }
+    vector<uint32_t> max_taxids;
+    uint32_t max_count = 0;
+    double max_frac_count = 0;
+    for (auto it : taxid_counts) {
+      if (it.second == max_count) {
+        if (frac_taxid_counts[it.first] == max_frac_count) {
+          max_taxids.push_back(it.first);
+        } else if (frac_taxid_counts[it.first] > max_frac_count) {
+          max_frac_count = frac_taxid_counts[it.first];
+          max_taxids = { it.first };
+        }
+      } else if (it.second > max_count) {
+        max_taxids = { it.first };
+        max_count = it.second;
+        max_frac_count = frac_taxid_counts[it.first];
+      }
+    }
+
+    uint32_t max_taxon = max_taxids[0];
+    auto sit = max_taxids.begin();
+    for (++sit; sit != max_taxids.end(); ++sit) {
+      max_taxon = lca(parent_map, max_taxon, *sit);
+
+    }
+
+    // return the taxid that appeared most often
+    return max_taxon;
+  }
+
+  // Tree resolution: take all hit taxa (plus ancestors), then
+  // return leaf of highest weighted leaf-to-root path.
+  uint32_t resolve_uids2(
+      const unordered_map<uint32_t, uint32_t> &uid_hit_counts,
+      const unordered_map<uint32_t, uint32_t> &parent_map,
+      char* fptr) {
+    unordered_map<uint32_t, uint32_t> taxid_counts;
+    unordered_map<uint32_t, double> frac_taxid_counts;
+
+    if (uid_hit_counts.size() == 0) {
+      return(0);
+    }
+
+    size_t int_size = sizeof(int);
+    size_t block_size = sizeof(int)*2;
+    for (auto it = uid_hit_counts.begin(); it != uid_hit_counts.end(); ++it) {
+      uint32_t uid = it->first;
+      if (uid == 0) {
+	continue;
+      }
+      uint32_t taxid;
+      // TODO: Just get a uint64_t and shift the bits, probably faster
+      vector<uint32_t> taxids;
+      do {
+        taxid = *(uint32_t*)(fptr+(uid-1)*block_size);
+        uid = *(uint32_t*)(fptr+(uid-1)*block_size + int_size);
+  
+        taxid_counts[taxid] += it->second;
+	taxids.push_back(taxid);
+      } while (uid != 0);
+
+      double frac_count = (double)it->second / (double)taxids.size();
+      for (uint32_t taxid : taxids) {
+        frac_taxid_counts[taxid] += frac_count;
+      }
+    }
+
+    if (taxid_counts.size() == 0) {
+      return(0);
+    }
+    vector<uint32_t> max_taxids;
+    uint32_t max_count = 0;
+    double max_frac_count = 0;
+    for (auto it : taxid_counts) {
+      if (it.second == max_count) {
+        if (frac_taxid_counts[it.first] == max_frac_count) {
+          max_taxids.push_back(it.first);
+        } else if (frac_taxid_counts[it.first] > max_frac_count) {
+          max_frac_count = frac_taxid_counts[it.first];
+          max_taxids = { it.first };
+        }
+      } else if (it.second > max_count) {
+        max_taxids = { it.first };
+        max_count = it.second;
+        max_frac_count = frac_taxid_counts[it.first];
+      }
+    }
+
+    uint32_t max_taxon = max_taxids[0];
+    auto sit = max_taxids.begin();
+    for (++sit; sit != max_taxids.end(); ++sit) {
+      max_taxon = lca(parent_map, max_taxon, *sit);
+
+    }
+
+    // return the taxid that appeared most often
+    return max_taxon;
+  }
+
+
+
 
   uint8_t KmerScanner::k = 0;
   uint64_t KmerScanner::kmer_mask = 0;

@@ -25,6 +25,7 @@
 #include "readcounts.hpp"
 #include "taxdb.h"
 #include "gzstream.h"
+#include <sstream>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 int New_taxid_start = 1000000000;
@@ -56,6 +57,12 @@ bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
+
+bool Map_UIDs = false;
+string UID_to_TaxID_map_filename;
+map<uint32_t, vector<uint32_t> > UID_to_taxids_map;
+QuickFile UID_to_TaxID_map_file;
+
 uint32_t Minimum_hit_count = 1;
 unordered_map<uint32_t, uint32_t> Parent_map;
 string Classified_output_file, Unclassified_output_file, Kraken_output_file, Report_output_file, TaxDB_file;
@@ -94,8 +101,6 @@ ostream* cout_or_file(string file) {
     }
 }
 
-
-
 void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename) {
 	QuickFile db_file;
 	db_file.open_file(DB_filename);
@@ -112,6 +117,35 @@ void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename)
 	database.set_index(&db_index);
 }
 
+vector<uint32_t> get_taxids_for_uid(uint32_t uid, char* fptr) {
+  size_t int_size = sizeof(int);
+  size_t block_size = sizeof(int)*2;
+  // TODO: Just get a uint64_t and shift the bits, probably faster
+  uint32_t taxid  = *(uint32_t*)(fptr+(uid-1)*block_size);
+  uint32_t parent_uid = *(uint32_t*)(fptr+(uid-1)*block_size + int_size);
+  
+  vector<uint32_t> taxids = {taxid};
+  while (parent_uid != 0) {
+    taxid  = *(uint32_t*)(fptr+(parent_uid-1)*block_size);
+    parent_uid = *(uint32_t*)(fptr+(parent_uid-1)*block_size + int_size);
+    taxids.push_back(taxid);
+  }
+  std::sort(taxids.begin(), taxids.end());
+  return(taxids);
+}
+
+vector<uint32_t> get_taxids_for_uid_from_map(uint32_t uid, char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map ) {
+  auto it = uid_map.find(uid);
+  if (it != uid_map.end()) {
+    return it->second;
+  } 
+  vector<uint32_t> taxids = get_taxids_for_uid(uid, fptr);
+  uid_map[uid] = taxids;
+  return(taxids);
+}
+
+
+
 int main(int argc, char **argv) {
   #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -119,11 +153,25 @@ int main(int argc, char **argv) {
 
   parse_command_line(argc, argv);
   
+  if (Map_UIDs) {
+    if (DB_filenames.size() > 1) {
+      cerr << "Cannot use more than one database with UID mapping!" << endl;
+      return 1;
+    }
+
+    cerr << "Reading UID mapping file " << UID_to_TaxID_map_filename << endl;
+    UID_to_TaxID_map_file.open_file(UID_to_TaxID_map_filename);
+    if (Populate_memory) {
+      UID_to_TaxID_map_file.load_file();
+    }
+  }
+
   if (!TaxDB_file.empty()) {
-	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_file, true);
+    // TODO: Define if the taxDB has read counts or not!!
+	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_file, false);
       for (const auto & tax : taxdb.taxIDsAndEntries) {
           if (tax.first != 0)
-          Parent_map[tax.first] = tax.second.parentTaxonomyID;
+            Parent_map[tax.first] = tax.second.parentTaxonomyID;
       }
       Parent_map[1] = 0;
   } else {
@@ -287,11 +335,12 @@ void process_file(char *filename) {
       kraken_output_ss.str("");
       classified_output_ss.str("");
       unclassified_output_ss.str("");
-      for (size_t j = 0; j < work_unit.size(); j++)
+      for (size_t j = 0; j < work_unit.size(); j++) {
         my_total_classified += 
             classify_sequence( work_unit[j], kraken_output_ss,
                            classified_output_ss, unclassified_output_ss,
                            my_taxon_counts);
+      }
 
       #pragma omp critical(write_output)
       {
@@ -330,6 +379,7 @@ uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& cu
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, ReadCounts>& my_taxon_counts) {
+  // TODO: use vector::reserve
   vector<uint32_t> taxa;
   vector<uint8_t> ambig_list;
   unordered_map<uint32_t, uint32_t> hit_counts;
@@ -356,11 +406,14 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
       else {
         ambig_list.push_back(0);
 
+        // go through multiple databases to map k-mer
         for (size_t i=0; i<KrakenDatabases.size(); ++i) {
-            taxon = get_taxon_for_kmer(*KrakenDatabases[i], kmer_ptr, 
-                    db_statuses[i].current_bin_key, db_statuses[i].current_min_pos, db_statuses[i].current_max_pos);
-            if (taxon) break;
+          taxon = get_taxon_for_kmer(*KrakenDatabases[i], kmer_ptr,
+              db_statuses[i].current_bin_key, db_statuses[i].current_min_pos, db_statuses[i].current_max_pos);
+          if (taxon) break;
         }
+
+        //cerr << "taxon for " << *kmer_ptr << " is " << taxon << endl;
 
         my_taxon_counts[taxon].add_kmer(*kmer_ptr);
 
@@ -375,10 +428,19 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   }
 
   uint32_t call = 0;
-  if (Quick_mode)
-    call = hits >= Minimum_hit_count ? taxon : 0;
-  else
-    call = resolve_tree(hit_counts, Parent_map);
+  if (Map_UIDs) {
+    if (Quick_mode) {
+      cerr << "Quick mode not available when mapping UIDs" << endl;
+      exit(1);
+    } else {
+      call = resolve_uids2(hit_counts, Parent_map, UID_to_TaxID_map_file.ptr());
+    }
+  } else {
+    if (Quick_mode)
+      call = hits >= Minimum_hit_count ? taxon : 0;
+    else
+      call = resolve_tree(hit_counts, Parent_map);
+  }
 
   ++(my_taxon_counts[call].n_reads);
 
@@ -482,7 +544,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:s")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -545,6 +607,10 @@ void parse_command_line(int argc, char **argv) {
       case 'M' :
         Populate_memory = true;
         break;
+      case 'I' :
+        UID_to_TaxID_map_filename = optarg;
+        Map_UIDs = true;
+        break;
       default:
         usage();
         break;
@@ -573,6 +639,7 @@ void usage(int exit_code) {
        << "  -o filename      Output file for Kraken output" << endl
        << "  -r filename      Output file for Kraken report output" << endl
        << "  -a filename      TaxDB" << endl
+       << "  -I filename      UID to TaxId map" << endl
        << "  -t #             Number of threads" << endl
        << "  -u #             Thread work unit size (in bp)" << endl
        << "  -q               Quick operation" << endl

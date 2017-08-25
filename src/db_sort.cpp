@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
 
   parse_command_line(argc, argv);
 
+  cerr << "db_sort: Getting database into memory ...";
   QuickFile input_db_file(Input_DB_filename);
   KrakenDB *input_db = new KrakenDB(input_db_file.ptr());
   Key_len = input_db->get_key_len();
@@ -62,10 +63,12 @@ int main(int argc, char **argv) {
   input_db = new KrakenDB(header);
   input_db_file.close_file();  // Stop using memory-mapped file
 
+  cerr << "db_sort: Sorting ...";
   char *data = new char[ key_ct * (Key_len + val_len) ];
   // Populate data w/ pairs from DB and sort bins in parallel
   bin_and_sort_data(*input_db, data, db_index);
 
+  cerr << "db_sort: Sorting complete - writing database to disk ..." << endl;
   ofstream output_file(Output_DB_filename.c_str(), std::ofstream::binary);
   output_file.write(header, skip_len);
   output_file.write(data, key_ct * (Key_len + val_len));

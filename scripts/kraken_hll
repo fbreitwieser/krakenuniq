@@ -58,6 +58,7 @@ my $classified_out;
 my $outfile;
 my $report_file;
 my $print_sequence = 0;
+my $uid_mapping = 0;
 
 GetOptions(
   "help" => \&display_help,
@@ -78,6 +79,7 @@ GetOptions(
   "check-names" => \$check_names,
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2,
+  "uid-mapping" => \$uid_mapping,
   "only-classified-output" => \$only_classified_output,
 ) or die $!;
 
@@ -145,6 +147,16 @@ push @flags, "-M" if $preload;
 push @flags, "-r", $report_file if defined $report_file;
 push @flags, "-a", $db_prefix[0]."/taxDB";
 push @flags, "-s" if $print_sequence;
+if ($uid_mapping) {
+  my $uid_mapping_file = "$db_prefix[0]/uid_to_taxid";
+  if (!-f $uid_mapping_file) {
+    print STDERR "Missing required file $uid_mapping_file for UID mapping.\n";
+    exit(1); 
+  }
+  push @flags, "-I", $uid_mapping_file; 
+} else {
+
+}
 
 # handle piping for decompression/merging
 my @pipe_argv;
