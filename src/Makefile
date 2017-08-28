@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -std=c++11 -fopenmp -O3
+CXXFLAGS = -Wall -std=c++11 -fopenmp -O2 -g
 PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink build_taxdb
 LIBFLAGS = -L. -I./gzstream -L./gzstream -lz -lgzstream
 

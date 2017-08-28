@@ -39,7 +39,7 @@ fi
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
 mkdir -p "$KRAKEN_DIR"
-make -C src clean
+#make -C src clean
 make -C src install
 for file in scripts/*
 do
@@ -58,7 +58,7 @@ echo "Kraken installation complete."
 echo
 echo "To make things easier for you, you may want to copy/symlink the following"
 echo "files into a directory in your PATH:"
-for file in $KRAKEN_DIR/kraken_hll*
+for file in $KRAKEN_DIR/krakenu*
 do
   [ -x "$file" ] && echo "  $file"
 done

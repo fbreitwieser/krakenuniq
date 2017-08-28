@@ -31,10 +31,10 @@ then
 fi
 
 check_for_jellyfish.sh
-kraken_hll-build --db $KRAKEN_DB_NAME --download-taxonomy
-kraken_hll-build --db $KRAKEN_DB_NAME --download-library bacteria
-kraken_hll-build --db $KRAKEN_DB_NAME --download-library viruses
-kraken_hll-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \
+krakenu-build --db $KRAKEN_DB_NAME --download-taxonomy
+krakenu-build --db $KRAKEN_DB_NAME --download-library bacteria
+krakenu-build --db $KRAKEN_DB_NAME --download-library viruses
+krakenu-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \
                --jellyfish-hash-size "$KRAKEN_HASH_SIZE" \
                --max-db-size "$KRAKEN_MAX_DB_SIZE" \
                --minimizer-len $KRAKEN_MINIMIZER_LEN \
