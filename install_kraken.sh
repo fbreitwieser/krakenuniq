@@ -19,7 +19,7 @@
 
 set -e
 
-VERSION="0.10.7-kraken-hll"
+VERSION=`cat $(dirname $0)/VERSION`
 
 if [ -z "$1" ] || [ -n "$2" ]
 then
