@@ -262,7 +262,7 @@ sub display_version {
 }
 
 sub download_taxonomy {
-  exec "download_taxonomy.sh";
+  exec "krakenu-download_taxonomy.sh";
 }
 
 sub download_library {
@@ -271,12 +271,12 @@ sub download_library {
     warn "Unknown library type \"$type\"\n";
     usage();
   }
-  exec "download_genomic_library.sh", $type;
+  exec "krakenu-download_genomic_library.sh", $type;
 }
 
 sub add_to_library {
   my $arg = shift;
-  exec "add_to_library.sh", $arg;
+  exec "krakenu-add_to_library.sh", $arg;
 }
 
 sub shrink_db {
@@ -287,11 +287,11 @@ sub shrink_db {
   if (! defined($new_db)) {
     die "Must specify new database name to perform shrink task\n";
   }
-  exec "shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
+  exec "krakenu-shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
 }
 
 sub standard_installation {
-  exec "standard_installation.sh";
+  exec "krakenu-standard_installation.sh";
 }
 
 sub build_database {
@@ -302,9 +302,9 @@ sub build_database {
 }
 
 sub clean_database {
-  exec "clean_db.sh";
+  exec "krakenu-clean_db.sh";
 }
 
 sub upgrade_database {
-  exec "upgrade_db.sh";
+  exec "krakenu-upgrade_db.sh";
 }
