@@ -110,10 +110,13 @@ class TaxonomyDB {
 
   TAXID getParentTaxID(const TAXID taxID) const;
   std::unordered_map<TAXID, TAXID> getParentMap() const;
+  TAXID getByScientificName(string name) const;
   std::unordered_map<std::string, TAXID> getScientificNameMap() const;
   std::string getLineage(TAXID taxonomyID) const;
   std::string getMetaPhlAnLineage(TAXID taxonomyID) const;
   TaxonomyEntry<TAXID,READCOUNTS> getEntry(TAXID taxID) const;
+
+  bool insert(TAXID taxonomyID_, TAXID parentTaxonomyID_, std::string rank_, std::string scientificName_);
 
   size_t distance(TAXID taxID1, TAXID taxID2) const;
 
@@ -157,12 +160,6 @@ public:
 	std::vector<std::string> _report_col_names;
 	std::vector<REPORTCOLS> _report_cols;
 };
-
-
-  // Return lowest common ancestor of a and b
-  // LCA(0,x) = LCA(x,0) = x
-  // Default ancestor is 1 (root of tree)
-uint32_t lca(std::unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b);
 
 template<typename K,typename V>
 inline
@@ -266,6 +263,15 @@ bool TaxonomyEntryPtr_comp<TAXID,READCOUNTS>::operator() ( const TaxonomyEntry<T
 	        return ((reads(a->readCounts)+reads(a->readCountsOfChildren)) > (reads(b->readCounts)+reads(b->readCountsOfChildren)));
 			    }
 
+template<typename TAXID, typename READCOUNTS>
+TAXID TaxonomyDB<TAXID,READCOUNTS>::getByScientificName(string name) const {
+	for (const auto & tax : taxIDsAndEntries) {
+		if (tax.second.scientificName == name) {
+		  return tax.first;
+		}
+	}
+	return 0;
+}
 
 template<typename TAXID, typename READCOUNTS>
 std::unordered_map<std::string, TAXID> TaxonomyDB<TAXID,READCOUNTS>::getScientificNameMap() const {
@@ -505,6 +511,26 @@ TAXID TaxonomyDB<TAXID,READCOUNTS>::getLowestCommonAncestor(
     consensus = temp;
   }
   return consensus;
+}
+
+template<typename TAXID, typename READCOUNTS>
+bool TaxonomyDB<TAXID, READCOUNTS>::insert(TAXID taxonomyID_, TAXID parentTaxonomyID_, 
+    std::string rank_, std::string scientificName_) {
+
+  TaxonomyEntry<TAXID,READCOUNTS> newEntry(taxonomyID_, parentTaxonomyID_, rank_, scientificName_, 0, 0);
+  
+  auto parentIt = taxIDsAndEntries.find(parentTaxonomyID_);
+  if (parentIt == taxIDsAndEntries.end() || parentTaxonomyID_ == taxonomyID_) {
+    cerr << "ERROR while inserting taxonomy entry - taxonomy ID " << taxonomyID_  <<"; parent taxonomy ID " << parentTaxonomyID_ << "!" << endl;
+    return false;
+  }
+
+  newEntry.parent = &(parentIt->second);
+  auto insert_res = taxIDsAndEntries.insert({taxonomyID_, newEntry});
+  parentIt->second.children.push_back(&insert_res.first->second);
+
+  return insert_res.second;
+
 }
 
 template<typename TAXID, typename READCOUNTS>
@@ -797,32 +823,6 @@ void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID,READCOUNTS>& tax
 	}
 }
 
-
-  // Return lowest common ancestor of a and b
-  // LCA(0,x) = LCA(x,0) = x
-  // Default ancestor is 1 (root of tree)
-uint32_t lca(unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b)
-  {
-    if (a == 0 || b == 0)
-      return a ? a : b;
-
-    // create a path from a to the root
-	std::unordered_set<uint32_t> a_path;
-    while (a > 0 && a != parent_map[a]) {
-	  if (a == b)
-		  return a;
-      a_path.insert(a);
-      a = parent_map[a];
-    }
-
-    // search for b in the path from a to the root
-    while (b > 0 && b != parent_map[b]) {
-      if (a_path.count(b) > 0)
-        return b;
-      b = parent_map[b];
-    }
-    return 1;
-  }
 
 template<typename K,typename V>
 inline

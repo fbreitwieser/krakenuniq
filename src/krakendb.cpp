@@ -69,15 +69,18 @@ KrakenDB::KrakenDB(char *ptr) {
   key_len = key_bits / 8 + !! (key_bits % 8);
 }
 
-std::unordered_map<uint32_t,uint64_t> KrakenDB::count_taxons() {
-  throw std::runtime_error("count_taxons() is not working");
-  // Not working currently!!
+//using std::map to have the keys sorted
+std::map<uint32_t,uint64_t> KrakenDB::count_taxons() {
   char *ptr = get_pair_ptr();
   size_t pair_sz = pair_size();
 
-  std::unordered_map<uint32_t, uint64_t> taxon_counts;
+  std::map<uint32_t, uint64_t> taxon_counts;
+  if (ptr == NULL) { 
+    std::cerr << "Kraken database pointer is NULL [pair_sz: " << pair_sz << ", key_ct: "<<key_ct<<", key_len: "<< key_len<<"]!" << std::endl;
+    exit(1);
+  }
   for (uint64_t i = 0; i < key_ct; i++) {
-    uint32_t* taxon = (uint32_t *) ptr + pair_sz * i + key_len;
+    uint32_t* taxon = (uint32_t *) (ptr + pair_sz * i + key_len);
     if (taxon == NULL) {
         std::cerr << "taxon is NULL (i is " << i << " and key_ct is " << key_ct << ")" << std::endl;
     } else {

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -std=c++11 -fopenmp -O2 -g
+CXXFLAGS = -Wall -std=c++11 -fopenmp -O2 -g -Wfatal-errors
 PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink build_taxdb
 LIBFLAGS = -L. -I./gzstream -L./gzstream -lz -lgzstream
 
@@ -17,9 +17,9 @@ db_shrink: krakendb.o quickfile.o
 
 db_sort: krakendb.o quickfile.o
 
-set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o
+set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.cpp
 
-classify: krakendb.o quickfile.o krakenutil.o seqreader.o
+classify: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.cpp
 	$(CXX) $(CXXFLAGS) -o classify classify.cpp $^ $(LIBFLAGS)
 
 build_taxdb: taxdb.h

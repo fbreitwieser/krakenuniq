@@ -1,4 +1,5 @@
 #!/bin/bash
+#vim: noai:ts=2:sw=2
 
 # Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
 #
@@ -23,9 +24,9 @@
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
-set -x
 
 function report_time_elapsed() {
+  set -x
   curr_time=$(date "+%s.%N")
   perl -e '$time = $ARGV[1] - $ARGV[0];' \
        -e '$sec = int($time); $nsec = $time - $sec;' \
@@ -37,12 +38,25 @@ function report_time_elapsed() {
        $1 $curr_time
 }
 
+export VERBOSE=1
+
+function cmd () {
+  export start_time1=$(date "+%s.%N")
+  if [[ $VERBOSE -eq 1 ]]; then
+    echo "EXECUTING $@"
+  fi
+  $@
+}
+
+
 start_time=$(date "+%s.%N")
 script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
 JELLYFISH_BIN=`$script_dir/krakenu-check_for_jellyfish.sh`
+NCBI_SERVER="ftp.ncbi.nih.gov"
+FTP_SERVER="ftp://$NCBI_SERVER"
 
 if [ ! -d "$DATABASE_DIR" ]
 then
@@ -72,7 +86,7 @@ fi
 N_FILES=`cat library-files.txt | wc -l`
 echo "Found $N_FILES sequence files (*.{fna,fa,ffn} in the library)"
 
-if [ -e "database.jdb" ]
+if [ -e "database.jdb" ] || [ -e "database0.kdb" ]
 then
   echo "Skipping step 1, k-mer set already exists."
 else
@@ -150,18 +164,19 @@ else
   fi
 fi
 
-if [ -e "database.kdb" ]
+SORTED_DB_NAME=database0.kdb
+if [ -e "$SORTED_DB_NAME" ]
 then
   echo "Skipping step 3, k-mer set already sorted."
 else
   echo "Sorting k-mer set (step 3 of 6)..."
   start_time1=$(date "+%s.%N")
   db_sort -z $MEMFLAG -t $KRAKEN_THREAD_CT -n $KRAKEN_MINIMIZER_LEN \
-    -d database.jdb -o database.kdb.tmp \
+    -d database.jdb -o $SORTED_DB_NAME.tmp \
     -i database.idx
 
   # Once here, DB is sorted, can put file in proper place.
-  mv database.kdb.tmp database.kdb
+  mv $SORTED_DB_NAME.tmp $SORTED_DB_NAME
 
   echo "K-mer set sorted. [$(report_time_elapsed $start_time1)]"
 fi
@@ -180,35 +195,99 @@ else
   echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "lca.complete" ]
-then
-  echo "Skipping step 5, LCAs already set."
-else
-  echo "Setting LCAs in database (step 5 of 6)..."
-  PARAM=""
-  if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
-	echo " Adding taxonomy IDs for sequences"
-	PARAM=" -a"
-  fi
-  start_time1=$(date "+%s.%N")
-  cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
-    set_lcas $MEMFLAG -x -d database.kdb -i database.idx -v \
-    -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
-  touch "lca.complete"
-
-  echo "Database LCAs set. [$(report_time_elapsed $start_time1)]"
-fi
 
 if [ -s "taxDB" ]
 then
-  echo "Skipping step 6, taxDB exists."
+  echo "Skipping step 5, taxDB exists."
 else
-  echo "Creating taxDB (step 6 of 6)... "
-  time $JELLYFISH_BIN histo --high 100000000 database.kdb | tee database.taxon_count
-  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp database.taxon_count | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
+  echo "Creating taxDB (step 5 of 6)... "
+  start_time1=$(date "+%s.%N")
+  if [ ! -f taxonomy/names.dmp ] || [ ! -f taxonomy/nodes.dmp ]; then
+    echo "taxonomy/names.dmp or taxonomy/nodes.dmp does not exist - downloading it ..."
+    [ -d taxonomy ] || mkdir taxonomy
+    cd taxonomy
+    wget $FTP_SERVER/pub/taxonomy/taxdump.tar.gz
+    tar zxf taxdump.tar.gz
+    cd ..
+  fi
+  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
   mv taxDB.tmp taxDB
+  echo "taxDB construction finished. [$(report_time_elapsed $start_time1)]"
+fi
+
+if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
+  if [ -e "database.kdb" ]
+  then
+    echo "Skipping step 6, LCAs already set."
+  else
+    echo "Building standard Kraken LCA database (step 6 of 6)..."
+    PARAM=""
+    if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
+  	echo " Adding taxonomy IDs for sequences"
+  	PARAM=" -a"
+    fi
+    if [[ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]]; then
+  	echo " Adding taxonomy IDs for genomes"
+  	PARAM="$PARAM -A"
+    fi
+    start_time1=$(date "+%s.%N")
+    set -x
+    cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
+      set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kmer_count \
+      -F /dev/fd/0 > seqid2taxid-plus.map
+
+    ## Make a classification report
+    krakenu --db . --report-file $(basename `pwd`).report --threads 10 --fasta-input library/archaea.fna > $(basename `pwd`).kraken
+    set +x
+    if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
+      mv seqid2taxid.map seqid2taxid.map.orig
+      mv seqid2taxid-plus.map seqid2taxid.map
+    fi
+    echo "LCA database created. [$(report_time_elapsed $start_time1)]"
+  fi
+fi
+
+
+if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
+  if [ -e "uid_database.complete" ]
+  then
+    echo "Skipping step 6.3, UIDs already set."
+  else
+    echo "Building UID database (step 6.3 of 6)..."
+    PARAM=""
+    if [[ "$KRAKEN_LCA_DATABASE" == "0" ]]; then
+      if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" && ]]; then
+  	echo " Adding taxonomy IDs for sequences"
+  	PARAM=" -a"
+      fi
+      if [[ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]]; then
+   	echo " Adding taxonomy IDs for genomes"
+    	PARAM="$PARAM -A"
+      fi
+    fi
+    start_time1=$(date "+%s.%N")
+    cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
+      set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -I uid_to_taxid.map -o uid_database.kdb -i database.idx -v \
+      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
+    touch "uid_database.complete"
+  
+    echo "UID Database created. [$(report_time_elapsed $start_time1)]"
+  fi
+fi
+
+if [ -s "uid_database.count" ]
+then
+  echo "Skipping step 6.4, uid_database.kmer_count exists."
+else
+  echo "Creating uid_database.kmer_count (step 6.4 of 6)... "
+  start_time1=$(date "+%s.%N")
+  time $JELLYFISH_BIN histo --high 100000000 uid_database.kdb > uid_database.kmer_count
+  echo "uid_database.kmer_count finished. [$(report_time_elapsed $start_time1)]"
 fi
 
 
 echo "Database construction complete. [Total: $(report_time_elapsed $start_time)]
 You can delete all files but database.{kdb,idx} and taxDB now, if you want"
+
+

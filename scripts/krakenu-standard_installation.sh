@@ -31,9 +31,9 @@ then
 fi
 
 check_for_jellyfish.sh
-krakenu-build --db $KRAKEN_DB_NAME --download-taxonomy
-krakenu-build --db $KRAKEN_DB_NAME --download-library bacteria
-krakenu-build --db $KRAKEN_DB_NAME --download-library viruses
+krakenu-download -o $KRAKEN_DB_NAME/taxonomy --download-taxonomy
+krakenu-download -o $KRAKEN_DB_NAME/library -d archaea,bacteria refseq > $KRAKEN_DB_NAME/seqid2taxid.map
+krakenu-download -o $KRAKEN_DB_NAME/library -d viral -a Any refseq >> $KRAKEN_DB_NAME/seqid2taxid.map
 krakenu-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \
                --jellyfish-hash-size "$KRAKEN_HASH_SIZE" \
                --max-db-size "$KRAKEN_MAX_DB_SIZE" \

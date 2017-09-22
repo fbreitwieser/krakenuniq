@@ -25,6 +25,7 @@
 #include "readcounts.hpp"
 #include "taxdb.h"
 #include "gzstream.h"
+#include "uid_mapping.hpp"
 #include <sstream>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
@@ -39,7 +40,6 @@ void process_file(char *filename);
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, ReadCounts>&);
-string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig);
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
 unordered_map<uint32_t, ReadCounts> taxon_counts; // stats per taxon
@@ -79,6 +79,7 @@ static vector<KrakenDB*> KrakenDatabases (DB_filenames.size());
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
 uint64_t total_bases = 0;
+uint32_t ambig_taxon = -1;
 
 inline bool ends_with(std::string const & value, std::string const & ending)
 {
@@ -117,35 +118,6 @@ void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename)
 	database.set_index(&db_index);
 }
 
-vector<uint32_t> get_taxids_for_uid(uint32_t uid, char* fptr) {
-  size_t int_size = sizeof(int);
-  size_t block_size = sizeof(int)*2;
-  // TODO: Just get a uint64_t and shift the bits, probably faster
-  uint32_t taxid  = *(uint32_t*)(fptr+(uid-1)*block_size);
-  uint32_t parent_uid = *(uint32_t*)(fptr+(uid-1)*block_size + int_size);
-  
-  vector<uint32_t> taxids = {taxid};
-  while (parent_uid != 0) {
-    taxid  = *(uint32_t*)(fptr+(parent_uid-1)*block_size);
-    parent_uid = *(uint32_t*)(fptr+(parent_uid-1)*block_size + int_size);
-    taxids.push_back(taxid);
-  }
-  std::sort(taxids.begin(), taxids.end());
-  return(taxids);
-}
-
-vector<uint32_t> get_taxids_for_uid_from_map(uint32_t uid, char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map ) {
-  auto it = uid_map.find(uid);
-  if (it != uid_map.end()) {
-    return it->second;
-  } 
-  vector<uint32_t> taxids = get_taxids_for_uid(uid, fptr);
-  uid_map[uid] = taxids;
-  return(taxids);
-}
-
-
-
 int main(int argc, char **argv) {
   #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -161,9 +133,11 @@ int main(int argc, char **argv) {
 
     cerr << "Reading UID mapping file " << UID_to_TaxID_map_filename << endl;
     UID_to_TaxID_map_file.open_file(UID_to_TaxID_map_filename);
-    if (Populate_memory) {
-      UID_to_TaxID_map_file.load_file();
-    }
+
+    // Always Populate memory
+    //if (Populate_memory) {
+    UID_to_TaxID_map_file.load_file();
+    //}
   }
 
   if (!TaxDB_file.empty()) {
@@ -376,12 +350,27 @@ uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& cu
 	return taxon;
 }
 
+inline
+void append_hitlist_string(string& hitlist_string, uint32_t& last_taxon, uint32_t& last_counter, uint32_t current_taxon) {
+  if (last_taxon == current_taxon) {
+    ++last_counter;
+  } else {
+    if (last_counter > 0) {
+      if (last_taxon == ambig_taxon) {
+        hitlist_string += "A:" + std::to_string(last_counter) + ' ';
+      } else {
+        hitlist_string += std::to_string(last_taxon) + ':' + std::to_string(last_counter) + ' ';
+      }
+    }
+    last_counter = 1;
+    last_taxon = current_taxon;
+  }
+}
+
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, ReadCounts>& my_taxon_counts) {
   // TODO: use vector::reserve
-  vector<uint32_t> taxa;
-  vector<uint8_t> ambig_list;
   unordered_map<uint32_t, uint32_t> hit_counts;
   uint64_t *kmer_ptr;
   uint32_t taxon = 0;
@@ -394,6 +383,10 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
     int64_t current_max_pos = 0;
   };
 
+  string hitlist_string;
+  uint32_t last_taxon;
+  uint32_t last_counter;
+
   vector<db_status> db_statuses(KrakenDatabases.size());
 
   if (dna.seq.size() >= KrakenDatabases[0]->get_k()) {
@@ -401,10 +394,9 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
     while ((kmer_ptr = scanner.next_kmer()) != NULL) {
       taxon = 0;
       if (scanner.ambig_kmer()) {
-        ambig_list.push_back(1);
+        append_hitlist_string(hitlist_string, last_taxon, last_counter, ambig_taxon);
       }
       else {
-        ambig_list.push_back(0);
 
         // go through multiple databases to map k-mer
         for (size_t i=0; i<KrakenDatabases.size(); ++i) {
@@ -423,7 +415,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
             break;
         }
       }
-      taxa.push_back(taxon);
+      append_hitlist_string(hitlist_string, last_taxon, last_counter, taxon);
     }
   }
 
@@ -433,7 +425,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
       cerr << "Quick mode not available when mapping UIDs" << endl;
       exit(1);
     } else {
-      call = resolve_uids2(hit_counts, Parent_map, UID_to_TaxID_map_file.ptr());
+      call = resolve_uids2(hit_counts, Parent_map, (const uint32_t *)UID_to_TaxID_map_file.ptr(), UID_to_TaxID_map_file.size());
     }
   } else {
     if (Quick_mode)
@@ -478,10 +470,13 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
     koss << "Q:" << hits;
   }
   else {
-    if (taxa.empty())
+    if (hitlist_string.empty() && last_counter == 0)
       koss << "0:0";
-    else
-      koss << hitlist_string(taxa, ambig_list);
+    else {
+      koss << hitlist_string
+           << (last_taxon == ambig_taxon? "A" :  std::to_string(last_taxon))
+           << ':' << std::to_string(last_counter);
+    }
   }
 
   if (Print_sequence)
@@ -489,43 +484,6 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
 
   koss << "\n";
   return call;
-}
-
-string hitlist_string(vector<uint32_t> &taxa, vector<uint8_t> &ambig)
-{
-  int64_t last_code;
-  int code_count = 1;
-  ostringstream hitlist;
-
-  if (ambig[0])   { last_code = -1; }
-  else            { last_code = taxa[0]; }
-
-  for (size_t i = 1; i < taxa.size(); i++) {
-    int64_t code;
-    if (ambig[i]) { code = -1; }
-    else          { code = taxa[i]; }
-
-    if (code == last_code) {
-      code_count++;
-    }
-    else {
-      if (last_code >= 0) {
-        hitlist << last_code << ":" << code_count << " ";
-      }
-      else {
-        hitlist << "A:" << code_count << " ";
-      }
-      code_count = 1;
-      last_code = code;
-    }
-  }
-  if (last_code >= 0) {
-    hitlist << last_code << ":" << code_count;
-  }
-  else {
-    hitlist << "A:" << code_count;
-  }
-  return hitlist.str();
 }
 
 set<uint32_t> get_ancestry(uint32_t taxon) {

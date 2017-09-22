@@ -25,6 +25,7 @@
 #include "seqreader.hpp"
 #include "taxdb.h"
 #include "readcounts.hpp"
+#include "uid_mapping.hpp"
 #include <unordered_map>
 #include <map>
 
@@ -43,6 +44,7 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish);
 int Num_threads = 1;
 string DB_filename, Index_filename,
   Output_DB_filename, TaxDB_filename,
+  Kmer_count_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
 bool force_taxid = false;
@@ -52,6 +54,7 @@ bool Allow_extra_kmers = false;
 bool verbose = false;
 bool Operate_in_RAM = false;
 bool One_FASTA_file = false;
+bool Add_taxIds_for_Assembly = false;
 bool Add_taxIds_for_Sequences = false;
 bool Use_uids_instead_of_taxids = false;
 bool Output_UID_map_to_STDOUT = false;
@@ -61,19 +64,19 @@ string UID_map_filename;
 ofstream UID_map_file;
 
 uint32_t current_uid = 0;
-uint32_t max_uid = -1;
 unordered_map<uint32_t, uint32_t> Parent_map;
 //unordered_multimap<uint32_t, uint32_t> Children_map;
 //typedef std::_Rb_tree_iterator<std::pair<const std::set<unsigned int>, unsigned int> > map_it;
 //typedef std::_Rb_tree_iterator<std::pair<const std::vector<unsigned int>, unsigned int> > map_it;
-typedef const vector<uint32_t>* map_it;
-vector< map_it > UID_to_taxids_vec;
-map< vector<uint32_t>, uint32_t> Taxids_to_UID_map;
+vector< const TaxidSet*  > UID_to_taxids_vec;
+map< TaxidSet, uint32_t> Taxids_to_UID_map;
 
 unordered_map<string, uint32_t> ID_to_taxon_map;
 unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
 TaxonomyDB<uint32_t, ReadCounts> taxdb;
+
+const string prefix = "kraken:taxid|";
 
 int main(int argc, char **argv) {
   #ifdef _OPENMP
@@ -141,6 +144,16 @@ int main(int argc, char **argv) {
   else
     process_files();
 
+  if (!Kmer_count_filename.empty()) {
+    ofstream ofs(Kmer_count_filename.c_str());
+    cerr << "Writing kmer counts to " << Kmer_count_filename << "..." << endl;
+    auto counts = Database.count_taxons();
+    for (auto const & kv : counts) {
+      ofs << kv.first << '\t' << kv.second << '\n';
+    }
+    ofs.close();
+  }
+
   if (Operate_in_RAM && !Pretend) {
     if (Output_DB_filename.size() > 0) {
       DB_filename = Output_DB_filename;
@@ -155,7 +168,7 @@ int main(int argc, char **argv) {
   UID_map_file.close();
 
   // Write new TaxDB file if new taxids were added
-  if (Add_taxIds_for_Sequences && !TaxDB_filename.empty() && !Pretend) {
+  if ((Add_taxIds_for_Sequences || Add_taxIds_for_Assembly) && !TaxDB_filename.empty() && !Pretend) {
     cerr << "Writing new TaxDB ..." << endl;
     ofstream ofs(TaxDB_filename.c_str());
     taxdb.writeTaxonomyIndex(ofs);
@@ -165,35 +178,78 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void process_single_file() {
-  cerr << "Processing FASTA files" << endl;
+inline 
+uint32_t get_taxid(
+    unordered_map<string, uint32_t>& name_to_taxid_map, 
+    unordered_map<uint32_t,uint32_t>& Parent_map,
+    string name, uint32_t parent_taxid, const string & rank_name) {
+
+  auto it = name_to_taxid_map.find(name);
+  if (it == name_to_taxid_map.end()) {
+    uint32_t new_taxid = ++New_taxid_start;
+    bool insert_res = taxdb.insert(new_taxid, parent_taxid, rank_name, name);
+    if (!insert_res)
+          cerr << "Taxonomy ID " << new_taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the -a option." << endl;
+    // insert_res shows if insert failed, but we don't care
+    // cerr << "Adding assembly: " << name << " with taxid " << new_taxid << endl;
+    Parent_map[new_taxid] = parent_taxid;
+    name_to_taxid_map[name] = new_taxid;
+    return new_taxid;
+   } else {
+    return it->second;
+   }
+}
+
+unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_filename, 
+    TaxonomyDB<uint32_t, ReadCounts>& taxdb, unordered_map<uint32_t,uint32_t>& Parent_map, 
+    bool Add_taxIds_for_Assembly, bool Add_taxIds_for_Sequences) {
+
+  unordered_map<string, uint32_t> ID_to_taxon_map;
   ifstream map_file(ID_to_taxon_map_filename.c_str());
   if (map_file.rdstate() & ifstream::failbit) {
     err(EX_NOINPUT, "can't open %s", ID_to_taxon_map_filename.c_str());
   }
   string line, seq_id;
-  uint32_t parent_taxid, taxid;
+  uint32_t taxid;
+
+  // Used when adding new taxids for assembly or sequence
+  unordered_map<string, uint32_t> name_to_taxid_map;
+
   while (map_file.good()) {
     getline(map_file, line);
     if (line.empty())
       break;
     istringstream iss(line);
-    iss >> seq_id;
-    if (ID_to_taxon_map.find(seq_id) != ID_to_taxon_map.end()) 
-        continue;
+    iss >> seq_id >> taxid;
+
+    auto it = ID_to_taxon_map.find(seq_id);
+    if (it != ID_to_taxon_map.end()) {
+      // The sequence ID has been seen before, ignore
+      continue;
+    }
+
+    if (Add_taxIds_for_Assembly && iss.good()) {
+      iss.get();
+      string name;
+      getline(iss, name);
+      taxid = get_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
+    }
 
     if (Add_taxIds_for_Sequences) {
-      iss >> parent_taxid;
-      taxid = ++New_taxid_start;
-      Parent_map[taxid] = parent_taxid;
-      auto itEntry = taxdb.taxIDsAndEntries.insert({taxid, TaxonomyEntry<uint32_t, ReadCounts>(taxid, parent_taxid, "sequence")});
-      if (!itEntry.second)
-          cerr << "Taxonomy ID " << taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the -a option." << endl;
-    } else {
-      iss >> taxid;
+      taxid = get_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
+    }
+    if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
+      cout << seq_id << '\t' << taxid << '\n';
     }
     ID_to_taxon_map[seq_id] = taxid;
   }
+  return std::move(ID_to_taxon_map);
+}
+
+void process_single_file() {
+  cerr << "Processing FASTA files" << endl;
+ 
+  ID_to_taxon_map = read_seqid_to_taxid_map(ID_to_taxon_map_filename, taxdb, Parent_map, Add_taxIds_for_Assembly, Add_taxIds_for_Sequences);
 
   FastaReader reader(Multi_fasta_filename);
   DNASequence dna;
@@ -213,23 +269,27 @@ void process_single_file() {
 
     // Get the taxid. If the header specifies kraken:taxid, use that
     uint32_t taxid;
-    string prefix = "kraken:taxid|";
-    if (dna.id.substr(0,prefix.size()) == prefix) {
+    auto it = ID_to_taxon_map.find(dna.id);
+    if (it != ID_to_taxon_map.end()) {
+      taxid = it->second;
+    } else if (dna.id.size() >= prefix.size() && dna.id.substr(0,prefix.size()) == prefix) {
         taxid = std::stol(dna.id.substr(prefix.size()));
         if (taxid == 0) {
-          cerr << "Error: taxid is zero for the line '" << dna.id << "'?!" << endl;
+          cerr << "Error: taxonomy ID is zero for sequence '" << dna.id << "'?!" << endl;
         }
         const auto strBegin = dna.header_line.find_first_not_of("\t ");
         if (strBegin != std::string::npos)
             dna.header_line = dna.header_line.substr(strBegin);
     } else {
-        taxid = ID_to_taxon_map[dna.id];
+        cerr << "Error! Didn't find taxonomy ID mapping for sequence " <<  dna.id << "!!" << endl;
+        ++seqs_skipped;
+        continue;
     }
     
     if (Add_taxIds_for_Sequences) {
       auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
       if (entryIt == taxdb.taxIDsAndEntries.end()) {
-        cerr << "Error! Didn't find " << taxid << " in TaxonomyDB!!" << endl;
+        cerr << "Error! Didn't find taxid " << taxid << " in TaxonomyDB - can't update it!! ["<<dna.header_line<<"]" << endl;
       } else {
         entryIt->second.scientificName = dna.header_line;
       }
@@ -271,6 +331,7 @@ void process_files() {
     istringstream iss(line);
     iss >> filename;
     iss >> taxid;
+    // TODO: Support a mapping file with only file names, not taxids
     process_file(filename, taxid);
     cerr << "\rProcessed " << ++seqs_processed << " sequences";
   }
@@ -289,6 +350,11 @@ void process_file(string filename, uint32_t taxid) {
   #pragma omp parallel for schedule(dynamic)
   for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
     set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
+}
+
+void process_sequence(DNASequence dna) {
+  // TODO: Refactor such that a list of files + taxid can be given.
+  // Or maybe asembly_summary file?
 }
 
 void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
@@ -311,62 +377,11 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
       }
       continue;
     }
+
+    // TODO: Should I use pragma omp critical here?
     if (Use_uids_instead_of_taxids) {
-      uint32_t kmer_uid = *val_ptr;
-      bool new_taxid = kmer_uid == 0;
-      vector<uint32_t> taxid_set;
-      if (new_taxid) {
-        taxid_set.push_back(taxid);
-      } else {
-        if (kmer_uid > UID_to_taxids_vec.size()) {
-          // This can happen when set_lcas is called on a database that is not all zeros
-          cerr << "kmer_uid ("<< kmer_uid <<") greater than UID vector size ("<< UID_to_taxids_vec.size()<<")!!" << endl;
-          exit(1);
-        }
-        taxid_set = *(UID_to_taxids_vec.at(kmer_uid-1));
-        auto it = std::lower_bound( taxid_set.begin(), taxid_set.end(), taxid); // find proper position in descending order
-
-        if (it == taxid_set.end() || *it != taxid) {
-          // add the taxid to the set, in the right position
-           taxid_set.insert( it, taxid ); // insert before iterator it
-           new_taxid = true;
-        }
-      }
-
-      if (new_taxid) {
-        if (max_uid <= current_uid) {
-          cerr << "Maxxed out on the UIDs!!" << endl;
-          exit(1);
-        }
-
-        // get a new taxid for this set
-        #pragma omp critical(new_uid)
-        {
-        auto insert_res = Taxids_to_UID_map.insert( { std::move(taxid_set), current_uid + 1 } );
-        if (insert_res.second) {
-          ++current_uid;
-
-          // print result for map:
-          if (Output_UID_map_to_STDOUT) {
-            auto tid_it = insert_res.first->first.begin();
-            cout << current_uid << '\t' << *tid_it++; 
-            while (tid_it != insert_res.first->first.end()) { cout << ' ' << *tid_it++; }
-            cout << '\n';
-          }
-
-          // FORMAT: TAXID<uint32_t> PARENT<uint32_t>
-          // TODO: Consider using mmap here
-          UID_map_file.write((char*)&taxid, sizeof(taxid));
-          UID_map_file.write((char*)&kmer_uid, sizeof(kmer_uid));
-
-          //UID_to_taxids_vec[current_uid] = taxid_set;
-          UID_to_taxids_vec.push_back( &(insert_res.first->first) );
-          *val_ptr = current_uid;
-        } else {
-         *val_ptr = insert_res.first->second;
-        }
-        }
-      }
+      #pragma omp critical(new_uid)
+      *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
     } else if (!force_taxid) {
       *val_ptr = lca(Parent_map, taxid, *val_ptr);
     } else {
@@ -383,7 +398,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:apI:o:S")) != -1) {
+  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:aApI:o:Sc:")) != -1) {
     switch (opt) {
       case 'f' :
         File_to_taxon_map_filename = optarg;
@@ -391,9 +406,6 @@ void parse_command_line(int argc, char **argv) {
       case 'I' :
         Use_uids_instead_of_taxids = true;
         UID_map_filename = optarg;
-        break;
-      case 'S' :
-        Output_UID_map_to_STDOUT = true;
         break;
       case 'd' :
         DB_filename = optarg;
@@ -430,8 +442,14 @@ void parse_command_line(int argc, char **argv) {
       case 'a' :
         Add_taxIds_for_Sequences = true;
         break;
+      case 'A' :
+        Add_taxIds_for_Assembly = true;
+        break;
       case 'b' :
         TaxDB_filename = optarg;
+        break;
+      case 'c' :
+        Kmer_count_filename = optarg;
         break;
       case 'M' :
         Operate_in_RAM = true;
@@ -475,10 +493,10 @@ void usage(int exit_code) {
        << "  -f filename      File to taxon map" << endl
        << "  -F filename      Multi-FASTA file with sequence data" << endl
        << "  -m filename      Sequence ID to taxon map" << endl
-       << "  -a               Add taxonomy IDs (starting with "<<New_taxid_start<<") for sequences to Taxonomy DB" << endl
+       << "  -a               Add taxonomy IDs (starting with "<<New_taxid_start<<") for assemblies (third column in seqid2taxid.map) to Taxonomy DB" << endl
+       << "  -A               Add taxonomy IDs (starting with "<<New_taxid_start<<") for sequences to Taxonomy DB" << endl
        << "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
        << "  -I filename      Write UIDs into database, and output (binary) UID-to-taxid map to filename" << endl
-       << "  -S               Write UID-to-taxid map to STDOUT" << endl
        << "  -p               Pretend - do not write database back to disk (when working in RAM)" << endl
        << "  -v               Verbose output" << endl
        << "  -h               Print this message" << endl

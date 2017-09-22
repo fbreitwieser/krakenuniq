@@ -27,22 +27,16 @@ namespace kraken {
   // Build a map of node to parent from an NCBI taxonomy nodes.dmp file
   std::unordered_map<uint32_t, uint32_t> build_parent_map(std::string filename);
 
-  // Return the lowest common ancestor of a and b, according to parent_map
-  // NOTE: LCA(0,x) = LCA(x,0) = x
+  // Return lowest common ancestor of a and b
+  // LCA(0,x) = LCA(x,0) = x
+  // Default ancestor is 1 (root of tree)
+uint32_t lca(const std::unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b);
+
+
 
   // Resolve classification tree
   uint32_t resolve_tree(const std::unordered_map<uint32_t, uint32_t> &hit_counts,
                         const std::unordered_map<uint32_t, uint32_t> &parent_map);
-
-  uint32_t resolve_uids(
-        const std::unordered_map<uint32_t, uint32_t> &uid_hit_counts,
-        const std::unordered_map<uint32_t, uint32_t> &parent_map,
-        const std::vector< std::vector<uint32_t> > &UID_to_taxids_vec);
-
-  uint32_t resolve_uids2(
-        const std::unordered_map<uint32_t, uint32_t> &uid_hit_counts,
-        const std::unordered_map<uint32_t, uint32_t> &parent_map,
-        char* fptr);
 
   class KmerScanner {
     public:

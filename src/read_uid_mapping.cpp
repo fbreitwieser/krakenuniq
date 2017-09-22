@@ -7,6 +7,7 @@
 using namespace std;
 using namespace kraken;
 
+inline
 vector<uint32_t> get_taxids_for_uid(uint32_t uid, char* fptr) {
   size_t int_size = sizeof(int);
   size_t block_size = sizeof(int)*2;
@@ -24,7 +25,7 @@ vector<uint32_t> get_taxids_for_uid(uint32_t uid, char* fptr) {
   return(taxids);
 }
 
-
+inline
 vector<uint32_t> get_taxids_for_uid_from_map(uint32_t uid, char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map ) {
   auto it = uid_map.find(uid);
   if (it != uid_map.end()) {

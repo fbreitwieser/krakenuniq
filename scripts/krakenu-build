@@ -64,7 +64,12 @@ my (
   $upgrade,
   $clean,
 
+  $build_uid_database,
+  $build_lca_database,
+
+  $add_taxonomy_ids_for_genome,
   $add_taxonomy_ids_for_seq
+
 );
 
 my $verbose = 0;
@@ -75,7 +80,10 @@ $kmer_len = $DEF_KMER_LEN;
 $work_on_disk = "";
 $hash_size = "";
 $max_db_size = "";
+$add_taxonomy_ids_for_genome = 0;
 $add_taxonomy_ids_for_seq = 0;
+$build_uid_database = 1;
+$build_lca_database = 1;
 
 # variables corresponding to task options
 my @TASK_LIST = (
@@ -115,7 +123,10 @@ GetOptions(
   "clean" => \$clean,
   "verbose" => \$verbose,
 
-  "generate-taxonomy-ids-for-sequences" => \$add_taxonomy_ids_for_seq
+  "taxids-for-genomes" => \$add_taxonomy_ids_for_genome,
+  "taxids-for-sequences" => \$add_taxonomy_ids_for_seq,
+  "lca-database!" => \$build_lca_database,
+  "uid-database!" => \$build_uid_database
 ) or usage();
 
 if (@ARGV) {
@@ -241,12 +252,17 @@ Options:
   --shrink-block-offset NUM  When shrinking, select the k-mer that is NUM
                              positions from the end of a block of k-mers
                              (default: 1)
+  --uid-database             Build a UID database (default no)
+  --lca-database             Build a LCA database (default yes)
+  --no-lca-database          Do not build a LCA database
   --work-on-disk             Perform most operations on disk rather than in
                              RAM (will slow down build in most cases)
-  --generate-taxonomy-ids-for-sequences 
-                             Generate taxonomy IDs for sequences, starting with 1000000000.
-							 Can be useful to resolve classifications with multiple genomes
-							 for one taxonomy ID.
+  --taxids-for-genomes       Add taxonomy IDs (starting with 1bio) for genomes.
+                             Only works with 3-column seqid2taxid map with third 
+                             column being the name
+  --taxids-for-sequences     Add taxonomy IDs for sequences, starting with 1bio.
+                             Can be useful to resolve classifications with multiple genomes
+                             for one taxonomy ID.
 EOF
   exit $exit_code;
 }
@@ -297,6 +313,9 @@ sub standard_installation {
 sub build_database {
   $ENV{"KRAKEN_REBUILD_DATABASE"} = (defined $rebuild? 1 : 0);
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_SEQ"} = $add_taxonomy_ids_for_seq;
+  $ENV{"KRAKEN_ADD_TAXIDS_FOR_GENOME"} = $add_taxonomy_ids_for_genome;
+  $ENV{"KRAKEN_UID_DATABASE"} = $build_uid_database;
+  $ENV{"KRAKEN_LCA_DATABASE"} = $build_lca_database;
   my $opt = ($verbose? "-x" : "");
   exec "krakenu-build_db.sh";
 }
