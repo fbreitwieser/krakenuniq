@@ -30,7 +30,7 @@ then
   WOD_FLAG="--work-on-disk"
 fi
 
-check_for_jellyfish.sh
+krakenu-check_for_jellyfish.sh
 krakenu-download -o $KRAKEN_DB_NAME/taxonomy --download-taxonomy
 krakenu-download -o $KRAKEN_DB_NAME/library -d archaea,bacteria refseq > $KRAKEN_DB_NAME/seqid2taxid.map
 krakenu-download -o $KRAKEN_DB_NAME/library -d viral -a Any refseq >> $KRAKEN_DB_NAME/seqid2taxid.map

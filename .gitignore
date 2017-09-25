@@ -3,3 +3,5 @@
 /tests/dbs
 /tests/data
 /tests/install
+
+\.idea/
