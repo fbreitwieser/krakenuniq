@@ -187,9 +187,10 @@ then
 else
   echo "Creating seqID to taxID map (step 4 of 6).."
   start_time1=$(date "+%s.%N")
-  cat library-files.txt | tr '\n' '\0' | xargs -0 grep '^>' | sed 's/.//' | sed 's/ .*//' | sort > library-headers.txt
-  join -t $'\t' nucl_gb.accession2taxid.sorted library-headers.txt > seqid2taxid.map.tmp
-  mv seqid2taxid.map.tmp seqid2taxid.map
+  #cat library-files.txt | tr '\n' '\0' | xargs -0 grep '^>' | sed 's/.//' | sed 's/ .*//' | sort > library-headers.txt
+  #join -t $'\t' nucl_gb.accession2taxid.sorted library-headers.txt > seqid2taxid.map.tmp
+  #mv seqid2taxid.map.tmp seqid2taxid.map
+  find library -name '*.map' -exec cat {} \; > seqid2taxid.map
   line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
   echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
@@ -238,7 +239,8 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
       -F /dev/fd/0 > seqid2taxid-plus.map
 
     ## Make a classification report
-    krakenu --db . --report-file $(basename `pwd`).report --threads 10 --fasta-input library/archaea.fna > $(basename `pwd`).kraken
+    cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
+    krakenu --db . --report-file $(basename `pwd`).report --threads 10 --fasta-input /dev/stdin > $(basename `pwd`).kraken
     set +x
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
       mv seqid2taxid.map seqid2taxid.map.orig
