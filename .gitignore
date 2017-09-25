@@ -1,3 +1,5 @@
 /install/
 /Debug/
 /tests/dbs
+/tests/data
+/tests/install
