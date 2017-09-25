@@ -1,4 +1,5 @@
-#!/bin/env perl
+#!/usr/bin/env perl
+#vim: et:ts=2:sw=2
 
 # krakenu-download.pl - based on centrifuge-download
 # (c) Florian Breitwieser, 2017
@@ -13,7 +14,8 @@ use IO::Uncompress::Gunzip qw/gunzip $GunzipError/;
 use autodie;
 use Term::ANSIColor;
 use Getopt::Long;
-use Parallel::ForkManager;
+use LWP::UserAgent;
+
 
 sub download_taxonomy(@);
 sub download_contaminats(@);
@@ -46,8 +48,9 @@ my $OVERWRITE_FILES=0;
 my $INCLUDE_VIRAL_NEIGHBORS=0;
 my $DOMAINS;
 my $DL_MOD_RSYNC;
+my $n_children = 0;
+my @pids;
 
-my %ac_to_taxid;
 my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
 
@@ -113,6 +116,8 @@ if (defined $BASE_DIR && defined $DB_DIR) {
   exit 1;
 }
 
+my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
+
 # Use current directory as base directory
 $BASE_DIR = "." unless defined $DB_DIR || defined $BASE_DIR;
 
@@ -126,15 +131,6 @@ sub get_dir {
   make_path $dir1;
   return $dir1;
 }
-
-my $pm = new Parallel::ForkManager($N_PROC);
-$pm->run_on_finish(sub {
-  my ($pid, $exit_code, $indent, $exit_signal, $core_dump, $data) = @_;
-  if (defined $data) {
-    @ac_to_taxid{keys %$data} = values %$data;
-  }
-}
-);
 
 my %select_taxonomy_ids;
 if (defined $TAXID) {
@@ -182,8 +178,9 @@ if ($INCLUDE_VIRAL_NEIGHBORS) {
   if (!$downloaded_viral_refseq) {
     print STDERR "--include-viral-neighbors only works when RefSeq viral is downloaded in the same session!";
   } else {
-    my $lib_dir = $add_dir? "$BASE_DIR/library/viral-neighbors" : "$BASE_DIR/viral-neighbors";
-    download_viral_neighbors($lib_dir);
+    my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral-neighbors" : "$BASE_DIR/viral-neighbors";
+    my $viral_lib_dir = $add_dir? "$BASE_DIR/library/viral" : "$BASE_DIR/viral";
+    download_viral_neighbors($viral_lib_dir, $nbr_lib_dir);
   }
 }
 
@@ -193,35 +190,103 @@ if ($INCLUDE_VIRAL_NEIGHBORS) {
 ## Functions
 
 sub download(@) {
-  my ($url, $file) = @_;
-  if (-f $file && !$OVERWRITE_FILES) {
+  my ($url, $file, $gunzipped_filename) = @_;
+  if (-s $file && !$OVERWRITE_FILES) {
     print STDERR "Not fetching $url - file $file exists.\n" if $VERBOSE;
     return 1;
   }
 
-  $url =~ s/https/http/;
+  start_fork() and return;
+  if ($url =~ /^http/) {
+    print STDERR "Fetching $url to $file ..." if $VERBOSE;
+    if (!-d dirname($file)) {
+      make_path(dirname($file));
+    }
+    my $response = $ua->get($url, ':content_file' => $file);
+    if (!$response->is_success) {
+      print STDERR "\nFAIL: Error downloading $url!\n";
+      print STDERR $response->status_line."\n";
+      exit;
+    } else {
+      print STDERR "SUCCESS\n" if $VERBOSE;
+    }
+  } else {
+    if ( $DL_MOD_RSYNC && $url =~ /^ftp/ ) {
+     $url =~ s/^ftp/rsync/;
+    }
+    print STDERR "Fetching $url to $file ..." if $VERBOSE;
 
-  if ( $DL_MOD_RSYNC && $url =~ /^ftp/ ) {
-    $url =~ s/^ftp/rsync/;
+    my $ff = File::Fetch->new(uri=>"$url");
+    my $where = $ff->fetch(to=> dirname($file)) or die $ff->error;
+    move($where, $file);
+
+    if (defined $gunzipped_filename) {
+      print STDERR " GUNZIPPING";
+      gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
+      unlink $file;
+      $file = $gunzipped_filename;
+    }
+    print STDERR " SUCCESS\n" if $VERBOSE;
   }
-
-  print STDERR "Fetching $url to $file ...\n" if $VERBOSE;
-  my $ff = File::Fetch->new(uri=>"$url");
-  my $where = $ff->fetch(to=> dirname($file)) or die $ff->error;
+  exit;
   #my $where = $ff->fetch(to=> dirname($file)) or die "\n$ff->error for $url!";
-  move($where, $file);
-  return -f $file;
+  return -s $file;
+}
+
+sub start_fork() {
+  my $pid;
+  return if $N_PROC <= 1;
+  if ($n_children == $N_PROC) {
+    $pid = wait();
+    --$n_children;
+  }
+  if (defined($pid = fork())) {
+    if ($pid) {
+      ++$n_children;
+      #print STDERR "Parent: forked child $pid\n";
+      push @pids, $pid;
+    } 
+  } else {
+    print STDERR "ERROR: Failed to fork\n";
+  }
+  return $pid;
+}
+
+sub wait_children() {
+  foreach my $pid (@pids) {
+    waitpid $pid, 0;
+  }
+  @pids = ();
+  $n_children = 0;
+}
+
+sub end_fork() {
+  exit() unless $N_PROC == 1;
 }
 
 sub download_viral_neighbors(@) {
-  my ($dir) = @_;
-  print STDERR "Downloading viral neighbors into $dir ...\n";
+  my ($viral_dir, $nbr_dir) = @_;
+  print STDERR "Reading map files from $viral_dir ... \n";
+  my %ac_to_taxid;
+  foreach my $f (glob("$viral_dir/*.map")) {
+    open (my $F, "<", $f);
+    while (<$F>) {
+      chomp;
+      my ($ac, $taxid, $name) = split(/\t/);
+      $ac =~ s/\.[0-9]*$//;
+      $ac_to_taxid{$ac} = [$name, $taxid];
+    }
+    close ($F);
+  }
+
+  print STDERR "Downloading viral neighbors into $nbr_dir ...\n";
   my $url = "https://www.ncbi.nlm.nih.gov/genomes/GenomesGroup.cgi?taxid=10239&cmd=download2";
-  my $nbr_file = "$dir/viral_neighbors-taxid10239.nbr";
+  my $nbr_file = "$nbr_dir/viral_neighbors-taxid10239.nbr";
   download($url, $nbr_file);
   open(my $F, "<", $nbr_file);
   my @file = <$F>;
   close($F);
+
   my $i = 0;
   my $n_genomes = scalar @file;
 
@@ -229,46 +294,44 @@ sub download_viral_neighbors(@) {
     next if /^#/;
     ++$i;
     print STDERR "\r  Downloading viral neighbor sequence $i/$n_genomes ..." unless $VERBOSE;
-    my $pid = $pm->start and next;
+#    my $pid = $pm->start and next;
+
     my ($rep_acs, $nbr_ac, undef, undef, $nname, $sname) = split /\t/;
     my ($name, $taxid);
     foreach my $rep_ac (split (/,/, $rep_acs)) {
       if (defined $ac_to_taxid{$rep_ac}) {
         ($name, $taxid) = @{$ac_to_taxid{$rep_ac}};
         last;
-      }
+      } 
     }
     if (!defined $taxid) {
-      print STDERR "No mapping for viral neighbor $nbr_ac [rep: $rep_acs, $nname]!\n";
-      $pm->finish(0);
+      print STDERR "\nNo mapping for viral neighbor $nbr_ac [rep: $rep_acs, $nname]!\n";
       next;
     }
     (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
     $name1 =~ s/__/_/g;
-    my $file = "$dir/$name1-tax$taxid/$nbr_ac.fna";
+    my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.fna";
     my $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&rettype=fasta&retmode=text&id=$nbr_ac";
     if (download($url,$file)) {
       print_header_lines($file, $taxid, "$nname $sname neighbor $nbr_ac");
     }
-    ## TODO: dust viral neighbors
-    $pm->finish(0);
   }
   print STDERR "\n";
-  $pm->wait_all_children();
+  wait_children;
+
+#  $pm->wait_all_children();
 }
 
 sub print_header_lines(@) {
-  my ($file, $taxid, $name, $map_ref) = @_;
-  #return if -f "$file.map";
+  my ($file, $taxid, $name) = @_;
+  return if -s "$file.map";
+  print STDERR "Making map file for $file\n" if ($VERBOSE);
   open (my $F, ">", "$file.map");
   open (my $G, "<", $file);
   while (<$G>) {
     next unless /^>([^ ]*)/;
     my $ac = $1;
     print $F "$ac\t$taxid\t$name\n";
-    $ac =~ s/\.[0-9]*$//;
-    $map_ref->{$ac} = [$name, $taxid] if defined $map_ref;
-    #$ac_to_taxid{$ac} = [$name, $taxid] if $downloaded_viral_refseq && $INCLUDE_VIRAL_NEIGHBORS;
   }
   close($G);
   close($F);
@@ -372,13 +435,13 @@ sub download_domain(@) {
   foreach my $g (@genomes_to_dl) {
     my ($ftp_path, $taxid, $organism_name, $infraspecific_name, $assembly_accession) = @$g;
     ++$i;
+    print STDERR "\r Downloading $domain genomes:  $i/$n_genomes ..." unless $VERBOSE;
 
     if (defined $infraspecific_name) {
         (my $i1 = $infraspecific_name) =~ s/strain=//;
         $organism_name .= " $infraspecific_name" unless $organism_name =~ /$i1/ || $i1 eq "";
     }
 
-    print STDERR "\r Downloading $domain genomes:  $i/$n_genomes ..." unless $VERBOSE;
 
     my $bname = basename($ftp_path);
     ( my $organism_name1 = $organism_name ) =~ s/[^a-zA-Z0-9_]/_/g;
@@ -386,20 +449,16 @@ sub download_domain(@) {
     $organism_name1 =~ s/__/_/g;
     $organism_name1 =~ s/_$//;
     my $bname1 = "${organism_name1}-tax${taxid}-${bname}";
-    my $pid = $pm->start and next;
-    my %local_ac_to_taxid;
     
     foreach my $ext (split(/,/, $FNA_FILES)) {
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
       my $fname = $bfname.".fna";
 
-      if (!$OVERWRITE_FILES && -f "$domain_dir/$fname") {
+      if (!$OVERWRITE_FILES && -s "$domain_dir/$fname") {
         print STDERR "$domain_dir/$fname exists - not downloading.. \n" if $VERBOSE;
       } else {
-        download($full_ftp_path, "$domain_dir/$fname.gz");
-        gunzip "$domain_dir/$fname.gz" => "$domain_dir/$fname" or die "gunzip failed: $GunzipError";
-        unlink "$domain_dir/$fname.gz";
+        download($full_ftp_path, "$domain_dir/$fname.gz", "$domain_dir/$fname");
       }
 
       if ($CHANGE_HEADER) {
@@ -411,11 +470,7 @@ sub download_domain(@) {
 
       ## Output sequenceID to taxonomy ID map to STDOUT
       
-      if ($domain eq "viral" && $INCLUDE_VIRAL_NEIGHBORS) {
-        print_header_lines("$domain_dir/$fname", $taxid, "$organism_name $assembly_accession", \%local_ac_to_taxid);
-      } else {
-        print_header_lines("$domain_dir/$fname", $taxid, "$organism_name $assembly_accession");
-      }
+      print_header_lines("$domain_dir/$fname", $taxid, "$organism_name $assembly_accession");
 
       if ($DO_DUST) {
         ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
@@ -423,9 +478,8 @@ sub download_domain(@) {
         unlink("$domain_dir/$fname");
       }
     }
-    $pm->finish(0, \%local_ac_to_taxid);
   }
 
-  $pm->wait_all_children;
+#  $pm->wait_all_children;
   print STDERR "\n";
 }
