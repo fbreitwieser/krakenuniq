@@ -25,12 +25,15 @@ set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
-JELLYFISH_BIN="jellyfish"
-if hash jellyfish1 2>/dev/null; then
-    JELLYFISH_BIN="jellyfish1"
-elif hash jellyfish 2>/dev/null; then
-    JELLYFISH_BIN="jellyfish"
-else 
+JELLYFISH_BIN=""
+for JF in $(dirname $0)/jellyfish jellyfish1 jellyfish; do
+  if hash $JF 2>/dev/null; then
+    JELLYFISH_BIN=$JF;
+    break
+  fi
+done
+
+if [ "$JELLYFISH_BIN" == "" ]; then
     echo "Did not find jellyfish!" 1>&2
     exit 1
 fi

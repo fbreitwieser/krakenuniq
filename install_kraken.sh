@@ -19,11 +19,22 @@
 
 set -e
 
+DIR=$(dirname $0)
 VERSION=`cat $(dirname $0)/VERSION`
+
+if [ "$1" == "--install-jellyfish" ]; then
+ INSTALL_JELLYFISH=1;
+ shift;
+fi
 
 if [ -z "$1" ] || [ -n "$2" ]
 then
-  echo "Usage: $(basename $0) KRAKEN_DIR"
+  echo "Usage: $(basename $0) [--install-jellyfish] KRAKEN_DIR
+
+If --install-jellyfish is specified, the source code for version 1.1
+is downloaded from http://www.cbcb.umd.edu/software/jellyfish and installed 
+in KRAKEN_DIR. Note that this may overwrite other jellyfish installation in 
+the same path."
   exit 64
 fi
 
@@ -34,14 +45,28 @@ then
   exit 1
 fi
 
+
 # Perl cmd used to canonicalize dirname - "readlink -f" doesn't work
 # on OS X.
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
+if [ "$INSTALL_JELLYFISH" == "1" ]; then
+  WD=`pwd`
+  cd /tmp
+  wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
+  tar xvvf jellyfish-1.1.11.tar.gz
+  cd jellyfish-1.1.11
+  ./configure
+  make
+  cp bin/jellyfish $KRAKEN_DIR
+  #rm -r jellyfish-1.1.11.tar.gz jellyfish-1.1.11
+  cd $WD
+fi
+
 mkdir -p "$KRAKEN_DIR"
 #make -C src clean
-make -C src install
-for file in scripts/*
+make -C $DIR/src install
+for file in $DIR/scripts/*
 do
   perl -pl -e 'BEGIN { while (@ARGV) { $_ = shift; ($k,$v) = split /=/, $_, 2; $H{$k} = $v } }'\
            -e 's/#####=(\w+)=#####/$H{$1}/g' \

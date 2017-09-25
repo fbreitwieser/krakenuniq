@@ -1,4 +1,0 @@
-[submodule "Jellyfish"]
-	path = Jellyfish
-	url = https://github.com/gmarcais/Jellyfish
-	branch = series-1.1
