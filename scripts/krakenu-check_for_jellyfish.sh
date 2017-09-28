@@ -26,8 +26,8 @@ set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
 JELLYFISH_BIN=""
-for JF in $(dirname $0)/jellyfish jellyfish1 jellyfish; do
-  if hash $JF 2>/dev/null; then
+for JF in $(dirname $0)/jellyfish/bin/jellyfish  /usr/local/opt/jellyfish-1.1/bin/jellyfish jellyfish1 jellyfish; do
+  if test -f $JF || hash $JF 2>/dev/null; then
     JELLYFISH_BIN=$JF;
     break
   fi
