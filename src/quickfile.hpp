@@ -21,6 +21,7 @@
 #define QUICKFILE_HPP
 
 #include "kraken_headers.hpp"
+#include <vector>
 
 namespace kraken {
   class QuickFile {
@@ -43,6 +44,9 @@ namespace kraken {
     char *fptr;
     size_t filesize;
   };
+
+  std::vector<char> slurp_file(std::string filename, size_t lSize = 0);
+
 }
 
 #endif

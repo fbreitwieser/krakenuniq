@@ -78,6 +78,7 @@ TaxonomyDB<uint32_t, ReadCounts> taxdb;
 
 const string prefix = "kraken:taxid|";
 
+
 int main(int argc, char **argv) {
   #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -105,31 +106,24 @@ int main(int argc, char **argv) {
       cerr << "Something went wrong while creating the file." << endl;
       exit(1);
     }
+  }
 
+  if (!Operate_in_RAM && Output_DB_filename.size() > 0) {
+      cerr << "You need to operate in RAM (flag -M) to use output to a different file (flag -o)" << endl;
+      return 1;
   }
 
   QuickFile db_file(DB_filename, "rw");
-
-  char *temp_ptr = NULL;
   size_t db_file_size = db_file.size();
+  vector<char> dat;
   if (Operate_in_RAM) {
-    cerr << "Getting " << DB_filename << " into memory ... ";
     db_file.close_file();
-    temp_ptr = new char[ db_file_size ];
-    ifstream ifs(DB_filename.c_str(), ifstream::binary);
-    ifs.read(temp_ptr, db_file_size);
-    ifs.close();
-    Database = KrakenDB(temp_ptr);
-    cerr << "done" << endl;
+    dat = slurp_file(DB_filename, db_file_size);
+    Database = KrakenDB(dat.data());
   } else {
     if (Output_DB_filename.size() > 0) {
-      cerr << "You need to operate in RAM (flag -M) to use output to a different file (flag -o)" << endl;
-      return 1;
+      //system("cp " + DB_filename + " " + Output_DB_filename);
     }
-    //std::ifstream ifs("input.txt", std::ios::binary);
-    //std::ofstream ofs("output.txt", std::ios::binary);
-    //ofs << ifs.rdbuf();
-
     Database = KrakenDB(db_file.ptr());
   }
 
@@ -160,9 +154,9 @@ int main(int argc, char **argv) {
     }
     cerr << "Writing database from RAM back to " << DB_filename << " ..." << endl;
     ofstream ofs(DB_filename.c_str(), ofstream::binary);
-    ofs.write(temp_ptr, db_file_size);
+    ofs.write(dat.data(), db_file_size);
     ofs.close();
-    delete temp_ptr;
+    dat.clear();
   }
 
   UID_map_file.close();
@@ -204,6 +198,8 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
     TaxonomyDB<uint32_t, ReadCounts>& taxdb, unordered_map<uint32_t,uint32_t>& Parent_map, 
     bool Add_taxIds_for_Assembly, bool Add_taxIds_for_Sequences) {
 
+  cerr << "Reading sequence ID to taxonomy ID mapping ... ";
+
   unordered_map<string, uint32_t> ID_to_taxon_map;
   ifstream map_file(ID_to_taxon_map_filename.c_str());
   if (map_file.rdstate() & ifstream::failbit) {
@@ -243,6 +239,10 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
     }
     ID_to_taxon_map[seq_id] = taxid;
   }
+  if (ID_to_taxon_map.size() == 0) {
+    cerr << "Error: No ID mappings present!!" << endl;
+  }
+  cerr << " Done - read " << ID_to_taxon_map.size() << " mappings." << endl;
   return std::move(ID_to_taxon_map);
 }
 

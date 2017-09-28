@@ -129,4 +129,48 @@ void QuickFile::close_file() {
   valid = false;
 }
 
+// from http://programanddesign.com/cpp/human-readable-file-size-in-c/
+char* readable_fs(double size/*in bytes*/, char *buf) {
+    int i = 0;
+    const char* units[] = {"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+    while (size > 1024) {
+        size /= 1024;
+        i++;
+    }
+    sprintf(buf, "%.*f %s", i, size, units[i]);
+    return buf;
+}
+
+
+
+std::vector<char> slurp_file(std::string filename, size_t lSize) {
+  FILE * pFile;
+  size_t result;
+
+  pFile = fopen ( filename.c_str() , "rb" );
+  if (pFile==NULL) {fputs ("File error",stderr); exit (1);}
+
+  if (lSize > 0) {
+    // obtain file size:
+    fseek (pFile , 0 , SEEK_END);
+    lSize = ftell (pFile);
+    rewind (pFile);
+  }
+  
+  char buf[50];
+  readable_fs(lSize, buf);
+  std::cerr << "Getting " << filename << " into memory (" << buf << ") ..."; 
+
+  // copy the file into the vector:
+  std::vector<char> buffer(lSize);
+  result = fread (buffer.data(),1,lSize,pFile);
+  if (result != lSize) {fputs ("Reading error",stderr); exit (3);}
+  fclose (pFile);
+
+  std::cerr << " Done" << std::endl;
+  return(std::move(buffer));
+}
+
+
+
 } // namespace
