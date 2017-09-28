@@ -76,15 +76,34 @@ fi
 
 if [ "$KRAKEN_REBUILD_DATABASE" == "1" ]
 then
-  rm -f database.* *.map lca.complete library-files.txt
+  rm -f database.* *.map lca.complete library-files.txt uid_database.* taxDB
 fi
 
-if [ ! -f "library-files.txt" ]; then
+LIBRARY_DIR="library/"
+[[ "$KRAKEN_LIBRARY_DIR" != "" ]] && LIBRARY_DIR="$KRAKEN_LIBRARY_DIR"
+
+TAXONOMY_DIR="library/"
+[[ "$KRAKEN_TAXONOMY_DIR" != "" ]] && TAXONOMY_DIR="$KRAKEN_TAXONOMY_DIR"
+
+if [ ! -s "library-files.txt" ]; then
     echo "Finding all library files"
-    find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library-files.txt
+    find $FIND_OPTS $LIBRARY_DIR '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library-files.txt
 fi
+
+files0() {
+  cat library-files.txt | tr '\n' '\0'
+}
+cat_library() {
+  cat library-files.txt | tr '\n' '\0' | xargs -0 cat
+}
+
 N_FILES=`cat library-files.txt | wc -l`
-echo "Found $N_FILES sequence files (*.{fna,fa,ffn} in the library)"
+if [[ "$N_FILES" -eq 0 ]]; then
+  echo "ERROR: No fna, fa, or ffn files found in $LIBRARY_DIR!";
+  exit 1
+fi
+echo "Found $N_FILES sequence files (*.{fna,fa,ffn}) in the library directory."
+
 
 if [ -e "database.jdb" ] || [ -e "database0.kdb" ]
 then
@@ -98,13 +117,12 @@ else
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
-    KRAKEN_HASH_SIZE=$(find $FIND_OPTS library/ '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' -printf '%s\n' | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
+    KRAKEN_HASH_SIZE=$( files0 | xargs -0 stat -f%z | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
-    $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
-      -o database /dev/fd/0
+  $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
+    -o database <( cat_library )
 
   # Merge only if necessary
   if [ -e "database_1" ]
@@ -181,16 +199,13 @@ else
   echo "K-mer set sorted. [$(report_time_elapsed $start_time1)]"
 fi
 
-if [ -e "seqid2taxid.map" ]
+if [ -s "seqid2taxid.map" ]
 then
   echo "Skipping step 4, seqID to taxID map already complete."
 else
   echo "Creating seqID to taxID map (step 4 of 6).."
   start_time1=$(date "+%s.%N")
-  #cat library-files.txt | tr '\n' '\0' | xargs -0 grep '^>' | sed 's/.//' | sed 's/ .*//' | sort > library-headers.txt
-  #join -t $'\t' nucl_gb.accession2taxid.sorted library-headers.txt > seqid2taxid.map.tmp
-  #mv seqid2taxid.map.tmp seqid2taxid.map
-  find library -name '*.map' -exec cat {} \; > seqid2taxid.map
+  find -L $LIBRARY_DIR/ -name '*.map' -exec cat {} \; > seqid2taxid.map
   line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
   echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
@@ -233,20 +248,21 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     fi
     start_time1=$(date "+%s.%N")
     set -x
-    cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
       -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kmer_count \
-      -F /dev/fd/0 > seqid2taxid-plus.map
-
-    ## Make a classification report
-    cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
-    krakenu --db . --report-file $(basename `pwd`).report --threads 10 --fasta-input /dev/stdin > $(basename `pwd`).kraken
+      -F <( cat_library ) > seqid2taxid-plus.map
     set +x
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
       mv seqid2taxid.map seqid2taxid.map.orig
       mv seqid2taxid-plus.map seqid2taxid.map
     fi
+
     echo "LCA database created. [$(report_time_elapsed $start_time1)]"
+  fi
+  ## Make a classification report
+  if [[ ! -s $(basename `pwd`).report ]]; then
+    echo "Creating database summary report ..."
+    krakenu --db . --report-file $(basename `pwd`).report --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $(basename `pwd`).kraken
   fi
 fi
 
@@ -254,12 +270,12 @@ fi
 if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   if [ -e "uid_database.complete" ]
   then
-    echo "Skipping step 6.3, UIDs already set."
+    echo "Skipping step 6.3, UID datanbase already generated."
   else
     echo "Building UID database (step 6.3 of 6)..."
     PARAM=""
     if [[ "$KRAKEN_LCA_DATABASE" == "0" ]]; then
-      if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" && ]]; then
+      if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
   	echo " Adding taxonomy IDs for sequences"
   	PARAM=" -a"
       fi
@@ -269,25 +285,19 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
       fi
     fi
     start_time1=$(date "+%s.%N")
-    cat library-files.txt | tr '\n' '\0' | xargs -0 cat | \
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -I uid_to_taxid.map -o uid_database.kdb -i database.idx -v \
-      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -F /dev/fd/0
+        -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c uid_database.kmer_count -F <( cat_library )
     touch "uid_database.complete"
   
     echo "UID Database created. [$(report_time_elapsed $start_time1)]"
   fi
-fi
 
-if [ -s "uid_database.count" ]
-then
-  echo "Skipping step 6.4, uid_database.kmer_count exists."
-else
-  echo "Creating uid_database.kmer_count (step 6.4 of 6)... "
-  start_time1=$(date "+%s.%N")
-  time $JELLYFISH_BIN histo --high 100000000 uid_database.kdb > uid_database.kmer_count
-  echo "uid_database.kmer_count finished. [$(report_time_elapsed $start_time1)]"
+  ## Make a classification report
+  if [[ ! -s $(basename `pwd`).uid_report ]]; then
+    echo "Creating database summary report ..."
+    krakenu --db . --report-file $(basename `pwd`).uid_report --threads $KRAKEN_THREAD_CT --fasta-input <(cat_library) > $(basename `pwd`).uid_kraken
+  fi
 fi
-
 
 echo "Database construction complete. [Total: $(report_time_elapsed $start_time)]
 You can delete all files but database.{kdb,idx} and taxDB now, if you want"

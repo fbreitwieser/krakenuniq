@@ -68,7 +68,10 @@ my (
   $build_lca_database,
 
   $add_taxonomy_ids_for_genome,
-  $add_taxonomy_ids_for_seq
+  $add_taxonomy_ids_for_seq,
+
+  $library_dir,
+  $taxonomy_dir
 
 );
 
@@ -125,8 +128,12 @@ GetOptions(
 
   "taxids-for-genomes" => \$add_taxonomy_ids_for_genome,
   "taxids-for-sequences" => \$add_taxonomy_ids_for_seq,
+
   "lca-database!" => \$build_lca_database,
-  "uid-database!" => \$build_uid_database
+  "uid-database!" => \$build_uid_database,
+
+  "library-dir=s" => \$library_dir,
+  "taxonomy-dir=s" => \$taxonomy_dir
 ) or usage();
 
 if (@ARGV) {
@@ -235,7 +242,7 @@ Task options (exactly one must be selected):
   --version                  Print version information
 
 Options:
-  --db NAME                  Kraken DB/library name (mandatory except for
+  --db DBDIR                 Kraken DB directory (mandatory except for
                              --help/--version)
   --threads #                Number of threads (def: $DEF_THREAD_CT)
   --new-db NAME              New Kraken DB name (shrink task only; mandatory
@@ -263,6 +270,8 @@ Options:
   --taxids-for-sequences     Add taxonomy IDs for sequences, starting with 1bio.
                              Can be useful to resolve classifications with multiple genomes
                              for one taxonomy ID.
+  --library-dir DIR          Use DIR for reference sequences instead of DBDIR/library.
+  --taxonomy-dir DIR         Use DIR for taxonomy instead of DBDIR/taxonomy.
 EOF
   exit $exit_code;
 }
@@ -316,6 +325,8 @@ sub build_database {
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_GENOME"} = $add_taxonomy_ids_for_genome;
   $ENV{"KRAKEN_UID_DATABASE"} = $build_uid_database;
   $ENV{"KRAKEN_LCA_DATABASE"} = $build_lca_database;
+  $ENV{"KRAKEN_LIBRARY_DIR"} = $library_dir;
+  $ENV{"KRAKEN_TAXONOMY_DIR"} = $taxonomy_dir;
   my $opt = ($verbose? "-x" : "");
   exec "krakenu-build_db.sh";
 }
