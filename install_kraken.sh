@@ -50,20 +50,24 @@ fi
 # on OS X.
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
+mkdir -p "$KRAKEN_DIR"
 if [ "$INSTALL_JELLYFISH" == "1" ]; then
   WD=`pwd`
-  cd /tmp
-  wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
-  tar xvvf jellyfish-1.1.11.tar.gz
-  cd jellyfish-1.1.11
-  ./configure
+  cd $KRAKEN_DIR
+  if [[ ! -d jellyfish ]]; then
+    wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
+    tar xvvf jellyfish-1.1.11.tar.gz
+    mv jellyfish-1.1.11 jellyfish
+  fi
+  cd jellyfish
+  [[ -f Makefile ]] || ./configure
   make
-  cp bin/jellyfish $KRAKEN_DIR
+  #make install ## doest not work for me on OSX
+  #cp $KRAKEN_DIR/jellyfish-install/bin/jellyfish $KRAKEN_DIR
   #rm -r jellyfish-1.1.11.tar.gz jellyfish-1.1.11
   cd $WD
 fi
 
-mkdir -p "$KRAKEN_DIR"
 #make -C src clean
 make -C $DIR/src install
 for file in $DIR/scripts/*
