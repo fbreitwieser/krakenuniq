@@ -46,15 +46,109 @@ std::vector<std::string> in_betweens(const std::string &s, const char start_char
 
 std::vector<std::string> tokenise(const std::string &s, const std::string& delimiter, size_t max_fields = 0, size_t end_chars = 0);
 
-
 std::vector<std::string> get_fields(const std::string &s, const std::string& delimiter, std::vector<size_t> fields); 
+
+// TODO: Consider using TaxRank instead of string in TaxonomyEntry
+//       However, then it would not be possible to define custom ranks..
+struct TaxRank {
+  // All ranks that appear in the NCBI taxonomy database,
+  //  plus 'sequence', 'assembly', and 'root'
+  //static constexpr vector<string> rank_strings = {
+  // "no rank", "sequence", "assembly",
+ // "subspecies", "species", "subgenus", "genus", "tribe", "subfamily",
+  //"family", "superfamily", "parvorder", "infraorder", "suborder",
+  //"order", "superorder", "parvclass", "infraclass", "subclass",
+  //"class", "superclass", "subphylum", "phylum", "kingdom",
+  //"superkingdom", "root"};
+
+  enum RANK { unknown, no_rank, sequence, assembly,
+    subspecies, species, subgenus, genus, tribe, subfamily,
+    family, superfamily, parvorder, infraorder, suborder,
+    order, superorder, parvclass, infraclass, subclass,
+    class_, superclass, subphylum, phylum, kingdom,
+    superkingdom, root
+  };
+
+  static const unordered_map<string, RANK> string_to_rank;
+
+  static const RANK toRank(const string& rank) {
+    return string_to_rank.at(rank);
+  }
+
+  static const char* toString(const TaxRank::RANK& rank) {
+    switch(rank) {
+      case RANK::unknown:           return "unknown";
+      case RANK::no_rank:          return "no rank";
+      case RANK::sequence:         return "sequence";
+      case RANK::assembly:         return "assembly";
+      case RANK::subspecies:       return "subspecies";
+      case RANK::species:          return "species";
+      case RANK::subgenus:         return "subgenus";
+      case RANK::genus:            return "genus";
+      case RANK::tribe:            return "tribe";
+      case RANK::subfamily:        return "subfamily";
+      case RANK::family:           return "family";
+      case RANK::superfamily:      return "superfamily";
+      case RANK::parvorder:        return "parvorder";
+      case RANK::infraorder:       return "infraorder";
+      case RANK::suborder:         return "suborder";
+      case RANK::order:            return "order";
+      case RANK::superorder:       return "superorder";
+      case RANK::parvclass:        return "parvclass";
+      case RANK::infraclass:       return "infraclass";
+      case RANK::subclass:         return "subclass";
+      case RANK::class_:            return "class";
+      case RANK::superclass:       return "superclass";
+      case RANK::subphylum:        return "subphylum";
+      case RANK::phylum:           return "phylum";
+      case RANK::kingdom:          return "kingdom";
+      case RANK::superkingdom:     return "superkingdom";
+      case RANK::root:             return "root";
+      default:
+        log_msg("Invalid rank!");
+    }
+    return "NA";
+  }
+  
+};
+
+const unordered_map<string, TaxRank::RANK> TaxRank::string_to_rank = {
+  {"unknown", TaxRank::unknown},
+  {"no rank", TaxRank::no_rank}, 
+  {"sequence", TaxRank::sequence},
+  {"assembly", TaxRank::assembly},
+  {"subspecies", TaxRank::subspecies},
+  {"species", TaxRank::species},
+  {"subgenus", TaxRank::subgenus},
+  {"genus", TaxRank::genus},
+  {"tribe", TaxRank::tribe},
+  {"subfamily", TaxRank::subfamily},
+  {"family", TaxRank::family},
+  {"superfamily", TaxRank::superfamily},
+  {"parvorder", TaxRank::parvorder},
+  {"infraorder", TaxRank::infraorder},
+  {"suborder", TaxRank::suborder},
+  {"order", TaxRank::order},
+  {"superorder", TaxRank::superorder},
+  {"parvclass", TaxRank::parvclass},
+  {"infraclass", TaxRank::infraclass},
+  {"subclass", TaxRank::subclass},
+  {"class", TaxRank::class_},
+  {"superclass", TaxRank::superclass},
+  {"subphylum", TaxRank::subphylum},
+  {"phylum", TaxRank::phylum},
+  {"kingdom", TaxRank::kingdom},
+  {"superkingdom", TaxRank::superkingdom},
+  {"root", TaxRank::root}
+};
+
 
 template<typename TAXID, typename READCOUNTS>
 class TaxonomyEntry {
  public:
   TAXID taxonomyID = 0;
   TAXID parentTaxonomyID = 0;
-  std::string rank;
+  string rank;
   std::string scientificName;
 
   TaxonomyEntry() {}
@@ -107,6 +201,9 @@ class TaxonomyDB {
   std::string getScientificName(const TAXID taxID) const;
   std::string getRank(const TAXID taxID) const;
   TAXID getLowestCommonAncestor(const std::vector<TAXID>& taxIDs) const;
+  pair<TAXID,int> getLowestCommonAncestor(TAXID a, TAXID b) const;
+  string getNextProperRank(TAXID a) const;
+  TAXID getTaxIDAtNextProperRank(TAXID a) const;
 
   TAXID getParentTaxID(const TAXID taxID) const;
   std::unordered_map<TAXID, TAXID> getParentMap() const;
@@ -132,6 +229,7 @@ class TaxonomyDB {
 
   std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> > taxIDsAndEntries;
   bool genomeSizes_are_set = false;
+
  private:
 
   std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
@@ -472,6 +570,63 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
 }
 
 template<typename TAXID, typename READCOUNTS>
+string TaxonomyDB<TAXID,READCOUNTS>::getNextProperRank(TAXID a) const {
+  if (a == 0) {
+    return "NA";
+  }
+  while (getRank(a) == "no rank" && a != getParentTaxID(a)) {
+    a = getParentTaxID(a);
+  }
+  if ( a == 1 ) {
+    return "root";
+  }
+  return getRank(a);
+}
+
+template<typename TAXID, typename READCOUNTS>
+TAXID TaxonomyDB<TAXID,READCOUNTS>::getTaxIDAtNextProperRank(TAXID a) const {
+  if (a == 0 || a == 1) {
+    return 0;
+  }
+  while (getRank(a) == "no rank" && a != getParentTaxID(a)) {
+    a = getParentTaxID(a);
+  }
+  return a;
+}
+
+template<typename TAXID, typename READCOUNTS>
+pair<TAXID,int> TaxonomyDB<TAXID,READCOUNTS>::getLowestCommonAncestor(TAXID a, TAXID b) const {
+    if (a == 0 || b == 0) {
+      return a ? pair<TAXID,int>(a,-1) : pair<TAXID,int>(b,-1); 
+    }
+
+    // create a path from a to the root
+    std::unordered_set<uint32_t> a_path;
+    int distA = 0;
+    while (a > 0 && a != getParentTaxID(a)) {
+      if (a == b)
+        return pair<TAXID,int>{a, distA};
+      a_path.insert(a);
+      a = getParentTaxID(a);
+      ++distA;
+    }
+
+    int distB = 0;
+    // search for b in the path from a to the root
+    while (b > 0 && b != getParentTaxID(b)) {
+      auto it = a_path.find(b);
+      if (it != a_path.end()) {
+        return pair<TAXID,int>(b, distB + std::distance(a_path.begin(), it));
+      }
+      b = getParentTaxID(b);
+      ++distB;
+    }
+    return pair<TAXID,int>(1, distA+distB);
+}
+
+
+
+template<typename TAXID, typename READCOUNTS>
 TAXID TaxonomyDB<TAXID,READCOUNTS>::getLowestCommonAncestor(
     const std::vector<TAXID>& taxIDs) const {
   if (taxIDs.size() == 0) {
@@ -623,11 +778,13 @@ std::string TaxonomyDB<TAXID,READCOUNTS>::getMetaPhlAnLineage(TAXID taxonomyID) 
 template<typename TAXID, typename READCOUNTS>
 TAXID TaxonomyDB<TAXID,READCOUNTS>::getTaxIDAtRank(const TAXID taxID,
                                     const std::string& rank) const {
+  if (taxID == 0 || taxID == 1)
+    return 0;
   auto entry = taxIDsAndEntries.find(taxID);
-  //cerr << "getTaxIDAtRank(" << taxID << "," << rank << ")" << endl;
+  // cerr << "getTaxIDAtRank(" << taxID << "," << rank << ")" << endl;
   while (entry != taxIDsAndEntries.end() &&
          entry->second.parentTaxonomyID != 1) {
-    //cerr << "Checking rank of " << entry->second.taxonomyID << ": " << entry->second.rank << endl;
+    // cerr << "Checking rank of " << entry->second.taxonomyID << ": " << entry->second.rank << endl;
     if (entry->second.rank == rank) {
       return entry->second.taxonomyID;
     } else {
@@ -722,8 +879,12 @@ void TaxonomyDB<TAXID,READCOUNTS>::setReadCounts(const unordered_map<TAXID, READ
 
 
 template<typename TAXID, typename READCOUNTS>
-	TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID,READCOUNTS>& taxdb, bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
-	_report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, REPORTCOLS::NUM_KMERS_CLADE, REPORTCOLS::NUM_UNIQUE_KMERS_CLADE, REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, REPORTCOLS::SPACED_NAME};
+  TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID,READCOUNTS>& taxdb, 
+    bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _show_zeros(show_zeros) {
+  _report_cols = {REPORTCOLS::PERCENTAGE, REPORTCOLS::NUM_READS_CLADE, REPORTCOLS::NUM_READS, 
+    REPORTCOLS::NUM_KMERS_CLADE, REPORTCOLS::NUM_UNIQUE_KMERS_CLADE, 
+    REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE, REPORTCOLS::TAX_RANK, REPORTCOLS::TAX_ID, 
+    REPORTCOLS::SPACED_NAME};
 }
 
 

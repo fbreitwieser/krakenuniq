@@ -86,14 +86,18 @@ namespace kraken {
 
     void set_index(KrakenDBIndex *i_ptr);
 
+    size_t filesize() const;
+
     // Null constructor
     KrakenDB();
 
     // ptr points to start of mmap'ed DB in read or read/write mode
-    KrakenDB(char *ptr);
+    KrakenDB(char *ptr, size_t filesize = 0);
+
 
     private:
 
+    size_t _filesize;
     char *fptr;
     KrakenDBIndex *index_ptr;
     uint8_t k;

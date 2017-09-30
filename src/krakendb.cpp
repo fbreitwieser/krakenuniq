@@ -52,14 +52,21 @@ KrakenDB::KrakenDB() {
   key_len = 0;
   key_bits = 0;
   k = 0;
+  _filesize = 0;
 }
 
 // Assumes ptr points to start of a readable mmap'ed file
-KrakenDB::KrakenDB(char *ptr) {
+KrakenDB::KrakenDB(char *ptr, size_t filesize) {
+  _filesize = filesize;
   index_ptr = NULL;
   fptr = ptr;
-  if (strncmp(ptr, DATABASE_FILE_TYPE, strlen(DATABASE_FILE_TYPE)))
-    errx(EX_DATAERR, "database in improper format");
+  if (ptr == NULL) {
+    errx(EX_DATAERR, "pointer is NULL");
+  }
+  if (strncmp(ptr, DATABASE_FILE_TYPE, strlen(DATABASE_FILE_TYPE))) {
+    string msg = "database in improper format - found " + string(ptr, strlen(DATABASE_FILE_TYPE));
+    errx(EX_DATAERR, msg.c_str());
+  }
   memcpy(&key_bits, ptr + 8, 8);
   memcpy(&val_len, ptr + 16, 8);
   memcpy(&key_ct, ptr + 48, 8);
@@ -68,6 +75,10 @@ KrakenDB::KrakenDB(char *ptr) {
   k = key_bits / 2;
   key_len = key_bits / 8 + !! (key_bits % 8);
   std::cerr << "Loaded database with " << key_ct << " keys with k of " << (size_t)k << " [val_len " << val_len << ", key_len " << key_len << "]." << std::endl;
+}
+
+size_t KrakenDB::filesize() const {
+  return _filesize;
 }
 
 //using std::map to have the keys sorted
