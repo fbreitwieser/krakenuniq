@@ -80,9 +80,9 @@ then
 fi
 
 LIBRARY_DIR="library/"
-[[ "$KRAKEN_LIBRARY_DIR" != "" ]] && LIBRARY_DIR="$KRAKEN_LIBRARY_DIR"
+[[ "$KRAKEN_LIBRARY_DIRS" != "" ]] && LIBRARY_DIR="$KRAKEN_LIBRARY_DIRS"
 
-TAXONOMY_DIR="library/"
+TAXONOMY_DIR="taxonomy/"
 [[ "$KRAKEN_TAXONOMY_DIR" != "" ]] && TAXONOMY_DIR="$KRAKEN_TAXONOMY_DIR"
 
 if [ ! -s "library-files.txt" ]; then
@@ -218,15 +218,15 @@ then
 else
   echo "Creating taxDB (step 5 of 6)... "
   start_time1=$(date "+%s.%N")
-  if [ ! -f taxonomy/names.dmp ] || [ ! -f taxonomy/nodes.dmp ]; then
-    echo "taxonomy/names.dmp or taxonomy/nodes.dmp does not exist - downloading it ..."
-    [ -d taxonomy ] || mkdir taxonomy
-    cd taxonomy
+  if [ ! -f $TAXONOMY_DIR/names.dmp ] || [ ! -f $TAXONOMY_DIR/nodes.dmp ]; then
+    echo "$TAXONOMY_DIR/names.dmp or $TAXONOMY_DIR/nodes.dmp does not exist - downloading it ..."
+    [ -d $TAXONOMY_DIR ] || mkdir $TAXONOMY_DIR
+    cd $TAXONOMY_DIR
     wget $FTP_SERVER/pub/taxonomy/taxdump.tar.gz
     tar zxf taxdump.tar.gz
     cd ..
   fi
-  build_taxdb taxonomy/names.dmp taxonomy/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
+  build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
   mv taxDB.tmp taxDB
   echo "taxDB construction finished. [$(report_time_elapsed $start_time1)]"
 fi

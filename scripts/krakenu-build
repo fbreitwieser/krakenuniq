@@ -70,10 +70,11 @@ my (
   $add_taxonomy_ids_for_genome,
   $add_taxonomy_ids_for_seq,
 
-  $library_dir,
   $taxonomy_dir
 
 );
+
+my @library_dirs;
 
 my $verbose = 0;
 
@@ -132,7 +133,7 @@ GetOptions(
   "lca-database!" => \$build_lca_database,
   "uid-database!" => \$build_uid_database,
 
-  "library-dir=s" => \$library_dir,
+  "library-dir=s" => \@library_dirs,
   "taxonomy-dir=s" => \$taxonomy_dir
 ) or usage();
 
@@ -325,7 +326,7 @@ sub build_database {
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_GENOME"} = $add_taxonomy_ids_for_genome;
   $ENV{"KRAKEN_UID_DATABASE"} = $build_uid_database;
   $ENV{"KRAKEN_LCA_DATABASE"} = $build_lca_database;
-  $ENV{"KRAKEN_LIBRARY_DIR"} = $library_dir;
+  $ENV{"KRAKEN_LIBRARY_DIRS"} = "@library_dirs";
   $ENV{"KRAKEN_TAXONOMY_DIR"} = $taxonomy_dir;
   my $opt = ($verbose? "-x" : "");
   exec "krakenu-build_db.sh";
