@@ -214,6 +214,7 @@ class TaxonomyDB {
   TaxonomyEntry<TAXID,READCOUNTS> getEntry(TAXID taxID) const;
 
   bool insert(TAXID taxonomyID_, TAXID parentTaxonomyID_, std::string rank_, std::string scientificName_);
+  bool hasTaxon(TAXID taxonomyID_);
 
   size_t distance(TAXID taxID1, TAXID taxID2) const;
 
@@ -667,6 +668,12 @@ TAXID TaxonomyDB<TAXID,READCOUNTS>::getLowestCommonAncestor(
   return consensus;
 }
 
+
+template<typename TAXID, typename READCOUNTS>
+bool TaxonomyDB<TAXID, READCOUNTS>::hasTaxon(TAXID taxonomyID_) {
+  return taxIDsAndEntries.find(taxonomyID_) != taxIDsAndEntries.end();
+}
+
 template<typename TAXID, typename READCOUNTS>
 bool TaxonomyDB<TAXID, READCOUNTS>::insert(TAXID taxonomyID_, TAXID parentTaxonomyID_, 
     std::string rank_, std::string scientificName_) {
@@ -684,8 +691,9 @@ bool TaxonomyDB<TAXID, READCOUNTS>::insert(TAXID taxonomyID_, TAXID parentTaxono
 
   newEntry.parent = &(parentIt->second);
   auto insert_res = taxIDsAndEntries.insert({taxonomyID_, newEntry});
-  parentIt->second.children.push_back(&insert_res.first->second);
-
+  if (insert_res.second) {
+    parentIt->second.children.push_back(&insert_res.first->second);
+  }
   return insert_res.second;
 
 }
@@ -784,8 +792,9 @@ TAXID TaxonomyDB<TAXID,READCOUNTS>::getTaxIDAtRank(const TAXID taxID,
     return 0;
   auto entry = taxIDsAndEntries.find(taxID);
   // cerr << "getTaxIDAtRank(" << taxID << "," << rank << ")" << endl;
-  while (entry != taxIDsAndEntries.end() &&
-         entry->second.parentTaxonomyID != 1) {
+  while (entry != taxIDsAndEntries.end() 
+      && entry->second.parentTaxonomyID != 1 
+      && entry->second.parentTaxonomyID != entry->first) {
     // cerr << "Checking rank of " << entry->second.taxonomyID << ": " << entry->second.rank << endl;
     if (entry->second.rank == rank) {
       return entry->second.taxonomyID;
