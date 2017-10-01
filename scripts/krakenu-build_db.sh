@@ -24,6 +24,7 @@
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
+set -x
 
 function report_time_elapsed() {
   set -x
@@ -90,8 +91,9 @@ if [ ! -s "library-files.txt" ]; then
     find $FIND_OPTS $LIBRARY_DIR '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library-files.txt
 fi
 
-files0() {
-  cat library-files.txt | tr '\n' '\0'
+file_sizes() {
+  ## stat -c is for Linux, stat -f is for BSD/OSX
+  cat library-files.txt | tr '\n' '\0' | xargs -0 -I '{}' sh -c "stat -c '%s\n' {} 2> /dev/null || stat -f '%z' {}"
 }
 cat_library() {
   cat library-files.txt | tr '\n' '\0' | xargs -0 cat
@@ -117,7 +119,7 @@ else
   # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
-    KRAKEN_HASH_SIZE=$( files0 | xargs -0 stat -f%z | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
+    KRAKEN_HASH_SIZE=$( file_sizes  | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
