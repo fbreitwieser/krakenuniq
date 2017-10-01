@@ -40,7 +40,6 @@ my $BASE_DIR;
 my $DB_DIR;
 my $N_PROC=5;
 my $CHANGE_HEADER=0;
-my $DOWNLOAD_RNA=0;
 my $DO_DUST=0;
 my $FILTER_UNPLACED=0;
 my $VERBOSE=0;
@@ -80,6 +79,7 @@ WHEN USING database refseq OR genbank:
  -c <refseq category>   Only download genomes in the specified refseq category. Default: any.
  -t <taxids>        Only download the specified taxonomy IDs, comma separated. Default: any.
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
+                    See the assembly project FTP site for available sequences
  -u                 Filter unplaced sequences.
  -m                 Mask low-complexity regions using dustmasker.
  -l                 Modify sequence header to include taxonomy ID for Kraken (i.e. add '>kraken:taxid|TAXID' to each sequence).
@@ -191,12 +191,11 @@ if ($INCLUDE_VIRAL_NEIGHBORS) {
 
 sub download(@) {
   my ($url, $file, $gunzipped_filename) = @_;
-  if (-s $file && !$OVERWRITE_FILES) {
+  if (!$OVERWRITE_FILES && (( defined $gunzipped_filename && -s $gunzipped_filename) || (!defined $gunzipped_filename && -s $file))) {
     print STDERR "Not fetching $url - file $file exists.\n" if $VERBOSE;
     return 1;
   }
 
-  start_fork() and return;
   if ($url =~ /^http/) {
     print STDERR "Fetching $url to $file ..." if $VERBOSE;
     if (!-d dirname($file)) {
@@ -206,7 +205,6 @@ sub download(@) {
     if (!$response->is_success) {
       print STDERR "\nFAIL: Error downloading $url!\n";
       print STDERR $response->status_line."\n";
-      exit;
     } else {
       print STDERR "SUCCESS\n" if $VERBOSE;
     }
@@ -221,14 +219,13 @@ sub download(@) {
     move($where, $file);
 
     if (defined $gunzipped_filename) {
-      print STDERR " GUNZIPPING";
+      print STDERR " GUNZIPPING" if $VERBOSE;
       gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
       unlink $file;
       $file = $gunzipped_filename;
     }
     print STDERR " SUCCESS\n" if $VERBOSE;
   }
-  exit;
   #my $where = $ff->fetch(to=> dirname($file)) or die "\n$ff->error for $url!";
   return -s $file;
 }
@@ -261,7 +258,7 @@ sub wait_children() {
 }
 
 sub end_fork() {
-  exit() unless $N_PROC == 1;
+  exit() unless $N_PROC <= 1;
 }
 
 sub download_viral_neighbors(@) {
@@ -312,12 +309,14 @@ sub download_viral_neighbors(@) {
     $name1 =~ s/__/_/g;
     my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.fna";
     my $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&rettype=fasta&retmode=text&id=$nbr_ac";
+    start_fork() and next;
     if (download($url,$file)) {
       print_header_lines($file, $taxid, "$nname $sname neighbor $nbr_ac");
     }
+    end_fork();
   }
   print STDERR "\n";
-  wait_children;
+  wait_children();
 
 #  $pm->wait_all_children();
 }
@@ -396,7 +395,7 @@ sub download_taxonomy(@) {
 
 sub download_domain(@) {
   my ($domain_dir, $domain, $_assembly_level, $_taxid) = @_;
-  print STDERR "Downloading assembly summary file for $domain genomes.\n";
+  print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level and taxid $_taxid.\n";
   die unless defined $domain_dir && defined $domain;
   if (-d $domain_dir) {
     print STDERR "WARNING: $domain_dir already exists - potentially overwriting files.\n";
@@ -451,6 +450,7 @@ sub download_domain(@) {
     my $bname1 = "${organism_name1}-tax${taxid}-${bname}";
     
     foreach my $ext (split(/,/, $FNA_FILES)) {
+      start_fork() and next;
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
       my $fname = $bfname.".fna";
@@ -477,9 +477,11 @@ sub download_domain(@) {
         system("dustmasker -infmt fasta -in '$domain_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$domain_dir/${bfname}_dustmasked.fna'");
         unlink("$domain_dir/$fname");
       }
+      end_fork();
     }
   }
 
-#  $pm->wait_all_children;
+  wait_children();
+
   print STDERR "\n";
 }

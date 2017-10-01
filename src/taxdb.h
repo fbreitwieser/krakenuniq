@@ -561,9 +561,8 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
       taxonomyID, newEntry
     });
   }
-  taxIDsAndEntries.insert({
-	0, {0, 0, "no rank", "unclassified" }
-  });
+  taxIDsAndEntries.insert({0, {0, 0, "no rank", "unclassified" }});
+  //taxIDsAndEntries.insert({-1, {-1, 0, "no rank", "uncategorized" }});
   createPointers(taxIDsAndEntries);
   log_msg("done reading TaxDB, read " + std::to_string(taxIDsAndEntries.size()) + " taxa");
   return(taxIDsAndEntries);
@@ -671,14 +670,17 @@ TAXID TaxonomyDB<TAXID,READCOUNTS>::getLowestCommonAncestor(
 template<typename TAXID, typename READCOUNTS>
 bool TaxonomyDB<TAXID, READCOUNTS>::insert(TAXID taxonomyID_, TAXID parentTaxonomyID_, 
     std::string rank_, std::string scientificName_) {
-
-  TaxonomyEntry<TAXID,READCOUNTS> newEntry(taxonomyID_, parentTaxonomyID_, rank_, scientificName_, 0, 0);
-  
-  auto parentIt = taxIDsAndEntries.find(parentTaxonomyID_);
-  if (parentIt == taxIDsAndEntries.end() || parentTaxonomyID_ == taxonomyID_) {
-    cerr << "ERROR while inserting taxonomy entry - taxonomy ID " << taxonomyID_  <<"; parent taxonomy ID " << parentTaxonomyID_ << "!" << endl;
+  if (parentTaxonomyID_ == taxonomyID_) {
     return false;
   }
+
+  auto parentIt = taxIDsAndEntries.find(parentTaxonomyID_);
+  if (parentIt == taxIDsAndEntries.end()) {
+    cerr << "ERROR with taxon [" << taxonomyID_  <<";"<<rank_<<";"<<scientificName_<<"] - parent taxon " << parentTaxonomyID_ << " not in database!" << endl;
+    return false;
+  }
+
+  TaxonomyEntry<TAXID,READCOUNTS> newEntry(taxonomyID_, parentTaxonomyID_, rank_, scientificName_, 0, 0);
 
   newEntry.parent = &(parentIt->second);
   auto insert_res = taxIDsAndEntries.insert({taxonomyID_, newEntry});
@@ -933,7 +935,10 @@ void TaxReport<TAXID,READCOUNTS>::printReport(std::string format, std::string ra
 		// B: print normal results
 		printReport(_taxdb.taxIDsAndEntries.at(1),0u);
 		// C: Print Unclassified stuff
-		//printReport(_taxdb.taxIDsAndEntries.at(-1),0u);
+		auto it = _taxdb.taxIDsAndEntries.find(-1);
+		if (it != _taxdb.taxIDsAndEntries.end()) {
+		  printReport(it->second,0u);
+		}
 	} else {
 		// print stuff at a certain level ..
 		//_uid_abundance;

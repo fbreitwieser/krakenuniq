@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
 }
 
 inline 
-uint32_t get_taxid(
+uint32_t get_new_taxid(
     unordered_map<string, uint32_t>& name_to_taxid_map, 
     unordered_map<uint32_t,uint32_t>& Parent_map,
     string name, uint32_t parent_taxid, const string & rank_name) {
@@ -182,8 +182,9 @@ uint32_t get_taxid(
   if (it == name_to_taxid_map.end()) {
     uint32_t new_taxid = ++New_taxid_start;
     bool insert_res = taxdb.insert(new_taxid, parent_taxid, rank_name, name);
-    if (!insert_res)
-          cerr << "Taxonomy ID " << new_taxid << " already in Taxonomy DB? Shouldn't happen - run set_lcas without the -a option." << endl;
+    if (!insert_res) {
+      return 0;
+    }
     // insert_res shows if insert failed, but we don't care
     // cerr << "Adding assembly: " << name << " with taxid " << new_taxid << endl;
     Parent_map[new_taxid] = parent_taxid;
@@ -205,7 +206,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
   if (map_file.rdstate() & ifstream::failbit) {
     err(EX_NOINPUT, "can't open %s", ID_to_taxon_map_filename.c_str());
   }
-  string line, seq_id;
+  string line, seq_id, name;
   uint32_t taxid;
 
   // Used when adding new taxids for assembly or sequence
@@ -226,13 +227,13 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
 
     if (Add_taxIds_for_Assembly && iss.good()) {
       iss.get();
-      string name;
       getline(iss, name);
-      taxid = get_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
+      if (!name.empty())
+        taxid = get_new_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
     }
 
     if (Add_taxIds_for_Sequences) {
-      taxid = get_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
+      taxid = get_new_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
     }
     if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
       cout << seq_id << '\t' << taxid << '\n';
