@@ -274,6 +274,7 @@ void process_single_file() {
     if (it != ID_to_taxon_map.end()) {
       taxid = it->second;
     } else if (dna.id.size() >= prefix.size() && dna.id.substr(0,prefix.size()) == prefix) {
+      // if the AC is not in the map, check if the fasta entry starts with '>kraken:taxid'
         taxid = std::stol(dna.id.substr(prefix.size()));
         if (taxid == 0) {
           cerr << "Error: taxonomy ID is zero for sequence '" << dna.id << "'?!" << endl;
@@ -288,6 +289,7 @@ void process_single_file() {
     }
     
     if (Add_taxIds_for_Sequences) {
+      // Update entry based on header line
       auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
       if (entryIt == taxdb.taxIDsAndEntries.end()) {
         cerr << "Error! Didn't find taxid " << taxid << " in TaxonomyDB - can't update it!! ["<<dna.header_line<<"]" << endl;
@@ -295,6 +297,11 @@ void process_single_file() {
         entryIt->second.scientificName = dna.header_line;
       }
     }
+
+    // TODO: Allow exclusion of certain taxids in the building process
+    //if (Excluded_taxons.count(taxid) > 0) {
+      // exclude taxid!
+    //}
 
     if (taxid) {
       #pragma omp parallel for schedule(dynamic)
