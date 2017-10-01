@@ -1,7 +1,7 @@
 CXX = g++
 FOPENMP?=-fopenmp
 CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O2 -g -Wfatal-errors
-PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink build_taxdb grade_classification
+PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink build_taxdb grade_classification dump_taxdb
 LIBFLAGS = -L. -I./gzstream -L./gzstream -lz -lgzstream
 
 .PHONY: all install clean
