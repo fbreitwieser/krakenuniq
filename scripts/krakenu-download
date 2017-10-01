@@ -344,9 +344,9 @@ sub download_contaminats(@) {
 
   # download UniVec and EmVec database
   download("ftp://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec","$CONTAMINANT_DIR/UniVec.fna");
-  download("ftp://ftp.ebi.ac.uk/pub/databases/emvec/emvec.dat.gz","$CONTAMINANT_DIR/emvec.dat.gz");
+  download("ftp://ftp.ebi.ac.uk/pub/databases/emvec/emvec.dat.gz","$CONTAMINANT_DIR/emvec.dat.gz", "$CONTAMINANT_DIR/emvec.dat");
 
-  open(my $E1, "|-", "gunzip -c emvec.dat.gz");
+  open(my $E1, "<", "$CONTAMINANT_DIR/emvec.dat");
   open(my $E2, ">", "$CONTAMINANT_DIR/EmVec.fna");
 
   my ($ac,$de);
@@ -360,12 +360,11 @@ sub download_contaminats(@) {
    } elsif (/^SQ/) {
       $in_seq = 1;
       print $E2 ">$ac $de\n";
-      print "$ac\t$CONTAMINANT_TAXID\tEmVec\n";
     } elsif ($in_seq) {
       if (/^\s+[agct]/) {
         s/\s+[0-9]+$//;
        s/ //g;
-       print $_;
+       print $E2 $_;
       } else {
         $in_seq = 0;
       }
@@ -373,13 +372,14 @@ sub download_contaminats(@) {
   }
   close($E2);
   close($E1);
-  unlink("emvec.dat.gz");
+  unlink("$CONTAMINANT_DIR/emvec.dat");
  
   if ( $CHANGE_HEADER ) {
     system("sed -i 's/^>/>taxid|$CONTAMINANT_TAXID /' $CONTAMINANT_DIR/UniVec.fna");
     system("sed -i 's/^>/>taxid|$CONTAMINANT_TAXID /' $CONTAMINANT_DIR/EmVec.fna");
   } else {
     print_header_lines("$CONTAMINANT_DIR/UniVec.fna", $CONTAMINANT_TAXID, "UniVec");
+    print_header_lines("$CONTAMINANT_DIR/EmVec.fna", $CONTAMINANT_TAXID, "EmVec");
   }
 }
 
