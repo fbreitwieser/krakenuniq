@@ -7,8 +7,8 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    std::cerr << "Usage: build_taxdb taxDB names.dmp nodes.dmp\n";
+  if (argc != 4) {
+    std::cerr << "Usage: dump_taxdb taxDB names.dmp nodes.dmp\n";
     return 1;
   }
   TaxonomyDB<uint32_t, uint32_t> taxdb {(string)argv[1]};
