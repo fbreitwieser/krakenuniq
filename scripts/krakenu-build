@@ -321,6 +321,17 @@ sub standard_installation {
 }
 
 sub build_database {
+  foreach (@library_dirs) {
+    if (!-d $_) {
+      print STDERR "Library directory $_ does not exist!\n";
+      exit(1);
+    }
+  }
+  if (! -d $taxonomy_dir) {
+    print STDERR "Taxonomy directory $taxonomy_dir does not exist!\n";
+    exit(1);
+  }
+
   $ENV{"KRAKEN_REBUILD_DATABASE"} = (defined $rebuild? 1 : 0);
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_SEQ"} = $add_taxonomy_ids_for_seq;
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_GENOME"} = $add_taxonomy_ids_for_genome;
