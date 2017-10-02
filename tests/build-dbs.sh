@@ -6,8 +6,11 @@ set -xeu
 
 export PATH="$DIR/install:$PATH"
 for K in 31 26 21; do
-  #mkdir -p $DIR/dbs/refseq-viral-k$K
-  #krakenu-build --kmer-len $K --minimizer-len 12 --threads 4 --db $DIR/dbs/refseq-viral-k$K --build --taxids-for-genomes --taxids-for-sequences --library-dir=$DIR/data/library/viral --taxonomy-dir=$DIR/data/taxonomy
+  mkdir -p $DIR/dbs/refseq-viral-k$K
+  time krakenu-build --kmer-len $K --minimizer-len 12 --threads 4 --db $DIR/dbs/refseq-viral-k$K --build --taxids-for-genomes --taxids-for-sequences --library-dir=$DIR/data/library/viral --taxonomy-dir=$DIR/data/taxonomy 2>&1 | tee $DIR/dbs/refseq-viral-k$K/build.log
+
+  mkdir -p $DIR/dbs/refseq-viral-k$K/taxonomy
+  dump_taxdb $DIR/dbs/refseq-viral-k$K/taxDB $DIR/dbs/refseq-viral-k$K/taxonomy/names.dmp $DIR/dbs/refseq-viral-k$K/taxonomy/nodes.dmp
 
   if [[ `uname` != "Darwin" ]]; then
     mkdir -p $DIR/dbs/refseq-oct2017-k$K

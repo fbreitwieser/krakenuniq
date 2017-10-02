@@ -40,6 +40,11 @@ uint32_t resolve_uids(
 uint32_t resolve_uids2(
       const unordered_map<uint32_t, uint32_t> &uid_hit_counts,
       const unordered_map<uint32_t, uint32_t> &parent_map,
-      const uint32_t* fptr, const size_t fsize);
+      const char* fptr, const size_t fsize);
 }
+
+vector<uint32_t> get_taxids_for_uid(const uint32_t uid, const char* fptr);
+
+vector<uint32_t> get_taxids_for_uid_from_map(uint32_t uid, char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map );
+
 #endif

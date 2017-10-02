@@ -94,6 +94,11 @@ int main(int argc, char **argv) {
       exit(1);
     } else {
       seq_taxid = it->second;
+      if (!taxdb.hasTaxon(seq_taxid)) {
+        cerr << "Ignoring taxon " << seq_taxid << " - not in database" << endl;
+        continue;
+      }
+      //cerr <<"seqid" << seq_taxid;
 
       // go up to species level or next proper (i.e. not 'no rank') rank for
       //  both real and assigned taxon

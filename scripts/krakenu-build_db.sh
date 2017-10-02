@@ -92,8 +92,11 @@ if [ ! -s "library-files.txt" ]; then
 fi
 
 file_sizes() {
-  ## stat -c is for Linux, stat -f is for BSD/OSX
-  cat library-files.txt | tr '\n' '\0' | xargs -0 -I '{}' sh -c "stat -c '%s\n' {} 2> /dev/null || stat -f '%z' {}"
+  if [[ `uname` == "Darwin" ]]; then
+    cat library-files.txt | tr '\n' '\0' | xargs -0 stat -f '%z'
+  else
+    cat library-files.txt | tr '\n' '\0' | xargs -0 stat -c '%s\n'
+  fi
 }
 cat_library() {
   cat library-files.txt | tr '\n' '\0' | xargs -0 cat
@@ -234,7 +237,7 @@ else
 fi
 
 if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
-  if [ -e "database.kdb" ]
+  if [ -s "database.kdb" ]
   then
     echo "Skipping step 6, LCAs already set."
   else
@@ -251,7 +254,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     start_time1=$(date "+%s.%N")
     set -x
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
-      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kmer_count \
+      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kdb.counts \
       -F <( cat_library ) > seqid2taxid-plus.map
     set +x
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
@@ -262,15 +265,16 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     echo "LCA database created. [$(report_time_elapsed $start_time1)]"
   fi
   ## Make a classification report
-  if [[ ! -s $(basename `pwd`).report ]]; then
-    echo "Creating database summary report ..."
-    krakenu --db . --report-file $(basename `pwd`).report --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $(basename `pwd`).kraken
+  REPNAME=database
+  if [[ ! -s $REPNAME.report.tsv ]]; then
+    echo "Creating database summary report $REPNAME.report.tsv ..."
+    krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 
 
 if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
-  if [ -e "uid_database.complete" ]
+  if [ -s "uid_database.kdb" ]
   then
     echo "Skipping step 6.3, UID datanbase already generated."
   else
@@ -288,16 +292,16 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
     fi
     start_time1=$(date "+%s.%N")
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -I uid_to_taxid.map -o uid_database.kdb -i database.idx -v \
-        -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c uid_database.kmer_count -F <( cat_library )
-    touch "uid_database.complete"
+        -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c uid_database.kdb.counts -F <( cat_library )
   
     echo "UID Database created. [$(report_time_elapsed $start_time1)]"
   fi
 
   ## Make a classification report
-  if [[ ! -s $(basename `pwd`).uid_report ]]; then
-    echo "Creating database summary report ..."
-    krakenu --db . --report-file $(basename `pwd`).uid_report --threads $KRAKEN_THREAD_CT --fasta-input <(cat_library) > $(basename `pwd`).uid_kraken
+  REPNAME=uid_database
+  if [[ ! -s $REPNAME.report.tsv ]]; then
+    #echo "Creating UID database summary report $REPNAME.report.tsv ..."
+    #krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
   fi
 fi
 
