@@ -237,7 +237,7 @@ public:
 	 * @param precision
 	 * @param sparse
 	 */
-	HyperLogLogPlusMinus(uint8_t precision=10, bool sparse=true):p(precision),sparse(sparse) {
+	HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true):p(precision),sparse(sparse) {
 		if (precision > 18 || precision < 4) {
 	        throw std::invalid_argument("precision (number of register = 2^precision) must be between 4 and 18");
 		}
