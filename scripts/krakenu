@@ -97,7 +97,9 @@ if ($@) {
   die "$PROG: $@";
 }
 
-my @kdb_files = map { "$_/database.kdb" } @db_prefix;
+my $database = $uid_mapping? "uid_database.kdb" : "database.kdb";
+my @kdb_files = map { "$_/$database" } @db_prefix;
+
 my @idx_files = map { "$_/database.idx" } @db_prefix;
 
 foreach my $file (@kdb_files,@idx_files) {
@@ -148,7 +150,7 @@ push @flags, "-r", $report_file if defined $report_file;
 push @flags, "-a", $db_prefix[0]."/taxDB";
 push @flags, "-s" if $print_sequence;
 if ($uid_mapping) {
-  my $uid_mapping_file = "$db_prefix[0]/uid_to_taxid";
+  my $uid_mapping_file = "$db_prefix[0]/uid_to_taxid.map";
   if (!-f $uid_mapping_file) {
     print STDERR "Missing required file $uid_mapping_file for UID mapping.\n";
     exit(1); 
@@ -220,6 +222,7 @@ Usage: $PROG [options] <filename(s)>
 Options:
   --db NAME               Name for Kraken DB (default: $default_db)
   --report-file FILENAME  Write Kraken report to FILENAME
+  --uid-mapping           Map using UID database
   --threads NUM           Number of threads (default: $def_thread_ct)
   --fasta-input           Input is FASTA format
   --fastq-input           Input is FASTQ format

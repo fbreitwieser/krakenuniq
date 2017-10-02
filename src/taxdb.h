@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <vector>
 #include <unordered_set>
+#include <iomanip>
 #include "report-cols.h"
 
 using namespace std;
@@ -223,6 +224,7 @@ class TaxonomyDB {
 
   void setGenomeSizes(const std::unordered_map<TAXID, uint64_t> & genomeSizes);
   void setReadCounts(const std::unordered_map<TAXID, READCOUNTS>& readCounts);
+  void readGenomeSizes(string file);
   void setGenomeSize(const TAXID taxid, const uint64_t genomeSize);
   void addReadCount(const TAXID taxid, const READCOUNTS& readCounts_);
 
@@ -876,6 +878,23 @@ void TaxonomyDB<TAXID,READCOUNTS>::setGenomeSize(const TAXID taxid, const uint64
 }
 
 
+template<typename TAXID, typename READCOUNTS>
+void TaxonomyDB<TAXID,READCOUNTS>::readGenomeSizes(string file) {
+  for (auto& entry : taxIDsAndEntries) {
+    entry.second.genomeSize = 0;
+    entry.second.genomeSizeOfChildren = 0;
+  }
+  log_msg("Reading genome sizes from " + file);
+  std::ifstream inFile(file);
+  if (!inFile.is_open())
+    throw std::runtime_error("unable to open file " + file);
+  TAXID taxonomyID;
+  uint64_t size;
+  while (!inFile.eof()) {
+    inFile >> taxonomyID >> size;
+    setGenomeSize(taxonomyID, size);
+  }
+}
 
 template<typename TAXID, typename READCOUNTS>
 void TaxonomyDB<TAXID,READCOUNTS>::setReadCounts(const unordered_map<TAXID, READCOUNTS>& readCounts) {
@@ -967,22 +986,29 @@ void TaxReport<TAXID,READCOUNTS>::printReport(TaxonomyEntry<TAXID,READCOUNTS>& t
 
 template<typename TAXID, typename READCOUNTS>
 void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID,READCOUNTS>& tax, unsigned depth) {
+
+  long long unique_kmers_for_clade = ( tax.readCounts.kmers.cardinality() + tax.readCountsOfChildren.kmers.cardinality());
+  double genome_size = double(tax.genomeSize+tax.genomeSizeOfChildren);
+
 	for (auto& col : _report_cols) {
 		switch (col) {
 		case REPORTCOLS::NAME:              _reportOfb << tax.scientificName ; break;
 		case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
 		case REPORTCOLS::TAX_ID:            _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
 		case REPORTCOLS::DEPTH:             _reportOfb << depth; break;
-		case REPORTCOLS::PERCENTAGE:       _reportOfb << 100.0*(reads(tax.readCounts) + reads(tax.readCountsOfChildren))/_total_n_reads; break;
+		case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*(reads(tax.readCounts) + reads(tax.readCountsOfChildren))/_total_n_reads; break;
 		//case REPORTCOLS::ABUNDANCE:      _reportOfb << 100*counts.abundance[0]; break;
 		//case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
 		case REPORTCOLS::NUM_READS:        _reportOfb << reads(tax.readCounts); break;
 		case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << (reads(tax.readCounts) + reads(tax.readCountsOfChildren)); break;
 		case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << tax.readCounts.kmers.cardinality(); break;
-		case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << (tax.readCounts.kmers.cardinality() + tax.readCountsOfChildren.kmers.cardinality()); break;
+		case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << unique_kmers_for_clade; break;
 		case REPORTCOLS::NUM_KMERS:        _reportOfb << tax.readCounts.n_kmers; break;
 		case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << tax.readCounts.n_kmers + tax.readCountsOfChildren.n_kmers; break;
-		case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
+    case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
+    case REPORTCOLS::CLADE_KMER_COVERAGE: if (genome_size == 0) { _reportOfb << "NA"; } else {
+       _reportOfb << setprecision(4) << (unique_kmers_for_clade  / genome_size); }; break;
+    case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(tax.readCounts.n_kmers + tax.readCountsOfChildren.n_kmers) / unique_kmers_for_clade ); break;
 		case REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
 		//case REPORTCOLS::GENOME_SIZE: ; break;
 		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;

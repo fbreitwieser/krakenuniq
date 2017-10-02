@@ -122,7 +122,7 @@ namespace kraken {
   uint32_t resolve_uids2(
       const unordered_map<uint32_t, uint32_t> &uid_hit_counts,
       const unordered_map<uint32_t, uint32_t> &parent_map,
-      const uint32_t* fptr, const size_t fsize) {
+      const char* fptr, const size_t fsize) {
 
     unordered_map<uint32_t, uint32_t> taxid_counts;
     unordered_map<uint32_t, double> frac_taxid_counts;
@@ -131,33 +131,17 @@ namespace kraken {
       return(0);
     }
 
-    for (auto it = uid_hit_counts.begin(); it != uid_hit_counts.end(); ++it) {
-      uint32_t next_uid = it->first;
-      if (next_uid == 0) {
+    for (const auto& it : uid_hit_counts) {
+      if (it.first == 0) {
         continue;
       }
-      uint32_t taxid;
       // TODO: Just get a uint64_t and shift the bits, probably faster
-      vector<uint32_t> taxids;
-      do {
-        // Check if the accessed memory is out of range
-				//   -- move this to a DEBUG-only assert
-				// UID-1 is used because UIDs start at 1
-				uint32_t offset = (next_uid-1)*UID_BLOCK_SIZE;
-        if (offset >= fsize) {
-          cerr << "It seems you are trying to access a block after the file end: \n" <<
-          " fptr: " << fptr << "; uid: " << next_uid << "; " << " addr: " << (offset + INT_SIZE) << endl;
-          exit(1);
-        }
-        taxid = *(fptr + offset);
-        next_uid = *(fptr+ offset + INT_SIZE);
-        taxid_counts[taxid] += it->second;
-        taxids.push_back(taxid);
-      } while (next_uid != 0);
+      vector<uint32_t> taxids = get_taxids_for_uid(it.first, fptr);
 
-      double frac_count = (double)it->second / (double)taxids.size();
+      double frac_count = (double)it.second / (double)taxids.size();
       for (uint32_t taxid : taxids) {
         frac_taxid_counts[taxid] += frac_count;
+        taxid_counts[taxid] += it.second;
       }
     }
 
@@ -194,3 +178,37 @@ namespace kraken {
   }
 
 }
+
+vector<uint32_t> get_taxids_for_uid(const uint32_t uid, const char* fptr) {
+  size_t int_size = sizeof(int);
+  size_t block_size = sizeof(int)*2;
+  // TODO: Just get a uint64_t and shift the bits, probably faster
+  uint32_t taxid  = *(uint32_t*)(fptr+(uid-1)*block_size);
+  uint32_t parent_uid = *(uint32_t*)(fptr+(uid-1)*block_size + int_size);
+
+  vector<uint32_t> taxids = {taxid};
+  while (parent_uid != 0) {
+    // TODO: Consider checking if the accessed meory is out of range. 
+      // if (offset >= fsize) {
+      //   cerr << "It seems you are trying to access a block after the file end: \n" <<
+      //      " fptr: " << fptr << "; uid: " << next_uid << "; " << " addr: " << (offset + INT_SIZE) << endl;
+      //  exit(1);
+      //}
+    taxid  = *(uint32_t*)(fptr+(parent_uid-1)*block_size);
+    parent_uid = *(uint32_t*)(fptr+(parent_uid-1)*block_size + int_size);
+    taxids.push_back(taxid);
+  }
+  //std::sort(taxids.begin(), taxids.end());
+  return(taxids);
+}
+
+vector<uint32_t> get_taxids_for_uid_from_map(uint32_t uid, char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map ) {
+  auto it = uid_map.find(uid);
+  if (it != uid_map.end()) {
+    return it->second;
+  } 
+  vector<uint32_t> taxids = get_taxids_for_uid(uid, fptr);
+  uid_map[uid] = taxids;
+  return(taxids);
+}
+

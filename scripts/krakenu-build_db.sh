@@ -254,7 +254,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     start_time1=$(date "+%s.%N")
     set -x
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
-      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kmer_count \
+      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kdb.counts \
       -F <( cat_library ) > seqid2taxid-plus.map
     set +x
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
@@ -292,7 +292,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
     fi
     start_time1=$(date "+%s.%N")
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -I uid_to_taxid.map -o uid_database.kdb -i database.idx -v \
-        -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c uid_database.kmer_count -F <( cat_library )
+        -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c uid_database.kdb.counts -F <( cat_library )
   
     echo "UID Database created. [$(report_time_elapsed $start_time1)]"
   fi
@@ -300,8 +300,8 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   ## Make a classification report
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
-    echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <(cat_library) > $REPNAME.kraken.tsv
+    #echo "Creating UID database summary report $REPNAME.report.tsv ..."
+    #krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
   fi
 fi
 
