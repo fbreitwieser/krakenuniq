@@ -77,6 +77,8 @@ KrakenDB Database;
 TaxonomyDB<uint32_t, ReadCounts> taxdb;
 
 const string prefix = "kraken:taxid|";
+unordered_set<uint32_t> host_taxids = {9606};
+uint32_t contaminant_taxids = {32630};
 
 
 int main(int argc, char **argv) {
@@ -232,7 +234,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
         taxid = get_new_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
     }
 
-    if (Add_taxIds_for_Sequences) {
+    if (Add_taxIds_for_Sequences && taxid != 9606) {
       taxid = get_new_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
     }
     if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
@@ -287,7 +289,7 @@ void process_single_file() {
         continue;
     }
     
-    if (Add_taxIds_for_Sequences) {
+    if (Add_taxIds_for_Sequences && taxid != 9606) {
       auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
       if (entryIt == taxdb.taxIDsAndEntries.end()) {
         cerr << "Error! Didn't find taxid " << taxid << " in TaxonomyDB - can't update it!! ["<<dna.header_line<<"]" << endl;
@@ -297,6 +299,9 @@ void process_single_file() {
     }
 
     if (taxid) {
+      if (Parent_map.find(taxid) == Parent_map.end()) {
+        cerr << "Ignoring sequence for taxID " << taxid << " - not in taxDB\n";
+      }
       #pragma omp parallel for schedule(dynamic)
       for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
         set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
@@ -383,7 +388,7 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
     if (Use_uids_instead_of_taxids) {
       #pragma omp critical(new_uid)
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
-    } else if (!force_taxid) {
+    } else if (!force_taxid && taxid != contaminant_taxids) {
       *val_ptr = lca(Parent_map, taxid, *val_ptr);
     } else {
       // When force_taxid is set, do not compute lca, but assign the taxid
