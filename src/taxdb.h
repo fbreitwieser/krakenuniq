@@ -445,25 +445,20 @@ void TaxonomyDB<TAXID,READCOUNTS>::parseNodesDump(const std::string nodesDumpFil
   TAXID taxonomyID;
   TAXID parentTaxonomyID;
   std::string rank;
+  char delim;
 
-  while (nodesDumpFile.good()) {
-    getline(nodesDumpFile, line);
-    std::vector<std::string> tokens = tokenise(line, "\t|\t", 3, 2);
-    if (tokens.size() < 3) {
-	  continue;
-	}
-
-	taxonomyID = string_to_T<TAXID>(tokens[0]);
-    parentTaxonomyID = string_to_T<TAXID>(tokens[1]);
-    rank = tokens[2];
-
+  while (nodesDumpFile >> taxonomyID >> delim >> parentTaxonomyID) {
+    nodesDumpFile.ignore(3);
+    getline(nodesDumpFile, rank, '\t');
     auto entryIt = taxIDsAndEntries.find(taxonomyID);
-	if (entryIt == taxIDsAndEntries.end()) {
-	  taxIDsAndEntries[taxonomyID] = TaxonomyEntry<TAXID,READCOUNTS>(taxonomyID, parentTaxonomyID, rank);
-	} else {
+    if (entryIt == taxIDsAndEntries.end()) {
+       taxIDsAndEntries[taxonomyID] = TaxonomyEntry<TAXID,READCOUNTS>(taxonomyID, parentTaxonomyID, rank);
+    } else {
       entryIt->second.parentTaxonomyID = parentTaxonomyID;
       entryIt->second.rank = rank;
     }
+
+    nodesDumpFile.ignore(2560, '\n');
   }
 }
 
@@ -475,22 +470,25 @@ void TaxonomyDB<TAXID,READCOUNTS>::parseNamesDump(const std::string namesDumpFil
   std::string line;
 
   TAXID taxonomyID;
-  std::string scientificName;
+  std::string scientificName, type;
   while (namesDumpFile.good()) {
-    getline(namesDumpFile, line);
-    std::vector<std::string> tokens = tokenise(line, "\t|\t", 4, 2);
-    if (tokens.size() < 4 || tokens[3] != "scientific name") {
-	  continue;
-	}
-    taxonomyID = string_to_T<TAXID>(tokens[0]);
-    scientificName = tokens[1];
+    namesDumpFile >> taxonomyID;
+    namesDumpFile.ignore(3);
+    getline(namesDumpFile, scientificName, '\t');
+    namesDumpFile.ignore(3);
+    namesDumpFile.ignore(256, '|');
+    namesDumpFile.ignore(1);
+    getline(namesDumpFile, type, '\t');
 
-    auto entryIt = taxIDsAndEntries.find(taxonomyID);
-	if (entryIt == taxIDsAndEntries.end()) {
-	  taxIDsAndEntries[taxonomyID] = TaxonomyEntry<TAXID,READCOUNTS>(taxonomyID, scientificName);
-	} else {
-      entryIt->second.scientificName = scientificName;
+    if (type == "scientific name") {
+      auto entryIt = taxIDsAndEntries.find(taxonomyID);
+     if (entryIt == taxIDsAndEntries.end()) {
+        taxIDsAndEntries[taxonomyID] = TaxonomyEntry<TAXID,READCOUNTS>(taxonomyID, scientificName);
+      } else {
+        entryIt->second.scientificName = scientificName;
+      }
     }
+    namesDumpFile.ignore(2560, '\n');
   }
 }
 
@@ -549,6 +547,10 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID,READCOUNTS> >
   std::string line;
   while (!inFile.eof()) {
     inFile >> taxonomyID >> parentTaxonomyID;
+    if (taxonomyID > 1 && taxonomyID == parentTaxonomyID) {
+      cerr << "ERROR: the parent of " << taxonomyID << " is itself. Should not happend!\n";
+      exit(1);
+    }
     inFile.get(); // read tab
     std::getline(inFile, scientificName, '\t');
     if (hasGenomeSizes) {
