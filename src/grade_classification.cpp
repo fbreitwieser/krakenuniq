@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <iomanip>
 
 using namespace std;
@@ -45,13 +46,14 @@ int main(int argc, char **argv) {
   cerr << "Read " << seqid_map.size() << " taxa mappings" << endl;
   
   ofstream out_file(argv[4]);
-  set<string> all_ranks;
+  unordered_set<string> all_ranks;
   unordered_map< string, size_t > rank_counts;
-  map< int, set<TAXID> > simulated_taxids_at_rank;
-  map< int, set<TAXID> > identified_taxids_at_rank;
-  map< int, size_t > correct_reads_at_rank;
-  map< int, size_t > incorrect_reads_at_rank;
-  map< int, size_t > reads_at_higher_rank;
+  unordered_map< int, set<TAXID> > simulated_taxids_at_rank;
+  unordered_map< int, set<TAXID> > identified_taxids_at_rank;
+  unordered_map< int, size_t > correct_reads_at_rank;
+  unordered_map< int, size_t > incorrect_reads_at_rank;
+  unordered_map< int, size_t > reads_at_higher_rank;
+  unordered_set<uint32_t> ignored_taxa;
   size_t total_reads = 0;
   size_t unidentified_reads = 0;
   
@@ -95,7 +97,10 @@ int main(int argc, char **argv) {
     } else {
       seq_taxid = it->second;
       if (!taxdb.hasTaxon(seq_taxid)) {
-        cerr << "Ignoring taxon " << seq_taxid << " - not in database" << endl;
+        if (ignored_taxa.count(seq_taxid) == 0) {
+          cerr << "Ignoring taxon " << seq_taxid << " - not in database" << endl;
+          ignored_taxa.insert(seq_taxid);
+        }
         continue;
       }
       //cerr <<"seqid" << seq_taxid;
