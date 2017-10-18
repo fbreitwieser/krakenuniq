@@ -26,11 +26,22 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-	if (argc < 3 || argc > 4) {
-      std::cerr << "Usage: build_taxdb names.dmp nodes.dmp [taxon-counts]\n";
+	if (argc < 2 || argc > 4) {
+      std::cerr << "USAGE:\n" 
+        << "With two or three arguments, echo taxDB based on NCBI taxonomy dump:\n"
+        << "build_taxdb names.dmp nodes.dmp [taxon-counts]\n"
+        << "\n"
+        << "With one argument, read in taxDB and echo it again for consistency checks:\n"
+        << "build_taxdb taxDB\n";
       return 1;
     }
-    TaxonomyDB<uint32_t, uint32_t> taxdb {(string)argv[1], (string)argv[2]};
+        
+    TaxonomyDB<uint32_t, uint32_t> taxdb;
+    if (argc == 2) {
+    taxdb = TaxonomyDB<uint32_t, uint32_t> ((string)argv[1]);
+    } else {
+    taxdb = TaxonomyDB<uint32_t, uint32_t> ((string)argv[1], (string)argv[2]);
+    }
     if (argc == 4) {
         ifstream ifs(argv[3]);
         uint32_t taxon; uint64_t count;
