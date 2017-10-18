@@ -29,7 +29,7 @@ namespace kraken {
         cerr << "kmer_uid ("<< kmer_uid <<") greater than UID vector size ("<< UID_to_taxids_vec.size()<<")!!" << endl;
         exit(1);
       }
-      taxid_set = *(UID_to_taxids_vec.at(kmer_uid-1));
+      taxid_set = *(UID_to_taxids_vec[kmer_uid-1]);
       auto it = std::lower_bound( taxid_set.begin(), taxid_set.end(), taxid); // find proper position in descending order
       if (it == taxid_set.end() || *it != taxid) {
         // add the taxid to the set, in the right position such that it remains sorted
