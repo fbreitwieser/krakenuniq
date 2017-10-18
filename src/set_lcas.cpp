@@ -227,6 +227,8 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
       continue;
     }
 
+    uint32_t orig_taxid = taxid;
+
     if (Add_taxIds_for_Assembly && iss.good()) {
       iss.get();
       getline(iss, name);
@@ -234,7 +236,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
         taxid = get_new_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
     }
 
-    if (Add_taxIds_for_Sequences && taxid != 9606) {
+    if (Add_taxIds_for_Sequences && orig_taxid != 9606) {
       taxid = get_new_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
     }
     if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
@@ -289,6 +291,12 @@ void process_single_file() {
         ++seqs_skipped;
         continue;
     }
+
+    if (Parent_map.find(taxid) == Parent_map.end()) {
+      cerr << "Skipping sequence " << dna.id << " since taxonomy ID " << taxid << " is not in taxonomy database!" << endl;
+      ++ seqs_skipped;
+      continue;
+    }
     
     if (Add_taxIds_for_Sequences && taxid != 9606) {
       // Update entry based on header line
@@ -308,12 +316,12 @@ void process_single_file() {
     if (taxid) {
       if (Parent_map.find(taxid) == Parent_map.end()) {
         cerr << "Ignoring sequence for taxID " << taxid << " - not in taxDB\n";
+      } else {
+        #pragma omp parallel for schedule(dynamic)
+        for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
+          set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
+         ++seqs_processed;
       }
-      #pragma omp parallel for schedule(dynamic)
-      for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
-        set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
-
-        ++seqs_processed;
     } else {
       if (verbose) 
         cerr << "Skipping sequence with header [" << dna.header_line << "] - no taxid" << endl;
@@ -396,7 +404,9 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
       #pragma omp critical(new_uid)
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
     } else if (!force_taxid && taxid != contaminant_taxids) {
-      *val_ptr = lca(Parent_map, taxid, *val_ptr);
+      if (Parent_map.find(taxid) != Parent_map.end()) {
+        *val_ptr = lca(Parent_map, taxid, *val_ptr);
+      }
     } else {
       // When force_taxid is set, do not compute lca, but assign the taxid
       // of the (last) sequence to k-mers
