@@ -1,22 +1,47 @@
 #!/bin/bash
 
-set -xeu
+set -eu
 
 [[ "$#" -ne 1 ]] && DIR=`pwd` || DIR=$1
+[[ `uname` == "Darwin" ]] && THREADS=4 || THREADS=10
 
-export PATH="$DIR/install:$PATH"
-for K in 31 26 21; do
-  mkdir -p $DIR/dbs/refseq-viral-k$K
-  time krakenu-build --kmer-len $K --minimizer-len 12 --threads 4 --db $DIR/dbs/refseq-viral-k$K --build --taxids-for-genomes --taxids-for-sequences --library-dir=$DIR/data/library/viral --taxonomy-dir=$DIR/data/taxonomy 2>&1 | tee $DIR/dbs/refseq-viral-k$K/build.log
 
-  mkdir -p $DIR/dbs/refseq-viral-k$K/taxonomy
-  dump_taxdb $DIR/dbs/refseq-viral-k$K/taxDB $DIR/dbs/refseq-viral-k$K/taxonomy/names.dmp $DIR/dbs/refseq-viral-k$K/taxonomy/nodes.dmp
+build_db() {
+  K=$1; shift
+  NAM=$1; shift
 
-  if [[ `uname` != "Darwin" ]]; then
-    mkdir -p $DIR/dbs/refseq-oct2017-k$K
-    krakenu-build --kmer-len $K --threads 20 --db $DIR/dbs/refseq-oct2017-k$K --build --taxids-for-genomes --taxids-for-sequences --library-dir=$DIR/data/library/viral-dusted --library-dir=$DIR/data/library/viral-neighbors-dusted --library-dir=$DIR/data/library/bacteria-dusted --library-dir=$DIR/data/library/archaea-dusted --library-dir=$DIR/data/library/vertebrate_mammalian --library-dir=$DIR/data/library/contaminants --taxonomy-dir=$DIR/data/taxonomy
-    mkdir -p $DIR/dbs/refseq-bacteria-k$K
-    krakenu-build --kmer-len $K --threads 20 --db $DIR/dbs/refseq-bacteria-k$K --build --taxids-for-genomes --taxids-for-sequences --library-dir=$DIR/data/library/bacteria --library-dir=$DIR/data/library/archaea --taxonomy-dir=$DIR/data/taxonomy
+  DB_NAM=refseq-$NAM-k$K
+  DB_DIR=$DIR/dbs/$DB_NAM
+
+  mkdir -p $DB_DIR
+  CMD="krakenu-build --kmer-len $K --minimizer-len 12 --threads $THREADS --db $DB_DIR --build --taxids-for-genomes --taxids-for-sequences --taxonomy-dir=$DIR/data/taxonomy --uid-database"
+  for L in $@; do
+    CMD="$CMD  --library-dir=$DIR/data/library/$L"
+  done
+  if [[ ! -f "$DB_DIR/is.busy" ]]; then
+    echo "EXECUTING $CMD"
+    touch $DB_DIR/is.busy
+    $CMD 2>&1 | tee $DIR/dbs/$DB_NAM/build.log
+    if [[ ! -f "$DB_DIR/taxonomy/nodes.dmp" ]]; then
+      mkdir -p $DB_DIR/taxonomy
+      echo "EXECUTING dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp"
+      dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp
+    fi
+    rm $DB_DIR/is.busy
+  else 
+    echo "IGNORING $DB_DIR"
+  fi
+}
+
+#export PATH="$DIR/install:$PATH"
+for K in 31 21; do
+  if [[ `uname` == "Darwin" ]]; then
+    build_db $K viral viral
+    build_db $K all-viral viral viral-neighbors
+  else
+    build_db $K oct2017 archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
+                         vertebrate_mammalian contaminants
+    #build_db $K bacteria bacteria archaea
   fi
 done
 
