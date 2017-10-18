@@ -63,7 +63,7 @@ struct TaxRank {
   //"superkingdom", "root"};
 
   enum RANK { unknown, no_rank, sequence, assembly,
-    subspecies, species, subgenus, genus, tribe, subfamily,
+    subspecies, species, species_subgroup, species_group, subgenus, genus, tribe, subfamily,
     family, superfamily, parvorder, infraorder, suborder,
     order, superorder, parvclass, infraclass, subclass,
     class_, superclass, subphylum, phylum, kingdom,
@@ -73,7 +73,12 @@ struct TaxRank {
   static const unordered_map<string, RANK> string_to_rank;
 
   static const RANK toRank(const string& rank) {
-    return string_to_rank.at(rank);
+    const auto& it = string_to_rank.find(rank);
+    if (it == string_to_rank.end()) {
+      cerr << "ERROR: Could not find rank " << rank << endl;
+      exit(1);
+    }
+    return it->second;
   }
 
   static const char* toString(const TaxRank::RANK& rank) {
@@ -84,6 +89,8 @@ struct TaxRank {
       case RANK::assembly:         return "assembly";
       case RANK::subspecies:       return "subspecies";
       case RANK::species:          return "species";
+      case RANK::species_subgroup: return "species subgroup";
+      case RANK::species_group:    return "species group";
       case RANK::subgenus:         return "subgenus";
       case RANK::genus:            return "genus";
       case RANK::tribe:            return "tribe";
@@ -120,6 +127,8 @@ const unordered_map<string, TaxRank::RANK> TaxRank::string_to_rank = {
   {"assembly", TaxRank::assembly},
   {"subspecies", TaxRank::subspecies},
   {"species", TaxRank::species},
+  {"species subgroup", TaxRank::species_subgroup},
+  {"species group", TaxRank::species_group},
   {"subgenus", TaxRank::subgenus},
   {"genus", TaxRank::genus},
   {"tribe", TaxRank::tribe},
