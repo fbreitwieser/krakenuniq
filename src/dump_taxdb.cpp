@@ -11,6 +11,8 @@ int main(int argc, char **argv) {
     std::cerr << "Usage: dump_taxdb taxDB names.dmp nodes.dmp\n";
     return 1;
   }
+
+	cerr << "Reading taxonomy database from " << argv[1] << ", writing nodes dump to " << argv[3] << " and names dump to " << argv[2] << "." << endl;
   TaxonomyDB<uint32_t, uint32_t> taxdb {(string)argv[1]};
   ofstream names_file(argv[2]);
   names_file.exceptions(ifstream::failbit | ifstream::badbit);
@@ -22,12 +24,12 @@ int main(int argc, char **argv) {
     nodes_file << taxon.second.taxonomyID 
       << "\t|\t" << taxon.second.parentTaxonomyID
       << "\t|\t" << taxon.second.rank
-      << "\t|\n"; // there are further columns, but Kraken does not care about them
+      << endl; // there are further columns, but Kraken does not care about them
     
     names_file << taxon.second.taxonomyID 
       << "\t|\t" << taxon.second.scientificName
       << "\t|\t" 
-      << "\t|\t" << "scientific name" << "\t|\n";
+      << "\t|\t" << "scientific name" << endl;
   }
   names_file.close();
   nodes_file.close();
