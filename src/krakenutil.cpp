@@ -55,20 +55,23 @@ namespace kraken {
       return a ? a : b;
 
     // create a path from a to the root
-    std::unordered_set<uint32_t> a_path;
-    while (a > 0 && a != parent_map.at(a)) {
-	  if (a == b)
-		  return a;
+    std::vector<uint32_t> a_path;
+    do {
+      if (a == b) 
+        return a; 
       a_path.insert(a);
       a = parent_map.at(a);
-    }
+    } while (a != a_path.back())
 
     // search for b in the path from a to the root
-    while (b > 0 && b != parent_map.at(b)) {
-      if (a_path.count(b) > 0)
+    uint32_t last_b = 0;
+    do {
+      if (a_path.find(b) != a_path.end())
         return b;
+
+      last_b = b;
       b = parent_map.at(b);
-    }
+    } while (last_b != b)
     return 1;
   }
 
@@ -77,8 +80,8 @@ namespace kraken {
   // Tree resolution: take all hit taxa (plus ancestors), then
   // return leaf of highest weighted leaf-to-root path.
   uint32_t resolve_tree(const unordered_map<uint32_t, uint32_t> &hit_counts,
-                        const unordered_map<uint32_t, uint32_t> &parent_map)
-  {
+                        const unordered_map<uint32_t, uint32_t> &parent_map) {
+  
     set<uint32_t> max_taxa;
     uint32_t max_taxon = 0, max_score = 0;
 
@@ -92,6 +95,10 @@ namespace kraken {
         auto it2 = hit_counts.find(node);
         if (it2 != hit_counts.end()) {
           score += it2->second;
+        }
+        if (node == parent_map.at(node)) {
+          cerr << "Taxon " << node << " has itself as parent!" << endl;
+          break;
         }
         node = parent_map.at(node);
 
