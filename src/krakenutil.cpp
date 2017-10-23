@@ -21,6 +21,7 @@
 #include "kraken_headers.hpp"
 #include "krakenutil.hpp"
 #include <unordered_set>
+#include<algorithm>
 
 using namespace std;
 
@@ -50,7 +51,26 @@ namespace kraken {
   // Return lowest common ancestor of a and b
   // LCA(0,x) = LCA(x,0) = x
   // Default ancestor is 1 (root of tree)
-  uint32_t lca(const unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b) {
+  uint32_t lca(const unordered_map<uint32_t, uint32_t> &parent_map,
+    uint32_t a, uint32_t b)
+  {
+    if (a == 0 || b == 0)
+      return a ? a : b;
+
+    unordered_set<uint32_t> a_path;
+    while (a > 0) {
+      a_path.insert(a);
+      a = parent_map.at(a);
+    }
+    while (b > 0) {
+      if (a_path.count(b) > 0)
+        return b;
+      b = parent_map.at(b);
+    }
+    return 1;
+  }
+
+  uint32_t lca_vec(const unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b) {
     if (a == 0 || b == 0)
       return a ? a : b;
 
@@ -59,19 +79,19 @@ namespace kraken {
     do {
       if (a == b) 
         return a; 
-      a_path.insert(a);
+      a_path.push_back(a);
       a = parent_map.at(a);
-    } while (a != a_path.back())
+    } while (a != a_path.back());
 
     // search for b in the path from a to the root
     uint32_t last_b = 0;
     do {
-      if (a_path.find(b) != a_path.end())
+      if (std::find(a_path.begin(), a_path.end(), b) != a_path.end())
         return b;
 
       last_b = b;
       b = parent_map.at(b);
-    } while (last_b != b)
+    } while (last_b != b);
     return 1;
   }
 

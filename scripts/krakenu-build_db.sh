@@ -255,7 +255,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     set -x
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
       -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kdb.counts \
-      -F <( cat_library ) > seqid2taxid-plus.map
+      -F <( cat_library ) -T > seqid2taxid-plus.map
     set +x
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
       mv seqid2taxid.map seqid2taxid.map.orig
@@ -300,8 +300,8 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   ## Make a classification report
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
-    #echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    #krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
+    echo "Creating UID database summary report $REPNAME.report.tsv ..."
+    krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
   fi
 fi
 

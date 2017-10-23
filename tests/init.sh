@@ -9,10 +9,11 @@ set -xeu
 
 ## Download taxonomy and genomic data into data/
 #$DIR/install/krakenu-download --db $DIR/data -R --include-viral-neighbors taxonomy refseq/archaea refseq/bacteria refseq/viral/Any
+$DIR/install/krakenu-download --db $DIR/data -R refseq/fungi refseq/fungi/Chromosome refseq/protozoa refseq/protozoa/Chromosome
 #$DIR/install/krakenu-download --db $DIR/data --fna rna,genomic -R refseq/vertebrate_mammalian/Chromosome/taxid9606 
-$DIR/install/krakenu-download --db $DIR/data -R contaminants
+#$DIR/install/krakenu-download --db $DIR/data -R contaminants
 
-for i in viral viral-neighbors archaea bacteria; do 
+for i in fungi protozoa viral viral-neighbors archaea bacteria; do 
   [[ -s "$DIR/data/all-$i.fna" ]] || find $DIR/data/library/$i -name '*.fna' -exec cat {} \; > $DIR/data/all-$i.fna
   [[ -s "$DIR/data/all-$i.map" ]] || find $DIR/data/library/$i -name '*.map' -exec cat {} \; > $DIR/data/all-$i.map
   DUSTED_F="$DIR/data/all-$i-dusted.fna"

@@ -39,7 +39,7 @@ void usage(int exit_code=EX_USAGE);
 void process_files();
 void process_single_file();
 void process_file(string filename, uint32_t taxid);
-void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish);
+void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_contaminant_taxid = false);
 
 int Num_threads = 1;
 string DB_filename, Index_filename,
@@ -47,8 +47,8 @@ string DB_filename, Index_filename,
   Kmer_count_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
-bool force_taxid = false;
-int New_taxid_start = 1000000000;
+bool force_contaminant_taxid = false;
+uint32_t New_taxid_start = 1000000000;
 
 bool Allow_extra_kmers = false;
 bool verbose = false;
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
   parse_command_line(argc, argv);
 
-  if (!TaxDB_filename.empty() && !force_taxid) {
+  if (!TaxDB_filename.empty()) {
     taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_filename);
     for (const auto & tax : taxdb.taxIDsAndEntries) {
       if (tax.first != 0)
@@ -211,6 +211,15 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
   string line, seq_id, name;
   uint32_t taxid;
 
+  if (Add_taxIds_for_Assembly && Add_taxIds_for_Sequences) {
+    for (const auto& k : taxdb.taxIDsAndEntries) {
+      if (k.first >= New_taxid_start) {
+        New_taxid_start = k.first;
+      } 
+    }
+    cerr << "Starting new taxonomy IDs with " << (New_taxid_start+1) << endl;
+  }
+
   // Used when adding new taxids for assembly or sequence
   unordered_map<string, uint32_t> name_to_taxid_map;
 
@@ -298,6 +307,8 @@ void process_single_file() {
       continue;
     }
     
+    bool is_contaminant_taxid = taxid == 32630 || taxid == 81077;
+    
     if (Add_taxIds_for_Sequences && taxid != 9606) {
       // Update entry based on header line
       auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
@@ -319,7 +330,7 @@ void process_single_file() {
       } else {
         #pragma omp parallel for schedule(dynamic)
         for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
-          set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
+          set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1, is_contaminant_taxid);
          ++seqs_processed;
       }
     } else {
@@ -378,7 +389,7 @@ void process_sequence(DNASequence dna) {
   // Or maybe asembly_summary file?
 }
 
-void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
+void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_contaminant_taxid) {
   KmerScanner scanner(seq, start, finish);
   uint64_t *kmer_ptr;
   uint32_t *val_ptr;
@@ -403,14 +414,12 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish) {
     if (Use_uids_instead_of_taxids) {
       #pragma omp critical(new_uid)
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
-    } else if (!force_taxid && taxid != contaminant_taxids) {
-      if (Parent_map.find(taxid) != Parent_map.end()) {
-        *val_ptr = lca(Parent_map, taxid, *val_ptr);
-      }
-    } else {
-      // When force_taxid is set, do not compute lca, but assign the taxid
+    } else if (force_contaminant_taxid && is_contaminant_taxid) {
+      // When force_contaminant_taxid is set, do not compute lca, but assign the taxid
       // of the (last) sequence to k-mers
       *val_ptr = taxid;
+    } else {
+      *val_ptr = lca(Parent_map, taxid, *val_ptr);
     }
   }
 }
@@ -454,7 +463,7 @@ void parse_command_line(int argc, char **argv) {
         #endif
         break;
       case 'T' :
-        force_taxid = true;
+        force_contaminant_taxid = true;
         break;
       case 'v' :
         verbose = true;
@@ -516,8 +525,8 @@ void usage(int exit_code) {
        << "  -f filename      File to taxon map" << endl
        << "  -F filename      Multi-FASTA file with sequence data" << endl
        << "  -m filename      Sequence ID to taxon map" << endl
-       << "  -a               Add taxonomy IDs (starting with "<<New_taxid_start<<") for assemblies (third column in seqid2taxid.map) to Taxonomy DB" << endl
-       << "  -A               Add taxonomy IDs (starting with "<<New_taxid_start<<") for sequences to Taxonomy DB" << endl
+       << "  -a               Add taxonomy IDs (starting with "<<(New_taxid_start+1)<<") for assemblies (third column in seqid2taxid.map) to Taxonomy DB" << endl
+       << "  -A               Add taxonomy IDs (starting with "<<(New_taxid_start+1)<<") for sequences to Taxonomy DB" << endl
        << "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
        << "  -I filename      Write UIDs into database, and output (binary) UID-to-taxid map to filename" << endl
        << "  -p               Pretend - do not write database back to disk (when working in RAM)" << endl

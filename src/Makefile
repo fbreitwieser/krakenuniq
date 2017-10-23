@@ -1,8 +1,8 @@
 CXX = g++
 FOPENMP?=-fopenmp
-CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O2 -g -Wfatal-errors
+CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -g -Wfatal-errors
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
-PROGS = db_sort set_lcas classify make_seqid_to_taxid_map db_shrink build_taxdb grade_classification dump_taxdb read_uid_mapping
+PROGS = classify db_sort set_lcas make_seqid_to_taxid_map db_shrink build_taxdb grade_classification dump_taxdb read_uid_mapping
 LIBFLAGS = -L. -I./gzstream -L./gzstream -lz -lgzstream
 
 .PHONY: all install clean
@@ -28,7 +28,7 @@ read_uid_mapping: quickfile.o
 classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o hyperloglogplus.h taxdb.h report-cols.h
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
-build_taxdb: taxdb.h report-cols.h
+build_taxdb: taxdb.h report-cols.h quickfile.o
 
 make_seqid_to_taxid_map: quickfile.o
 

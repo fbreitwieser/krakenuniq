@@ -7,14 +7,15 @@ set -eu
 
 
 build_db() {
-  K=$1; shift
-  NAM=$1; shift
+  local K=$1; shift
+  local NAM=$1; shift
+  local MIN=15
 
-  DB_NAM=refseq-$NAM-k$K
+  local DB_NAM=refseq-$NAM-k$K
   DB_DIR=$DIR/dbs/$DB_NAM
 
   mkdir -p $DB_DIR
-  CMD="krakenu-build --kmer-len $K --minimizer-len 12 --threads $THREADS --db $DB_DIR --build --taxids-for-genomes --taxids-for-sequences --taxonomy-dir=$DIR/data/taxonomy --uid-database"
+  CMD="krakenu-build --kmer-len $K --minimizer-len $MIN --threads $THREADS --db $DB_DIR --build --taxids-for-genomes --taxids-for-sequences --taxonomy-dir=$DIR/data/taxonomy --uid-database"
   for L in $@; do
     CMD="$CMD  --library-dir=$DIR/data/library/$L"
   done
@@ -34,13 +35,18 @@ build_db() {
 }
 
 #export PATH="$DIR/install:$PATH"
-for K in 31 21; do
+for K in 31; do
   if [[ `uname` == "Darwin" ]]; then
     build_db $K viral viral
     build_db $K all-viral viral viral-neighbors
   else
     build_db $K oct2017 archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
                          vertebrate_mammalian contaminants
+    
+    EUKD=$DIR/dbs/refseq-euk-oct2017-k31
+    [[ -d $EUKD ]] || mkdir -p $EUKD
+    [[ -f $EUKD/taxDB ]] || cp -v $DB_DIR/taxDB $EUKD
+    build_db $K euk-oct2017 fungi protozoa
     #build_db $K bacteria bacteria archaea
   fi
 done
