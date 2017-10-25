@@ -8,14 +8,15 @@ set -xeu
 #$(dirname $0)/../install_kraken.sh --install-jellyfish $DIR/install
 
 ## Download taxonomy and genomic data into data/
-#$DIR/install/krakenu-download --db $DIR/data -R --include-viral-neighbors taxonomy refseq/archaea refseq/bacteria refseq/viral/Any
-$DIR/install/krakenu-download --db $DIR/data -R refseq/fungi refseq/fungi/Chromosome refseq/protozoa refseq/protozoa/Chromosome
-#$DIR/install/krakenu-download --db $DIR/data --fna rna,genomic -R refseq/vertebrate_mammalian/Chromosome/taxid9606 
-#$DIR/install/krakenu-download --db $DIR/data -R contaminants
+time $DIR/install/krakenu-download --db $DIR/data -R taxonomy refseq/archaea refseq/bacteria
+time $DIR/install/krakenu-download --db $DIR/data -R --include-viral-neighbors refseq/viral/Any
+time $DIR/install/krakenu-download --db $DIR/data -R refseq/fungi refseq/fungi/Chromosome refseq/protozoa refseq/protozoa/Chromosome
+time $DIR/install/krakenu-download --db $DIR/data --fna rna,genomic -R refseq/vertebrate_mammalian/Chromosome/taxid9606 
+time $DIR/install/krakenu-download --db $DIR/data -R contaminants
 
 for i in fungi protozoa viral viral-neighbors archaea bacteria; do 
-  [[ -s "$DIR/data/all-$i.fna" ]] || find $DIR/data/library/$i -name '*.fna' -exec cat {} \; > $DIR/data/all-$i.fna
-  [[ -s "$DIR/data/all-$i.map" ]] || find $DIR/data/library/$i -name '*.map' -exec cat {} \; > $DIR/data/all-$i.map
+  [[ -s "$DIR/data/all-$i.fna" ]] || find $DIR/data/library/$i -name '*.fna' -print0 | xargs -0 -n 100 cat > $DIR/data/all-$i.fna
+  [[ -s "$DIR/data/all-$i.map" ]] || find $DIR/data/library/$i -name '*.map' -print0 | xargs -0 -n 100 cat > $DIR/data/all-$i.map
   DUSTED_F="$DIR/data/all-$i-dusted.fna"
   [[ -s $DUSTED_F ]] || dustmasker -infmt fasta -in $DIR/data/all-$i.fna -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > "$DUSTED_F"
   mkdir -p $DIR/data/library/$i-dusted

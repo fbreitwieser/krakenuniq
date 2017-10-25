@@ -24,7 +24,6 @@
 set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
-set -x
 
 function report_time_elapsed() {
   set -x

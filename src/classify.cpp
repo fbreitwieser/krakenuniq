@@ -480,8 +480,8 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   };
 
   //string hitlist_string;
-  uint32_t last_taxon;
-  uint32_t last_counter;
+  //uint32_t last_taxon;
+  //uint32_t last_counter;
 
   vector<db_status> db_statuses(KrakenDatabases.size());
 

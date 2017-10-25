@@ -74,6 +74,7 @@ map< TaxidSet, uint32_t> Taxids_to_UID_map;
 unordered_map<string, uint32_t> ID_to_taxon_map;
 unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
+const size_t hll_prec = 10;
 TaxonomyDB<uint32_t, ReadCounts> taxdb;
 
 const string prefix = "kraken:taxid|";
@@ -211,7 +212,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
   string line, seq_id, name;
   uint32_t taxid;
 
-  if (Add_taxIds_for_Assembly && Add_taxIds_for_Sequences) {
+  if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
     for (const auto& k : taxdb.taxIDsAndEntries) {
       if (k.first >= New_taxid_start) {
         New_taxid_start = k.first;
@@ -301,15 +302,15 @@ void process_single_file() {
         continue;
     }
 
-    if (Parent_map.find(taxid) == Parent_map.end()) {
+    auto it_p = Parent_map.find(taxid);
+    if (it_p == Parent_map.end()) {
       cerr << "Skipping sequence " << dna.id << " since taxonomy ID " << taxid << " is not in taxonomy database!" << endl;
       ++ seqs_skipped;
       continue;
     }
     
     bool is_contaminant_taxid = taxid == 32630 || taxid == 81077;
-    
-    if (Add_taxIds_for_Sequences && taxid != 9606) {
+    if (Add_taxIds_for_Sequences && taxid != 9606 && it_p->second != 9606) {
       // Update entry based on header line
       auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
       if (entryIt == taxdb.taxIDsAndEntries.end()) {
@@ -414,12 +415,20 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_
     if (Use_uids_instead_of_taxids) {
       #pragma omp critical(new_uid)
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
-    } else if (force_contaminant_taxid && is_contaminant_taxid) {
-      // When force_contaminant_taxid is set, do not compute lca, but assign the taxid
-      // of the (last) sequence to k-mers
-      *val_ptr = taxid;
     } else {
-      *val_ptr = lca(Parent_map, taxid, *val_ptr);
+      if (!force_contaminant_taxid) {
+        *val_ptr = lca(Parent_map, taxid, *val_ptr);
+      } else {
+        if (*val_ptr == 32630 || *val_ptr == 81077) {
+          // keep value
+        } else if (is_contaminant_taxid) {
+          // When force_contaminant_taxid is set, do not compute lca, but assign the taxid
+          // of the (last) sequence to k-mers
+          *val_ptr = taxid;
+        } else {
+          *val_ptr = lca(Parent_map, taxid, *val_ptr);
+        }
+      }
     }
   }
 }

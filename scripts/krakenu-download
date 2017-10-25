@@ -23,6 +23,7 @@ sub download(@);
 sub print_header_lines(@);
 sub download_domain(@);
 sub download_viral_neighbors(@);
+sub download_viral_neighbors2(@);
 
 my $FTP="ftp://ftp.ncbi.nih.gov";
 my @ALL_GENOMES=qw/bacteria viral archaea fungi protozoa invertebrate plant vertebrate_mammalian vertebrate_other/;
@@ -68,7 +69,7 @@ ARGUMENT
 COMMON OPTIONS
  -o <directory>     Folder to which the files are downloaded. Default: '.'
  --db <directory>   Alternative to -o: Download to <directory>/{library,taxonomy}.
- -P <# of threads>  Number of processes when downloading (uses xargs). Default: '$N_PROC'
+ --threads <# of threads>  Number of processes when downloading (uses xargs). Default: '$N_PROC'
  --rsync, -R        Download using rsync.
  --overwrite        Redownload and overwrite files with the same name.
  -v                 Verbose.
@@ -174,10 +175,13 @@ foreach my $DATABASE (@ARGV) {
   }
 }
 
+my %taxid_name_map;
+
 if ($INCLUDE_VIRAL_NEIGHBORS) {
   if (!$downloaded_viral_refseq) {
     print STDERR "--include-viral-neighbors only works when RefSeq viral is downloaded in the same session!";
   } else {
+
     my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral-neighbors" : "$BASE_DIR/viral-neighbors";
     my $viral_lib_dir = $add_dir? "$BASE_DIR/library/viral" : "$BASE_DIR/viral";
     download_viral_neighbors($viral_lib_dir, $nbr_lib_dir);
@@ -261,25 +265,64 @@ sub end_fork() {
   exit() unless $N_PROC <= 1;
 }
 
+sub download_viral_neighbors2(@) {
+  my ($viral_dir, $nbr_dir) = @_;
+  my $dir = get_dir($BASE_DIR,"taxonomy");
+  print STDERR "Reading names file ...\n";
+  my $names_file = "$dir/names.dmp";
+  open (my $N, "<", $names_file);
+  while (<$N>) {
+    my ($taxid, undef, $name, undef, $type) = split /\t|\t/;
+    next unless $type eq "scientific name";
+    $taxid_name_map{$taxid} = $name;
+  }
+  close($N);
+
+  print STDERR "Downloading nucl_gb.accession2taxid ...\n";
+  my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz";
+  download($url, "$dir/nucl_gb.accession2taxid.gz");
+
+  print STDERR "Sorting mapping file ...\n";
+  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | sort --parallel $N_PROC > $dir/nucl_gb.accession2taxid.sorted") unless -s "$dir/nucl_gb.accession2taxid.sorted";
+
+  if (!-f "$nbr_dir/all-nbrs.fa"){
+  my $FMT="fasta";
+  my $TERM="Viruses[Organism]+NOT+cellular+organisms[ORGN]+NOT+wgs[PROP]+NOT+AC_000001:AC_999999[pacc]+NOT+gbdiv+syn[prop]+AND+nuccore+genome+samespecies[Filter]";
+  my $ESEARCH_URL="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
+  ## TODO: Go through it 10,000 entries at a time
+  my $URL_PARAMS=`curl -g "$ESEARCH_URL?db=nuccore&usehistory=y&retmax=1&retmode=json&term=$TERM" | grep -e 'querykey' -e 'webenv' | sed -e 's/^ *"querykey": "/query_key=/' -e 's/^ *"webenv": "/WebEnv=/' -e 's/",//' | paste -sd\\&`;
+  chomp $URL_PARAMS;
+  download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&query_key=1&$URL_PARAMS&rettype=fasta", "$nbr_dir/all-nbrs.fa");
+}
+
+}
+
 sub download_viral_neighbors(@) {
   my ($viral_dir, $nbr_dir) = @_;
-  print STDERR "Reading map files from $viral_dir ... \n";
-  my %ac_to_taxid;
-  foreach my $f (glob("$viral_dir/*.map")) {
-    open (my $F, "<", $f);
-    while (<$F>) {
-      chomp;
-      my ($ac, $taxid, $name) = split(/\t/);
-      $ac =~ s/\.[0-9]*$//;
-      $ac_to_taxid{$ac} = [$name, $taxid];
-    }
-    close ($F);
+
+  print STDERR "Reading names file ...\n";
+  my $dir = get_dir($BASE_DIR,"taxonomy");
+  my $names_file = "$dir/names.dmp";
+  open (my $N, "<", $names_file);
+  while (<$N>) {
+    next unless /scientific name/;
+    my ($taxid, $name) = split /\t\|\t/;
+    $taxid_name_map{$taxid} = $name;
   }
+  close($N);
+
+  print STDERR "Downloading nucl_gb.accession2taxid ...\n";
+  my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz";
+  download($url, "$dir/nucl_gb.accession2taxid.gz");
+
+  my $sorted_map_f = "$dir/nucl_gb.accession2taxid.sorted";
+  print STDERR "Sorting mapping file ...\n";
+  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | sort --parallel $N_PROC > $sorted_map_f") unless -s $sorted_map_f;
 
   print STDERR "Downloading viral neighbors into $nbr_dir ...\n";
-  my $url = "https://www.ncbi.nlm.nih.gov/genomes/GenomesGroup.cgi?taxid=10239&cmd=download2";
+  my $url1 = "https://www.ncbi.nlm.nih.gov/genomes/GenomesGroup.cgi?taxid=10239&cmd=download2";
   my $nbr_file = "$nbr_dir/viral_neighbors-taxid10239.nbr";
-  download($url, $nbr_file);
+  download($url1, $nbr_file);
   open(my $F, "<", $nbr_file);
   my @file = <$F>;
   close($F);
@@ -292,28 +335,37 @@ sub download_viral_neighbors(@) {
     ++$i;
     print STDERR "\r  Downloading viral neighbor sequence $i/$n_genomes ..." unless $VERBOSE;
 #    my $pid = $pm->start and next;
-
+    chomp;
     my ($rep_acs, $nbr_ac, undef, undef, $nname, $sname) = split /\t/;
-    my ($name, $taxid);
-    foreach my $rep_ac (split (/,/, $rep_acs)) {
-      if (defined $ac_to_taxid{$rep_ac}) {
-        ($name, $taxid) = @{$ac_to_taxid{$rep_ac}};
-        last;
-      } 
+    my $taxid = `look $nbr_ac $sorted_map_f | cut -f 2`;
+    chomp $taxid;
+
+    if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
+      my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
+      chomp $res;
+      ($taxid) = split /\t/, $res;
     }
-    if (!defined $taxid) {
-      print STDERR "\nNo mapping for viral neighbor $nbr_ac [rep: $rep_acs, $nname]!\n";
-      next;
+
+    my $name = $taxid_name_map{$taxid};
+    if (!defined $taxid || !defined $name) {
+       print STDERR "\nNo mapping for viral neighbor $nbr_ac [rep: $rep_acs, $nname, $taxid]!\n";
+       next;
     }
     (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
     $name1 =~ s/__/_/g;
     my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.fna";
-    my $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&rettype=fasta&retmode=text&id=$nbr_ac";
-    start_fork() and next;
-    if (download($url,$file)) {
-      print_header_lines($file, $taxid, "$nname $sname neighbor $nbr_ac");
+    system("mkdir -p $nbr_dir/$name1-tax$taxid");
+    if (-s "$nbr_dir/$nbr_ac.fna") {
+      system("mv -v $nbr_dir/$nbr_ac.fna $nbr_dir/$name1-tax$taxid/$nbr_ac.fna");
     }
-    end_fork();
+    my $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&rettype=fasta&retmode=text&id=$nbr_ac";
+    if (! -s $file || ! -s "$file.map") {
+      start_fork() and next;
+      if (download($url,$file)) {
+       print_header_lines($file, $taxid, "$nname neighbors");
+      }
+      end_fork();
+    }
   }
   print STDERR "\n";
   wait_children();
@@ -330,7 +382,11 @@ sub print_header_lines(@) {
   while (<$G>) {
     next unless /^>([^ ]*)/;
     my $ac = $1;
-    print $F "$ac\t$taxid\t$name\n";
+    if (defined $name) {
+      print $F "$ac\t$taxid\t$name\n";
+    } else {
+      print $F "$ac\t$taxid\n";
+    }
   }
   close($G);
   close($F);
@@ -395,7 +451,8 @@ sub download_taxonomy(@) {
 
 sub download_domain(@) {
   my ($domain_dir, $domain, $_assembly_level, $_taxid) = @_;
-  print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level and taxid $_taxid.\n";
+  print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level";
+  print STDERR (defined $_taxid? "and taxid $_taxid.\n" : ".\n");
   die unless defined $domain_dir && defined $domain;
   if (-d $domain_dir) {
     print STDERR "WARNING: $domain_dir already exists - potentially overwriting files.\n";
@@ -430,6 +487,9 @@ sub download_domain(@) {
   close $A2;
   close $A1;
 
+  my $downloaded_files = 0;
+  my $existing_files = 0;
+
   my $i = 0;
   foreach my $g (@genomes_to_dl) {
     my ($ftp_path, $taxid, $organism_name, $infraspecific_name, $assembly_accession) = @$g;
@@ -450,15 +510,22 @@ sub download_domain(@) {
     my $bname1 = "${organism_name1}-tax${taxid}-${bname}";
     
     foreach my $ext (split(/,/, $FNA_FILES)) {
-      start_fork() and next;
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
       my $fname = $bfname.".fna";
 
       if (!$OVERWRITE_FILES && -s "$domain_dir/$fname") {
+        ++$existing_files;
+      } else {
+        ++$downloaded_files;
+      }
+
+      if (!$OVERWRITE_FILES && -s "$domain_dir/$fname") {
         print STDERR "$domain_dir/$fname exists - not downloading.. \n" if $VERBOSE;
       } else {
+        start_fork() and next;
         download($full_ftp_path, "$domain_dir/$fname.gz", "$domain_dir/$fname");
+        end_fork();
       }
 
       if ($CHANGE_HEADER) {
@@ -470,18 +537,19 @@ sub download_domain(@) {
 
       ## Output sequenceID to taxonomy ID map to STDOUT
       
-      print_header_lines("$domain_dir/$fname", $taxid, "$organism_name $assembly_accession");
+      print_header_lines("$domain_dir/$fname", $taxid, "$assembly_accession $organism_name");
 
       if ($DO_DUST) {
+        start_fork() and next;
         ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
         system("dustmasker -infmt fasta -in '$domain_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$domain_dir/${bfname}_dustmasked.fna'");
         unlink("$domain_dir/$fname");
+        end_fork();
       }
-      end_fork();
     }
   }
 
   wait_children();
 
-  print STDERR "\n";
+  print STDERR "  downloaded $downloaded_files files, $existing_files already existed.\n";
 }
