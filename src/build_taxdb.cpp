@@ -36,11 +36,11 @@ int main(int argc, char **argv) {
       return 1;
     }
         
-    TaxonomyDB<uint32_t, uint32_t> taxdb;
+    TaxonomyDB<uint32_t> taxdb;
     if (argc == 2) {
-    taxdb = TaxonomyDB<uint32_t, uint32_t> ((string)argv[1]);
+    taxdb = TaxonomyDB<uint32_t> ((string)argv[1]);
     } else {
-    taxdb = TaxonomyDB<uint32_t, uint32_t> ((string)argv[1], (string)argv[2]);
+    taxdb = TaxonomyDB<uint32_t> ((string)argv[1], (string)argv[2]);
     }
     if (argc == 4) {
         ifstream ifs(argv[3]);

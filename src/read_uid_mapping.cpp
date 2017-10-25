@@ -38,8 +38,8 @@ int main(int argc, char **argv) {
       uint32_t UID = atol(argv[i]);
       vector<uint32_t> taxids = get_taxids_for_uid(UID, fptr);
       cout << UID << '\t';
-      for (auto t : taxids) {
-        cout << t << ' ';
+      for (auto it = taxids.begin(); it != taxids.end(); ++it) {
+        cout << *it << ' ';
       }
       cout << endl;
     }

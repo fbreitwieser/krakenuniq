@@ -13,16 +13,18 @@ int main(int argc, char **argv) {
   }
 
 	cerr << "Reading taxonomy database from " << argv[1] << ", writing nodes dump to " << argv[3] << " and names dump to " << argv[2] << "." << endl;
-  TaxonomyDB<uint32_t, uint32_t> taxdb {(string)argv[1]};
+  TaxonomyDB<uint32_t> taxdb {(string)argv[1]};
   ofstream names_file(argv[2]);
   names_file.exceptions(ifstream::failbit | ifstream::badbit);
   ofstream nodes_file(argv[3]);
   nodes_file.exceptions(ifstream::failbit | ifstream::badbit);
 
-  for (const auto &taxon : taxdb.taxIDsAndEntries) {
+  for (auto it = taxdb.entries.begin(); it != taxdb.entries.end(); ++it) {
+    const auto &taxon = *it;
     std::string scientificName;
+    uint32_t parentTaxonomyID = taxon.second.parent == NULL? taxon.first : taxon.second.parent->taxonomyID;
     nodes_file << taxon.second.taxonomyID 
-      << "\t|\t" << taxon.second.parentTaxonomyID
+      << "\t|\t" << parentTaxonomyID
       << "\t|\t" << taxon.second.rank
       << endl; // there are further columns, but Kraken does not care about them
     
