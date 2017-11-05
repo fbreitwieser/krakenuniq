@@ -173,7 +173,7 @@ template<typename TAXID>
 class TaxonomyEntry {
  public:
   TAXID taxonomyID;
-  TaxonomyEntry* parent;
+  TaxonomyEntry<TAXID>* parent;
   std::vector<TaxonomyEntry*> children;
 
   string rank;
@@ -183,7 +183,7 @@ class TaxonomyEntry {
 
   TaxonomyEntry() : taxonomyID(0), parent(NULL), genomeSize(0), genomeSizeOfChildren(0) {}
 
-  TaxonomyEntry(TAXID taxonomyID_, TaxonomyEntry* parent_, std::string rank_, std::string scientificName_, uint64_t genomeSize_ = 0, uint64_t genomeSizeOfChildren_ = 0) :
+  TaxonomyEntry(TAXID taxonomyID_, TaxonomyEntry<TAXID>* parent_, std::string rank_, std::string scientificName_, uint64_t genomeSize_ = 0, uint64_t genomeSizeOfChildren_ = 0) :
 	  taxonomyID(taxonomyID_), parent(parent_), rank(rank_), scientificName(scientificName_),
       genomeSize(genomeSize_), genomeSizeOfChildren(genomeSizeOfChildren_) {
 	  
@@ -195,7 +195,16 @@ class TaxonomyEntry {
 
   inline bool operator==(const TaxonomyEntry& other) const; 
 
+  friend std::ostream &operator<<(std::ostream &os, const TaxonomyEntry<TAXID> &m) { 
+	TAXID parentTaxonomyID = (m.parent == NULL)? m.taxonomyID : m.parent->taxonomyID;
+    os << '[' << m.taxonomyID << ";parent="<< parentTaxonomyID << ";name=" << m.scientificName << ";rank=" << m.rank << ']';
+	return os;
+}
+
 };
+
+
+
 
 //template<>
 //TaxonomyEntry<uint32_t, uint64_t>::TaxonomyEntry () {
@@ -217,6 +226,16 @@ class TaxonomyDB {
   TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName);
   TaxonomyDB(const std::string inFileName, bool hasGenomeSizes = false);
   TaxonomyDB();
+
+  TaxonomyDB(TaxonomyDB&& rhs) : entries(std::move(rhs.entries)) {
+  }
+
+  TaxonomyDB& operator=(TaxonomyDB&& rhs) {
+	entries = std::move(rhs.entries);
+	return *this;
+  }
+
+
   void writeTaxonomyIndex(std::ostream & outs) const;
   void readTaxonomyIndex(const std::string inFileName, bool hasGenomeSizes);
 
@@ -257,12 +276,6 @@ class TaxonomyDB {
 
   std::unordered_map<TAXID, TaxonomyEntry<TAXID> >
         readTaxonomyIndex_(const std::string inFileName, bool hasGenomeSizes);
-  void parseNamesDump(const std::string namesDumpFileName);
-  std::unordered_map<TAXID,TAXID> parseNodesDump(const std::string nodesDumpFileName);
-  void createPointers(
-		  std::unordered_map<TAXID, TaxonomyEntry<TAXID> >& entries,
-		  const std::unordered_map<TAXID, TAXID>& parentMap
-		  );
 };
 
 
@@ -443,19 +456,24 @@ TaxonomyEntry<TAXID> TaxonomyDB<TAXID>::getEntry(TAXID taxID) const {
 }
 
 template<typename TAXID>
-void TaxonomyDB<TAXID>::createPointers(
+void createPointers(
 		std::unordered_map<TAXID, TaxonomyEntry<TAXID> >& entries, 
 		const std::unordered_map<TAXID, TAXID>& parentMap) {
-  for (auto it = entries.begin(); it != entries.end(); ++it) {
-	TAXID taxonomyID = it->first;
-	TAXID parentTaxonomyID = parentMap.at(taxonomyID);
-	if (taxonomyID != parentTaxonomyID) {
-	  auto parent_ptr = entries.find(parentTaxonomyID);
-	  if (parent_ptr != entries.end()) {
-		it->second.parent = &parent_ptr->second;
-		parent_ptr->second.children.push_back(&it->second);
-	  } else {
-		cerr << "Could not find parent with taxonomy ID " << parentTaxonomyID << " for taxonomy ID " << taxonomyID << endl;
+  for (auto entry_it = entries.begin(); entry_it != entries.end(); ++entry_it) {
+	TAXID taxonomyID = entry_it->first;
+	auto parent_it = parentMap.find(taxonomyID);
+	if (parent_it == parentMap.end()) {
+	  cerr << "Cannot find parent for " << taxonomyID << endl;
+	} else {
+	  TAXID parentTaxonomyID = parent_it->second;
+      if (taxonomyID != parentTaxonomyID) {
+	    auto parent_ptr = entries.find(parentTaxonomyID);
+	    if (parent_ptr != entries.end()) {
+		  entry_it->second.parent = &parent_ptr->second;
+		  parent_ptr->second.children.push_back(&entry_it->second);
+	    } else {
+		  cerr << "Could not find parent with taxonomy ID " << parentTaxonomyID << " for taxonomy ID " << taxonomyID << endl;
+	    }
 	  }
 	}
   }
@@ -470,16 +488,23 @@ TaxonomyDB<TAXID>::TaxonomyDB(const std::string inFileName, bool hasGenomeSizes)
  { }
 
 template<typename TAXID>
-TaxonomyDB<TAXID>::TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName) {
+unordered_map<TAXID, TaxonomyEntry<TAXID>> readDumps(const std::string namesDumpFileName, const std::string nodesDumpFileName) {
+  std::unordered_map<TAXID, TaxonomyEntry<TAXID> > entries;
   log_msg("Building taxonomy index from " + nodesDumpFileName + " and " + namesDumpFileName);
-  unordered_map<TAXID, TAXID> parentMap = parseNodesDump(nodesDumpFileName);
-  parseNamesDump(namesDumpFileName);
+  unordered_map<TAXID, TAXID> parentMap = parseNodesDump(nodesDumpFileName, entries);
   createPointers(entries, parentMap);
+  parseNamesDump(namesDumpFileName, entries);
   log_msg(". Done, got " + patch::to_string(entries.size()) + " taxa\n");
+  return(entries);
 }
 
 template<typename TAXID>
-std::unordered_map<TAXID,TAXID> TaxonomyDB<TAXID>::parseNodesDump(const std::string nodesDumpFileName) {
+TaxonomyDB<TAXID>::TaxonomyDB(const std::string namesDumpFileName, const std::string nodesDumpFileName) : 
+	entries(readDumps<TAXID>(namesDumpFileName, nodesDumpFileName)) {
+}
+
+template<typename TAXID>
+std::unordered_map<TAXID,TAXID> parseNodesDump(const std::string nodesDumpFileName, std::unordered_map<TAXID, TaxonomyEntry<TAXID> >& entries) {
   std::ifstream nodesDumpFile(nodesDumpFileName);
   if (!nodesDumpFile.is_open())
     throw std::runtime_error("unable to open nodes file");
@@ -510,7 +535,7 @@ std::unordered_map<TAXID,TAXID> TaxonomyDB<TAXID>::parseNodesDump(const std::str
 }
 
 template<typename TAXID>
-void TaxonomyDB<TAXID>::parseNamesDump(const std::string namesDumpFileName) {
+void parseNamesDump(const std::string namesDumpFileName, std::unordered_map<TAXID, TaxonomyEntry<TAXID> >& entries) {
   std::ifstream namesDumpFile(namesDumpFileName);
   if (!namesDumpFile.is_open())
     throw std::runtime_error("unable to open names file");
@@ -530,7 +555,8 @@ void TaxonomyDB<TAXID>::parseNamesDump(const std::string namesDumpFileName) {
     if (type == "scientific name") {
       auto entryIt = entries.find(taxonomyID);
      if (entryIt == entries.end()) {
-        entries[taxonomyID] = TaxonomyEntry<TAXID>(taxonomyID, NULL, "", scientificName);
+		 cerr << "Entry for " << taxonomyID << " does not exist - it should!" << '\n';
+        //entries[taxonomyID] = TaxonomyEntry<TAXID>(taxonomyID, NULL, "", scientificName);
       } else {
         entryIt->second.scientificName = scientificName;
       }
@@ -593,7 +619,8 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID> >
   std::unordered_map<TAXID, TAXID> parentMap;
   TAXID taxonomyID, parentTaxonomyID;
   std::string scientificName, rank;
-  uint64_t genomeSize, genomeSizeOfChildren = 0;
+  uint64_t genomeSize = 0;
+  uint64_t genomeSizeOfChildren = 0;
 
   std::string line;
   while (!inFile.eof()) {
@@ -1044,10 +1071,14 @@ void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID>& tax, unsigned 
 		case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << unique_kmers_for_clade; break;
 		case REPORTCOLS::NUM_KMERS:        _reportOfb << _readCounts[tax.taxonomyID].n_kmers; break;
 		case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << _readCountsIncludingChildren[tax.taxonomyID].n_kmers; break;
-    case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
-    case REPORTCOLS::CLADE_KMER_COVERAGE: if (genome_size == 0) { _reportOfb << "NA"; } else {
-       _reportOfb << setprecision(4) << (unique_kmers_for_clade  / genome_size); }; break;
-    case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(_readCountsIncludingChildren[tax.taxonomyID].n_kmers) / unique_kmers_for_clade ); break;
+		case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
+		case REPORTCOLS::CLADE_KMER_COVERAGE: 
+		  if (genome_size == 0) { 
+		    _reportOfb << "NA"; 
+		  } else {
+		   _reportOfb << setprecision(4) << (unique_kmers_for_clade  / genome_size); 
+		  }; break;
+		case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(_readCountsIncludingChildren[tax.taxonomyID].n_kmers) / unique_kmers_for_clade ); break;
 		case REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
 		//case REPORTCOLS::GENOME_SIZE: ; break;
 		//case REPORTCOLS::NUM_WEIGHTED_READS: ; break;

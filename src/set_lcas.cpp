@@ -180,11 +180,12 @@ uint32_t get_new_taxid(
   if (it == name_to_taxid_map.end()) {
     uint32_t new_taxid = ++New_taxid_start;
     bool insert_res = taxdb.insert(new_taxid, parent_taxid, rank_name, name);
+    cerr << "Adding assembly: " << name << " with taxid " << new_taxid;
     if (!insert_res) {
       return 0;
     }
+    cerr << "Oida " << (insert_res? "success" : "naaa") << endl;
     // insert_res shows if insert failed, but we don't care
-    // cerr << "Adding assembly: " << name << " with taxid " << new_taxid << endl;
     Parent_map[new_taxid] = parent_taxid;
     name_to_taxid_map[name] = new_taxid;
     return new_taxid;

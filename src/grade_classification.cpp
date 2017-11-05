@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     std::cerr << "Usage: grade_classification taxDB seqid2taxid.map classification_file result_file\n";
     return 1;
   }
-  TaxonomyDB<uint32_t> taxdb = TaxonomyDB<uint32_t>(argv[1], false);
+  TaxonomyDB<uint32_t> taxdb (argv[1], false);
   unordered_map<string, uint32_t> seqid_map = read_seqid_mapping(argv[2]);
   
   ofstream out_file(argv[4]);
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
       // getLowestCommonAncestor returns lca taxon as well as distance between the taxa
       pair<uint32_t, int> lca_taxid_dist = taxdb.getLowestCommonAncestor(seq_taxid, identified_taxid);
       string lca_rank_string = taxdb.getNextProperRank(lca_taxid_dist.first);
-      TaxRank::RANK lca_rank = TaxRank::toRank(lca_rank_string);
+      // TaxRank::RANK lca_rank = TaxRank::toRank(lca_rank_string);
 
       TaxRank::RANK identified_rank = TaxRank::toRank(taxdb.getRank(identified_taxid));
       for (size_t i=0; i < ranks_of_interest.size(); ++i) {
