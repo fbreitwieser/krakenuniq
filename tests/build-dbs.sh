@@ -51,9 +51,10 @@ HELP=false
 DRY_RUN=false
 K=31
 THREADS=10
+PATH1="."
 
 USAGE="
-`basename $0` [options] {kraken,kaiju} {viral|all-viral|prok|oct2017|euk-oct2017}
+`basename $0` [options] {kraken,kaiju} {viral|all-viral|prok|oct2017|euk-oct2017|archaea}
 
 Options:
   -k KMER_SIZE     default $K
@@ -92,6 +93,7 @@ for VAR in $@; do
     viral)     build_db $PROG $K 12 viral viral ;;
     all-viral) build_db $PROG $K 12 all-viral viral viral-neighbors  ;;
     prok)      build_db $PROG $K 15 prok archaea-dusted bacteria-dusted ;;
+    archaea)   build_db $PROG $K 15 archaea archaea ;;
     oct2017)   build_db $PROG $K 15 oct2017 archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
                                vertebrate_mammalian contaminants ;;
     euk-oct2017)

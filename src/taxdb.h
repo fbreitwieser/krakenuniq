@@ -432,14 +432,15 @@ template<typename TAXID>
 unordered_map<TAXID, TAXID> TaxonomyDB<TAXID>::getParentMap() const {
 	unordered_map<TAXID, TAXID> Parent_map;
 	//for (const auto & tax : entries) {
-	for (auto it = entries.begin(); it != entries.end(); ++it) {
-		const auto&tax = *it;
-		if (tax.first != 0) 
+	for (auto tax_it = entries.begin(); tax_it != entries.end(); ++tax_it) {
+		if (tax_it->first == 0) 
 			continue;
-		if (tax.second.parent == NULL)
-			Parent_map[tax.first] = 0; // for kraken::lca
-		else
-			Parent_map[tax.first] = tax.second.parent->taxonomyID;
+		if (tax_it->second.parent == NULL) {
+			//cerr << "Parent for " << tax.first << " is 0\n";
+			Parent_map[tax_it->first] = 0; // for kraken::lca
+		} else {
+			Parent_map[tax_it->first] = tax_it->second.parent->taxonomyID;
+		}
     }
 	return Parent_map;
 }
@@ -639,8 +640,9 @@ std::unordered_map<TAXID, TaxonomyEntry<TAXID> >
     }
     TaxonomyEntry<TAXID> newEntry(taxonomyID, NULL, rank, scientificName, genomeSize, genomeSizeOfChildren);
 
-    auto insert_res = entries.insert({ taxonomyID, newEntry });
-	parentMap[taxonomyID] = parentTaxonomyID;
+    //auto insert_res = entries.insert({ taxonomyID, newEntry });
+    entries.insert({ taxonomyID, newEntry });
+    parentMap[taxonomyID] = parentTaxonomyID;
   }
   entries.insert({0, {0, NULL, "no rank", "unclassified" }});
   //entries.insert({-1, {-1, 0, "no rank", "uncategorized" }});

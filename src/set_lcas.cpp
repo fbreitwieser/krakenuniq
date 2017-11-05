@@ -180,11 +180,10 @@ uint32_t get_new_taxid(
   if (it == name_to_taxid_map.end()) {
     uint32_t new_taxid = ++New_taxid_start;
     bool insert_res = taxdb.insert(new_taxid, parent_taxid, rank_name, name);
-    cerr << "Adding assembly: " << name << " with taxid " << new_taxid;
+    //cerr << "Adding assembly: " << name << " with taxid " << new_taxid;
     if (!insert_res) {
       return 0;
     }
-    cerr << "Oida " << (insert_res? "success" : "naaa") << endl;
     // insert_res shows if insert failed, but we don't care
     Parent_map[new_taxid] = parent_taxid;
     name_to_taxid_map[name] = new_taxid;
@@ -214,7 +213,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
         New_taxid_start = it->first+100;
       } 
     }
-    cerr << "Starting new taxonomy IDs with " << (New_taxid_start+1) << endl;
+    cerr << "[starting new taxonomy IDs with " << (New_taxid_start+1) << ']';
   }
 
   // Used when adding new taxids for assembly or sequence
@@ -253,7 +252,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
   if (ID_to_taxon_map.size() == 0) {
     cerr << "Error: No ID mappings present!!" << endl;
   }
-  cerr << " Done - read " << ID_to_taxon_map.size() << " mappings." << endl;
+  cerr << " got " << ID_to_taxon_map.size() << " mappings." << endl;
   return std::move(ID_to_taxon_map);
 }
 
@@ -322,7 +321,7 @@ void process_single_file() {
     //}
 
     if (taxid) {
-      if (Parent_map.find(taxid) == Parent_map.end()) {
+      if (Parent_map.find(taxid) == Parent_map.end() || taxdb.entries.find(taxid) == taxdb.entries.end()) {
         cerr << "Ignoring sequence for taxID " << taxid << " - not in taxDB\n";
       } else {
         #pragma omp parallel for schedule(dynamic)
