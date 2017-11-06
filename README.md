@@ -1,9 +1,9 @@
-Kraken taxonomic sequence classification system with unique k-mer counting
+KrakenHLL taxonomic sequence classification system with unique k-mer counting
 ===============================================
 
 [Kraken](https://github.com/DerrickWood/kraken) is a fast taxonomic classifier for metagenomics data. This project, kraken-hll, adds some additional functionality - most notably a unique k-mer count using the HyperLogLog algorithm. Spurious identifications due to sequence contamination in the dataset or database often leads to many reads, however they usually cover only a small portion of the genome. 
 
-kraken-hll adds two additional columns to the Kraken report - total number of k-mers observed for taxon, and the total number of unique k-mers observed for taxon (columns 3 and 4, resp.). 
+KrakenHLL adds two additional columns to the Kraken report - total number of k-mers observed for taxon, and the total number of unique k-mers observed for taxon (columns 3 and 4, resp.). 
 
 Here's a small example of a classification against a viral database with k=25. There are three species identified by just one read - Enterobacteria phage BP-4795, Salmonella phage SEN22, Sulfolobus monocaudavirus SMV1. Out of those, the identification of Salmonella phage SEN22 is the strongest, as there read was matched with 116 k-mers that are unique to the sequence, while the match to Sulfolobus monocaudavirus SMV1 is only based on a single 25-mer.
 
@@ -33,13 +33,13 @@ Here's a small example of a classification against a viral database with k=25. T
 
 ## Usage
 
-For usage, see `krakenu --help`. Note that you can use the same database as Kraken with one difference - instead of the files `DB_DIR/taxonomy/nodes.dmp` and `DB_DIR/taxonomy/names.dmp` than kraken relies upon, `kraken-hll` needs the file `DB_DIR/taxDB`. This can be generated with the script `build_taxdb`: `KRAKEN_DIR/build_taxdb DB_DIR/taxonomy/names.dmp DB_DIR/taxonomy/nodes.dmp > DB_DIR/taxDB`. The code behind the taxDB is based on [k-SLAM](https://github.com/aindj/k-SLAM).
+For usage, see `krakenhll --help`. Note that you can use the same database as Kraken with one difference - instead of the files `DB_DIR/taxonomy/nodes.dmp` and `DB_DIR/taxonomy/names.dmp` than kraken relies upon, `kraken-hll` needs the file `DB_DIR/taxDB`. This can be generated with the script `build_taxdb`: `KRAKEN_DIR/build_taxdb DB_DIR/taxonomy/names.dmp DB_DIR/taxonomy/nodes.dmp > DB_DIR/taxDB`. The code behind the taxDB is based on [k-SLAM](https://github.com/aindj/k-SLAM).
 
 ### Differences to `kraken`
- - Use `krakenu --report-file FILENAME ...` to write the kraken report to `FILENAME`.
- - Use `krakenu --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenu-build --generate-taxonomy-ids-for-sequences` since the taxDB between the databases has to be absolutely the same.
+ - Use `krakenhll --report-file FILENAME ...` to write the kraken report to `FILENAME`.
+ - Use `krakenhll --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenhll-build --generate-taxonomy-ids-for-sequences` since the taxDB between the databases has to be absolutely the same.
  - Add a suffix `.gz` to output files to generate gzipped output files
 
 ### Differences to `kraken-build`
- - Use `krakenu-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
+ - Use `krakenhll-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
  - `seqid2taxid.map` mapping sequence IDs to taxonomy IDs does NOT parse or require `>gi|`, but rather the sequence ID is the header up to just before the first space

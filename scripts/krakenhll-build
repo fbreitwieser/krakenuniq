@@ -86,7 +86,7 @@ $hash_size = "";
 $max_db_size = "";
 $add_taxonomy_ids_for_genome = 0;
 $add_taxonomy_ids_for_seq = 0;
-$build_uid_database = 1;
+$build_uid_database = 0;
 $build_lca_database = 1;
 
 # variables corresponding to task options
@@ -260,7 +260,6 @@ Options:
   --shrink-block-offset NUM  When shrinking, select the k-mer that is NUM
                              positions from the end of a block of k-mers
                              (default: 1)
-  --uid-database             Build a UID database (default no)
   --lca-database             Build a LCA database (default yes)
   --no-lca-database          Do not build a LCA database
   --work-on-disk             Perform most operations on disk rather than in
@@ -273,6 +272,9 @@ Options:
                              for one taxonomy ID.
   --library-dir DIR          Use DIR for reference sequences instead of DBDIR/library.
   --taxonomy-dir DIR         Use DIR for taxonomy instead of DBDIR/taxonomy.
+
+Experimental:
+  --uid-database             Build a UID database (default no)
 EOF
   exit $exit_code;
 }
@@ -288,7 +290,7 @@ sub display_version {
 }
 
 sub download_taxonomy {
-  exec "krakenu-download_taxonomy.sh";
+  exec "krakenhll-download_taxonomy.sh";
 }
 
 sub download_library {
@@ -297,12 +299,12 @@ sub download_library {
     warn "Unknown library type \"$type\"\n";
     usage();
   }
-  exec "krakenu-download_genomic_library.sh", $type;
+  exec "krakenhll-download_genomic_library.sh", $type;
 }
 
 sub add_to_library {
   my $arg = shift;
-  exec "krakenu-add_to_library.sh", $arg;
+  exec "krakenhll-add_to_library.sh", $arg;
 }
 
 sub shrink_db {
@@ -313,11 +315,11 @@ sub shrink_db {
   if (! defined($new_db)) {
     die "Must specify new database name to perform shrink task\n";
   }
-  exec "krakenu-shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
+  exec "krakenhll-shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
 }
 
 sub standard_installation {
-  exec "krakenu-standard_installation.sh";
+  exec "krakenhll-standard_installation.sh";
 }
 
 sub build_database {
@@ -340,13 +342,13 @@ sub build_database {
   $ENV{"KRAKEN_LIBRARY_DIRS"} = "@library_dirs";
   $ENV{"KRAKEN_TAXONOMY_DIR"} = $taxonomy_dir;
   my $opt = ($verbose? "-x" : "");
-  exec "krakenu-build_db.sh";
+  exec "krakenhll-build_db.sh";
 }
 
 sub clean_database {
-  exec "krakenu-clean_db.sh";
+  exec "krakenhll-clean_db.sh";
 }
 
 sub upgrade_database {
-  exec "krakenu-upgrade_db.sh";
+  exec "krakenhll-upgrade_db.sh";
 }

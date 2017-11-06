@@ -32,7 +32,7 @@ using namespace std;
 
 // experimentally determined threshold values for  p - 4
 static const uint32_t threshold[] = {10, 20, 40, 80, 220, 400, 900, 1800, 3100,
-							  6500, 11500, 20000, 50000, 120000, 350000};
+				  6500, 11500, 20000, 50000, 120000, 350000};
 
 
 ///////////////////////
@@ -69,6 +69,7 @@ inline uint64_t ranhash (uint64_t u) {
   return v;
 }
 
+// from https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 inline uint64_t murmurhash3_finalizer (uint64_t key)  {
 	key += 1; // murmurhash returns a hash value of 0 for the key 0 - avoid that.
 	key ^= key >> 33;

@@ -17,8 +17,8 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KRAKENUTIL_HPP
-#define KRAKENUTIL_HPP
+#ifndef KRAKENHLLTIL_HPP
+#define KRAKENHLLTIL_HPP
 
 #include "kraken_headers.hpp"
 #include <unordered_map>

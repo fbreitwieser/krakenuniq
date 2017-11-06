@@ -222,7 +222,6 @@ Usage: $PROG [options] <filename(s)>
 Options:
   --db NAME               Name for Kraken DB (default: $default_db)
   --report-file FILENAME  Write Kraken report to FILENAME
-  --uid-mapping           Map using UID database
   --threads NUM           Number of threads (default: $def_thread_ct)
   --fasta-input           Input is FASTA format
   --fastq-input           Input is FASTQ format
@@ -245,6 +244,9 @@ Options:
                           with each other; ignored if --paired is not specified
   --help                  Print this message
   --version               Print version information
+
+Experimental:
+  --uid-mapping           Map using UID database
 
 If none of the *-input or *-compressed flags are specified, and the 
 file is a regular file, automatic format detection is attempted.

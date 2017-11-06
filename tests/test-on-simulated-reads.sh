@@ -29,10 +29,10 @@ run_kraken() {
 
   if [[ "$PROG" == "kraken" ]]; then 
     CMD="kraken"
-  elif [[ "$PROG" == "krakenu" ]]; then
-    CMD="$DIR/install/krakenu --report-file $KFILE.report"
-  elif [[ "$PROG" == "krakenuid" ]]; then
-    CMD="$DIR/install/krakenu --report-file $KFILE.report --uid-mapping"
+  elif [[ "$PROG" == "krakenhll" ]]; then
+    CMD="$DIR/install/krakenhll --report-file $KFILE.report"
+  elif [[ "$PROG" == "krakenhull" ]]; then
+    CMD="$DIR/install/krakenhll --report-file $KFILE.report --uid-mapping"
   else 
     echo "Unknown $PROG"
     return;
@@ -61,14 +61,14 @@ for i in 1; do # 2 3
       FQ=$SDIR/$NAM.fq
       [[ -f $FQ ]] || randomreads.sh -Xmx40g ref=$DIR/data/all-$dat.fna out=$FQ reads=$AB len=$len seed=$i
       for K in 31; do
-        # run_kraken $FQ $NAM $dat viral $K krakenuid
+        # run_kraken $FQ $NAM $dat viral $K krakenhllid
         if [[ `uname` != "Darwin" ]]; then
           run_kraken $FQ $NAM $dat oct2017 $K kraken ALWAYS_SEQMAP
-          run_kraken $FQ $NAM $dat oct2017 $K krakenu ALWAYS_SEQMAP
-          run_kraken $FQ $NAM $dat oct2017 $K krakenuid ALWAYS_SEQMAP
+          run_kraken $FQ $NAM $dat oct2017 $K krakenhll ALWAYS_SEQMAP
+          run_kraken $FQ $NAM $dat oct2017 $K krakenhllid ALWAYS_SEQMAP
         else
           run_kraken $FQ $NAM $dat viral $K kraken
-          run_kraken $FQ $NAM $dat viral $K krakenu
+          run_kraken $FQ $NAM $dat viral $K krakenhll
         fi
       done
     done
