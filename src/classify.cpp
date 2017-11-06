@@ -19,7 +19,7 @@
 
 #include "kraken_headers.hpp"
 #include "krakendb.hpp"
-#include "krakenutil.hpp"
+#include "krakenhlltil.hpp"
 #include "quickfile.hpp"
 #include "seqreader.hpp"
 #include "readcounts.hpp"

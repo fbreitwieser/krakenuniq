@@ -30,11 +30,11 @@ then
   WOD_FLAG="--work-on-disk"
 fi
 
-krakenu-check_for_jellyfish.sh
-krakenu-download -o $KRAKEN_DB_NAME/taxonomy --download-taxonomy
-krakenu-download -o $KRAKEN_DB_NAME/library -d archaea,bacteria refseq > $KRAKEN_DB_NAME/seqid2taxid.map
-krakenu-download -o $KRAKEN_DB_NAME/library -d viral -a Any refseq >> $KRAKEN_DB_NAME/seqid2taxid.map
-krakenu-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \
+krakenhll-check_for_jellyfish.sh
+krakenhll-download -o $KRAKEN_DB_NAME/taxonomy --download-taxonomy
+krakenhll-download -o $KRAKEN_DB_NAME/library -d archaea,bacteria refseq > $KRAKEN_DB_NAME/seqid2taxid.map
+krakenhll-download -o $KRAKEN_DB_NAME/library -d viral -a Any refseq >> $KRAKEN_DB_NAME/seqid2taxid.map
+krakenhll-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \
                --jellyfish-hash-size "$KRAKEN_HASH_SIZE" \
                --max-db-size "$KRAKEN_MAX_DB_SIZE" \
                --minimizer-len $KRAKEN_MINIMIZER_LEN \

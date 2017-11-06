@@ -54,7 +54,7 @@ script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
-JELLYFISH_BIN=`$script_dir/krakenu-check_for_jellyfish.sh`
+JELLYFISH_BIN=`$script_dir/krakenhll-check_for_jellyfish.sh`
 NCBI_SERVER="ftp.ncbi.nih.gov"
 FTP_SERVER="ftp://$NCBI_SERVER"
 
@@ -267,7 +267,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   REPNAME=database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
-    krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    krakenhll --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 
@@ -300,7 +300,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    krakenu --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
+    krakenhll --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
   fi
 fi
 

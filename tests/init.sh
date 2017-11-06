@@ -4,15 +4,15 @@ set -xeu
 
 [[ $# -eq 1 ]] && DIR=$1 || DIR=`pwd`
 
-## Install KrakenU locally into install/
+## Install KrakenHLL locally into install/
 #$(dirname $0)/../install_kraken.sh --install-jellyfish $DIR/install
 
 ## Download taxonomy and genomic data into data/
-time $DIR/install/krakenu-download --db $DIR/data -R taxonomy refseq/archaea refseq/bacteria
-time $DIR/install/krakenu-download --db $DIR/data -R --include-viral-neighbors refseq/viral/Any
-time $DIR/install/krakenu-download --db $DIR/data -R refseq/fungi refseq/fungi/Chromosome refseq/protozoa refseq/protozoa/Chromosome
-time $DIR/install/krakenu-download --db $DIR/data --fna rna,genomic -R refseq/vertebrate_mammalian/Chromosome/taxid9606 
-time $DIR/install/krakenu-download --db $DIR/data -R contaminants
+time $DIR/install/krakenhll-download --db $DIR/data -R taxonomy refseq/archaea refseq/bacteria
+time $DIR/install/krakenhll-download --db $DIR/data -R --include-viral-neighbors refseq/viral/Any
+time $DIR/install/krakenhll-download --db $DIR/data -R refseq/fungi refseq/fungi/Chromosome refseq/protozoa refseq/protozoa/Chromosome
+time $DIR/install/krakenhll-download --db $DIR/data --fna rna,genomic -R refseq/vertebrate_mammalian/Chromosome/taxid9606 
+time $DIR/install/krakenhll-download --db $DIR/data -R contaminants
 
 for i in fungi protozoa viral viral-neighbors archaea bacteria; do 
   [[ -s "$DIR/data/all-$i.fna" ]] || find $DIR/data/library/$i -name '*.fna' -print0 | xargs -0 -n 100 cat > $DIR/data/all-$i.fna

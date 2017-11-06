@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 #vim: et:ts=2:sw=2
 
-# krakenu-download.pl - based on centrifuge-download
+# krakenhll-download.pl - based on centrifuge-download
 # (c) Florian Breitwieser, 2017
 
 use strict;

@@ -19,7 +19,7 @@ build_db() {
 
   if [[ "$PROG" == "kraken" ]]; then
     mkdir -p $DB_DIR
-    CMD="krakenu-build --kmer-len $K --minimizer-len $MIN --threads $THREADS --db $DB_DIR --build --taxids-for-genomes --taxids-for-sequences --taxonomy-dir=$DIR/data/taxonomy --uid-database"
+    CMD="krakenhll-build --kmer-len $K --minimizer-len $MIN --threads $THREADS --db $DB_DIR --build --taxids-for-genomes --taxids-for-sequences --taxonomy-dir=$DIR/data/taxonomy --uid-database"
     for L in $@; do
       CMD="$CMD  --library-dir=$DIR/data/library/$L"
     done

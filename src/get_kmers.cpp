@@ -20,7 +20,7 @@
 #include "kraken_headers.hpp"
 #include "quickfile.hpp"
 #include "krakendb.hpp"
-#include "krakenutil.hpp"
+#include "krakenhlltil.hpp"
 #include "seqreader.hpp"
 #include <unordered_map>
 
