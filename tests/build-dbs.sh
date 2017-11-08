@@ -20,7 +20,7 @@ build_db() {
   for L in $@; do
     CMD="$CMD  --library-dir=$DIR/data/library/$L"
   done
-  #if [[ ! -f "$DB_DIR/is.busy" ]]; then
+  if [[ ! -f "$DB_DIR/is.busy" ]]; then
     echo "EXECUTING $CMD"
     touch $DB_DIR/is.busy
     $CMD 2>&1 | tee $DIR/dbs/$DB_NAM/build.log
@@ -30,9 +30,9 @@ build_db() {
       dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp
     fi
     rm $DB_DIR/is.busy
-  #else 
-  #  echo "IGNORING $DB_DIR"
-  #fi
+  else 
+    echo "$DB_DIR/is.busy exists, ignoring directory."
+  fi
 }
 
 K=$1; shift;
