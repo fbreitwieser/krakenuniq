@@ -19,7 +19,7 @@
 
 #include "assert_helpers.h"
 #include "kraken_headers.hpp"
-#include "krakenutil.hpp"
+#include "krakenhlltil.hpp"
 #include <unordered_set>
 #include<algorithm>
 
@@ -58,14 +58,25 @@ namespace kraken {
       return a ? a : b;
 
     unordered_set<uint32_t> a_path;
-    while (a > 0) {
+    while (a > 1) {
       a_path.insert(a);
-      a = parent_map.at(a);
+      auto a_it = parent_map.find(a);
+      if (a_it == parent_map.end()) {
+        cerr << "No parent for " << a << "!\n";
+        break;
+      } 
+      a = a_it->second;
     }
-    while (b > 0) {
+    while (b > 1) {
       if (a_path.count(b) > 0)
         return b;
-      b = parent_map.at(b);
+
+      auto b_it = parent_map.find(b);
+      if (b_it == parent_map.end()) {
+        cerr << "No parent for " << b << "!\n";
+        break;
+      } 
+      b = b_it->second;
     }
     return 1;
   }

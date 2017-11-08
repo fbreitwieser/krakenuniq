@@ -7,11 +7,11 @@
 
 namespace kraken {
   struct ReadCounts {
-    uint64_t n_reads = 0;
-    uint64_t n_kmers = 0;
+    uint64_t n_reads;
+    uint64_t n_kmers;
     HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
 
-    ReadCounts() { }
+    ReadCounts() : n_reads(0), n_kmers(0) { }
 
     ReadCounts(size_t precision) : kmers(HyperLogLogPlusMinus<uint64_t>(precision)) {
     }

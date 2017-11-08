@@ -19,7 +19,7 @@
 
 #include "kraken_headers.hpp"
 #include "krakendb.hpp"
-#include "krakenutil.hpp"
+#include "krakenhlltil.hpp"
 #include "quickfile.hpp"
 #include "seqreader.hpp"
 #include "readcounts.hpp"
@@ -77,8 +77,15 @@ ostream *Report_output;
 vector<ofstream*> Open_fstreams;
 vector<ogzstream*> Open_gzstreams;
 size_t Work_unit_size = DEF_WORK_UNIT_SIZE;
-TaxonomyDB<uint32_t, ReadCounts> taxdb;
+TaxonomyDB<uint32_t> taxdb;
 static vector<KrakenDB*> KrakenDatabases (DB_filenames.size());
+
+struct db_status {
+  db_status() : current_bin_key(0), current_min_pos(1), current_max_pos(0) {}
+  uint64_t current_bin_key;
+  int64_t current_min_pos;
+  int64_t current_max_pos;
+};
 
 uint64_t total_classified = 0;
 uint64_t total_sequences = 0;
@@ -146,12 +153,8 @@ int main(int argc, char **argv) {
 
   if (!TaxDB_file.empty()) {
     // TODO: Define if the taxDB has read counts or not!!
-	  taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_file, false);
-      for (const auto & tax : taxdb.taxIDsAndEntries) {
-          if (tax.first != 0)
-            Parent_map[tax.first] = tax.second.parentTaxonomyID;
-      }
-      Parent_map[1] = 0;
+	  taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
+      Parent_map = taxdb.getParentMap();
   } else {
       cerr << "TaxDB argument is required!" << endl;
       return 1;
@@ -222,7 +225,8 @@ int main(int argc, char **argv) {
   std::cerr << "Finishing up ..\n";
 
   if (Print_kraken_report) {
-    for (auto fname : DB_filenames) {
+    for (size_t i = 0; i < DB_filenames.size(); ++i) {
+      const auto& fname = DB_filenames[i];
       ifstream ifs(fname + ".counts");
       if (ifs.good()) {
         ifs.close();
@@ -230,9 +234,8 @@ int main(int argc, char **argv) {
       }
     }
 
-	taxdb.setReadCounts(taxon_counts);
-	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, false);
-	rep.setReportCols({ 
+	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
+	rep.setReportCols(vector<string> { 
 		"%",
 		"reads", 
     "taxReads",
@@ -245,10 +248,13 @@ int main(int argc, char **argv) {
 	rep.printReport("kraken","blu");
   }
 
-  for (ofstream* ofs : Open_fstreams) {
+  for (size_t i = 0; i < Open_fstreams.size(); ++i) {
+    ofstream* ofs = Open_fstreams[i];
     ofs->close();
   }
-  for (ogzstream* ogzs : Open_gzstreams) {
+
+  for (size_t i = 0; i < Open_gzstreams.size(); ++i) {
+    ogzstream* ogzs = Open_gzstreams[i];
     ogzs->close();
   }
 
@@ -328,8 +334,8 @@ void process_file(char *filename) {
       #pragma omp critical(write_output)
       {
         total_classified += my_total_classified;
-        for (auto &it : my_taxon_counts) {
-            taxon_counts[it.first] += it.second;
+        for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end(); ++it) {
+            taxon_counts[it->first] += it->second;
         }
 
         if (Print_kraken)
@@ -374,6 +380,7 @@ inline void print_sequence(ostringstream* oss_ptr, const DNASequence& dna) {
       }
 }
 
+/*
 inline
 void append_hitlist_string(string& hitlist_string, uint32_t& last_taxon, uint32_t& last_counter, uint32_t current_taxon) {
   if (last_taxon == current_taxon) {
@@ -390,6 +397,7 @@ void append_hitlist_string(string& hitlist_string, uint32_t& last_taxon, uint32_
     last_taxon = current_taxon;
   }
 }
+*/
 
 string hitlist_string(const vector<uint32_t> &taxa, const vector<uint8_t> &ambig)
 {
@@ -428,7 +436,7 @@ string hitlist_string(const vector<uint32_t> &taxa, const vector<uint8_t> &ambig
   return hitlist.str();
 }
 
-
+/*
 string hitlist_string_depr(const vector<uint32_t> &taxa)
 {
   uint32_t last_code = taxa[0];
@@ -460,7 +468,7 @@ string hitlist_string_depr(const vector<uint32_t> &taxa)
   }
   return hitlist.str();
 }
-
+*/
 
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
@@ -471,13 +479,6 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   uint64_t *kmer_ptr;
   uint32_t taxon = 0;
   uint32_t hits = 0;  // only maintained if in quick mode
-
-
-  struct db_status {
-    uint64_t current_bin_key;
-    int64_t current_min_pos = 1;
-    int64_t current_max_pos = 0;
-  };
 
   //string hitlist_string;
   //uint32_t last_taxon;

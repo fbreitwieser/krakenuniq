@@ -1,7 +1,8 @@
 
 #include<iostream>
+#include<algorithm>
 #include "uid_mapping.hpp"
-#include "krakenutil.hpp"
+#include "krakenhlltil.hpp"
 #include "assert_helpers.h"
 
 using namespace std;
@@ -83,15 +84,18 @@ namespace kraken {
     for (auto it = uid_hit_counts.begin(); it != uid_hit_counts.end(); ++it) {
       uint32_t uid = it->first;
       double frac_count = ((double)it->second / (double)UID_to_taxids_vec[uid-1].size());
-      for (auto taxid : UID_to_taxids_vec[uid-1]) {
-        taxid_counts[taxid] += it->second;
-        frac_taxid_counts[taxid] += frac_count;
+      //for (auto taxid : UID_to_taxids_vec[uid-1]) {
+      for (auto taxid_it = UID_to_taxids_vec[uid-1].begin(); taxid_it != UID_to_taxids_vec[uid-1].end(); ++taxid_it) { // supporting gcc 4.4
+        taxid_counts[*taxid_it] += it->second;
+        frac_taxid_counts[*taxid_it] += frac_count;
       }
     }
     vector<uint32_t> max_taxids;
     uint32_t max_count = 0;
     double max_frac_count = 0;
-    for (auto it : taxid_counts) {
+    // for (auto it : taxid_counts) { 
+    for (auto itt = taxid_counts.begin(); itt != taxid_counts.end(); ++itt) {  // supporting gcc 4.4
+      const auto& it = *itt;
       if (it.second == max_count) {
         if (frac_taxid_counts[it.first] == max_frac_count) {
           max_taxids.push_back(it.first);
@@ -131,7 +135,8 @@ namespace kraken {
       return(0);
     }
 
-    for (const auto& it : uid_hit_counts) {
+    for (auto it1=uid_hit_counts.begin(); it1 != uid_hit_counts.end(); ++it1) { // supporting gcc 4.4
+      const auto &it = *it1;
       if (it.first == 0) {
         continue;
       }
@@ -139,7 +144,8 @@ namespace kraken {
       vector<uint32_t> taxids = get_taxids_for_uid(it.first, fptr);
 
       double frac_count = (double)it.second / (double)taxids.size();
-      for (uint32_t taxid : taxids) {
+      for (size_t i = 0; i < taxids.size(); ++i) { // supporting gcc 4.4
+        uint32_t taxid = taxids[i];
         frac_taxid_counts[taxid] += frac_count;
         taxid_counts[taxid] += it.second;
       }
@@ -151,7 +157,8 @@ namespace kraken {
     vector<uint32_t> max_taxids;
     uint32_t max_count = 0;
     double max_frac_count = 0;
-    for (auto it : taxid_counts) {
+    for (auto it1 = taxid_counts.begin(); it1 != taxid_counts.end(); ++it1) {
+      const auto& it = *it1;
       if (it.second == max_count) {
         if (frac_taxid_counts[it.first] == max_frac_count) {
           max_taxids.push_back(it.first);

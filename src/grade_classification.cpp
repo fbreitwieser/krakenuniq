@@ -10,10 +10,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <iomanip>
+#include <limits>
 
 using namespace std;
 
-using TAXID = uint32_t;
+//using TAXID = uint32_t;
+typedef uint32_t TAXID;
 
 unordered_map<string, uint32_t> read_seqid_mapping(string filename) {
   unordered_map<string, uint32_t> ID_to_taxon_map;
@@ -38,7 +40,7 @@ int main(int argc, char **argv) {
     std::cerr << "Usage: grade_classification taxDB seqid2taxid.map classification_file result_file\n";
     return 1;
   }
-  TaxonomyDB<uint32_t, uint32_t> taxdb = TaxonomyDB<uint32_t, uint32_t>(argv[1], false);
+  TaxonomyDB<uint32_t> taxdb (argv[1], false);
   unordered_map<string, uint32_t> seqid_map = read_seqid_mapping(argv[2]);
   
   ofstream out_file(argv[4]);
@@ -121,10 +123,11 @@ int main(int argc, char **argv) {
       // getLowestCommonAncestor returns lca taxon as well as distance between the taxa
       pair<uint32_t, int> lca_taxid_dist = taxdb.getLowestCommonAncestor(seq_taxid, identified_taxid);
       string lca_rank_string = taxdb.getNextProperRank(lca_taxid_dist.first);
-      TaxRank::RANK lca_rank = TaxRank::toRank(lca_rank_string);
+      // TaxRank::RANK lca_rank = TaxRank::toRank(lca_rank_string);
 
       TaxRank::RANK identified_rank = TaxRank::toRank(taxdb.getRank(identified_taxid));
-      for (TaxRank::RANK rank : ranks_of_interest) {
+      for (size_t i=0; i < ranks_of_interest.size(); ++i) {
+        TaxRank::RANK rank = ranks_of_interest[i];
         TAXID simulated_taxid_at_rank = taxdb.getTaxIDAtRank(seq_taxid, TaxRank::toString(rank));
         TAXID identified_taxid_at_rank = taxdb.getTaxIDAtRank(identified_taxid, TaxRank::toString(rank));
         simulated_taxids_at_rank[rank].insert(simulated_taxid_at_rank);
@@ -158,14 +161,15 @@ int main(int argc, char **argv) {
 
   if (0) {
     cout << "#LCA_RANK_READ_COUNTS" << endl;
-    for (const auto & kv : rank_counts) {
-      cout << kv.first << delim << kv.second << endl;
+    for (auto it = rank_counts.begin(); it != rank_counts.end(); ++it) {
+      cout << it->first << delim << it->second << endl;
     }
     cout << endl;
   }
 
   cout << "#rank" << delim << "total_reads" << delim << "correct"<< delim << "incorrect"<< delim << "sensitivity" << delim << "precision"  << delim << "higher_rank" << delim << "unidentified" << endl;
-  for (TaxRank::RANK rank : ranks_of_interest) {
+  for (size_t i=0; i < ranks_of_interest.size(); ++i) {
+    TaxRank::RANK rank = ranks_of_interest[i];
     size_t true_positives = correct_reads_at_rank.at(rank);
     size_t false_positives = incorrect_reads_at_rank.at(rank);
     double sensitivity = 100.0*(double)true_positives/(double)total_reads;
@@ -182,12 +186,14 @@ int main(int argc, char **argv) {
   }
 
   cout << "#rank" << delim << "true_count" << delim << "correct" << delim << "incorrect" << delim << "recall" << delim << "precision" << endl;
-  for (TaxRank::RANK rank : ranks_of_interest) {
+  for (size_t i=0; i < ranks_of_interest.size(); ++i) {
+    TaxRank::RANK rank = ranks_of_interest[i];
     size_t true_positives = 0;
     size_t false_positives = 0;
     
     if (identified_taxids_at_rank.find(rank) != identified_taxids_at_rank.end()) {
-    for (const auto & tid : identified_taxids_at_rank[rank]) {
+    for (auto it = identified_taxids_at_rank[rank].begin(); it != identified_taxids_at_rank[rank].end(); ++it) {
+      const auto & tid = *it;
       if (simulated_taxids_at_rank[rank].count(tid) == 1) {
         ++true_positives;
       } else {

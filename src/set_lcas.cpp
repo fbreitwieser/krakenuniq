@@ -21,7 +21,7 @@
 #include "kraken_headers.hpp"
 #include "quickfile.hpp"
 #include "krakendb.hpp"
-#include "krakenutil.hpp"
+#include "krakenhlltil.hpp"
 #include "seqreader.hpp"
 #include "taxdb.h"
 #include "readcounts.hpp"
@@ -75,7 +75,7 @@ unordered_map<string, uint32_t> ID_to_taxon_map;
 unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
 const size_t hll_prec = 10;
-TaxonomyDB<uint32_t, ReadCounts> taxdb;
+TaxonomyDB<uint32_t> taxdb;
 
 const string prefix = "kraken:taxid|";
 unordered_set<uint32_t> host_taxids = {9606};
@@ -90,13 +90,8 @@ int main(int argc, char **argv) {
   parse_command_line(argc, argv);
 
   if (!TaxDB_filename.empty()) {
-    taxdb = TaxonomyDB<uint32_t, ReadCounts>(TaxDB_filename);
-    for (const auto & tax : taxdb.taxIDsAndEntries) {
-      if (tax.first != 0)
-        Parent_map[tax.first] = tax.second.parentTaxonomyID;
-//      Children_map[tax.second.parentTaxonomyID].insert(tax.first);
-    }
-    Parent_map[1] = 0;
+    taxdb = TaxonomyDB<uint32_t>(TaxDB_filename);
+    Parent_map = taxdb.getParentMap();
   } else {
     cerr << "TaxDB argument is required!" << endl;
     return 1;
@@ -145,8 +140,8 @@ int main(int argc, char **argv) {
     ofstream ofs(Kmer_count_filename.c_str());
     cerr << "Writing kmer counts to " << Kmer_count_filename << "..." << endl;
     auto counts = Database.count_taxons();
-    for (auto const & kv : counts) {
-      ofs << kv.first << '\t' << kv.second << '\n';
+    for (auto it = counts.begin(); it != counts.end(); ++it) {
+      ofs << it->first << '\t' << it->second << '\n';
     }
     ofs.close();
   }
@@ -185,11 +180,11 @@ uint32_t get_new_taxid(
   if (it == name_to_taxid_map.end()) {
     uint32_t new_taxid = ++New_taxid_start;
     bool insert_res = taxdb.insert(new_taxid, parent_taxid, rank_name, name);
+    //cerr << "Adding assembly: " << name << " with taxid " << new_taxid;
     if (!insert_res) {
       return 0;
     }
     // insert_res shows if insert failed, but we don't care
-    // cerr << "Adding assembly: " << name << " with taxid " << new_taxid << endl;
     Parent_map[new_taxid] = parent_taxid;
     name_to_taxid_map[name] = new_taxid;
     return new_taxid;
@@ -199,7 +194,7 @@ uint32_t get_new_taxid(
 }
 
 unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_filename, 
-    TaxonomyDB<uint32_t, ReadCounts>& taxdb, unordered_map<uint32_t,uint32_t>& Parent_map, 
+    TaxonomyDB<uint32_t>& taxdb, unordered_map<uint32_t,uint32_t>& Parent_map, 
     bool Add_taxIds_for_Assembly, bool Add_taxIds_for_Sequences) {
 
   cerr << "Reading sequence ID to taxonomy ID mapping ... ";
@@ -213,12 +208,12 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
   uint32_t taxid;
 
   if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
-    for (const auto& k : taxdb.taxIDsAndEntries) {
-      if (k.first >= New_taxid_start) {
-        New_taxid_start = k.first;
+    for (auto it = taxdb.entries.begin(); it != taxdb.entries.end(); ++it) {
+      if (it->first >= New_taxid_start) {
+        New_taxid_start = it->first+100;
       } 
     }
-    cerr << "Starting new taxonomy IDs with " << (New_taxid_start+1) << endl;
+    cerr << "[starting new taxonomy IDs with " << (New_taxid_start+1) << ']';
   }
 
   // Used when adding new taxids for assembly or sequence
@@ -257,7 +252,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
   if (ID_to_taxon_map.size() == 0) {
     cerr << "Error: No ID mappings present!!" << endl;
   }
-  cerr << " Done - read " << ID_to_taxon_map.size() << " mappings." << endl;
+  cerr << " got " << ID_to_taxon_map.size() << " mappings." << endl;
   return std::move(ID_to_taxon_map);
 }
 
@@ -312,8 +307,8 @@ void process_single_file() {
     bool is_contaminant_taxid = taxid == 32630 || taxid == 81077;
     if (Add_taxIds_for_Sequences && taxid != 9606 && it_p->second != 9606) {
       // Update entry based on header line
-      auto entryIt = taxdb.taxIDsAndEntries.find(taxid);
-      if (entryIt == taxdb.taxIDsAndEntries.end()) {
+      auto entryIt = taxdb.entries.find(taxid);
+      if (entryIt == taxdb.entries.end()) {
         cerr << "Error! Didn't find taxid " << taxid << " in TaxonomyDB - can't update it!! ["<<dna.header_line<<"]" << endl;
       } else {
         entryIt->second.scientificName = dna.header_line;
@@ -326,7 +321,7 @@ void process_single_file() {
     //}
 
     if (taxid) {
-      if (Parent_map.find(taxid) == Parent_map.end()) {
+      if (Parent_map.find(taxid) == Parent_map.end() || taxdb.entries.find(taxid) == taxdb.entries.end()) {
         cerr << "Ignoring sequence for taxID " << taxid << " - not in taxDB\n";
       } else {
         #pragma omp parallel for schedule(dynamic)

@@ -20,9 +20,12 @@ using namespace std;
 //       - write the mapping to UID_map_file
 //
 
-using TaxidSet = vector<uint32_t>;
+//using TaxidSet = typename std::vector<uint32_t>;
+typedef std::vector<uint32_t> TaxidSet;
 
 namespace kraken {
+
+
 uint32_t uid_mapping(
       map< TaxidSet, uint32_t>& Taxids_to_UID_map, 
       vector< const TaxidSet* >& UID_to_taxids_vec, 
