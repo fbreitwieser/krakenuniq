@@ -29,7 +29,7 @@ build_db() {
       CMD="$CMD  $DIR/data/all-$L.fna"
     done
   fi
-  if [[ ! -f "$DB_DIR/is.busy" ]]; then
+  if [[ ! -f "$DB_DIR-is.busy" ]]; then
     echo "EXECUTING $CMD"
     touch $DB_DIR-is.busy
     $CMD 2>&1 | tee $DIR/dbs-$PROG/$DB_NAM-build.log
@@ -38,9 +38,9 @@ build_db() {
       echo "EXECUTING dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp"
       dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp
     fi
-    rm $DB_DIR-is.busy
+    rm $DB_DIR/is.busy
   else 
-    echo "$DB_DIR/is.busy exists, ignoring directory."
+    echo "$DB_DIR-is.busy exists, ignoring directory."
   fi
 }
 
