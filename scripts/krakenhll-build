@@ -86,7 +86,7 @@ $hash_size = "";
 $max_db_size = "";
 $add_taxonomy_ids_for_genome = 0;
 $add_taxonomy_ids_for_seq = 0;
-$build_uid_database = 1;
+$build_uid_database = 0;
 $build_lca_database = 1;
 
 # variables corresponding to task options
@@ -260,7 +260,6 @@ Options:
   --shrink-block-offset NUM  When shrinking, select the k-mer that is NUM
                              positions from the end of a block of k-mers
                              (default: 1)
-  --uid-database             Build a UID database (default no)
   --lca-database             Build a LCA database (default yes)
   --no-lca-database          Do not build a LCA database
   --work-on-disk             Perform most operations on disk rather than in
@@ -273,6 +272,9 @@ Options:
                              for one taxonomy ID.
   --library-dir DIR          Use DIR for reference sequences instead of DBDIR/library.
   --taxonomy-dir DIR         Use DIR for taxonomy instead of DBDIR/taxonomy.
+
+Experimental:
+  --uid-database             Build a UID database (default no)
 EOF
   exit $exit_code;
 }

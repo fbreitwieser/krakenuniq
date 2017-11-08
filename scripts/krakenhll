@@ -38,6 +38,7 @@ $ENV{"KRAKEN_DIR"} = $KRAKEN_DIR;
 $ENV{"PATH"} = "$KRAKEN_DIR:$ENV{PATH}";
 
 my $CLASSIFY = "$KRAKEN_DIR/classify";
+my $CREATE_TAXDB = "$KRAKEN_DIR/build_taxdb";
 my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
 my $BZIP2_MAGIC = "BZ";
 
@@ -90,6 +91,12 @@ if (! defined $threads) {
 if (! @ARGV) {
   print STDERR "Need to specify input filenames!\n";
   usage();
+}
+
+if (!defined $report_file) {
+  print STDERR "Need to specify a report file with --report-file!
+See --help for more details.\n";
+  exit 1;
 }
 
 eval { @db_prefix = map { krakenlib::find_db($_) } @db_prefix };
@@ -160,6 +167,16 @@ if ($uid_mapping) {
 
 }
 
+if (! -f $db_prefix[0]."/taxDB") {
+  print STDERR "Taxonomy database not at ".$db_prefix[0]."/taxDB - creating it ...";
+  die "$db_prefix[0]/taxonomy/nodes.dmp does not exist!" unless  -f $db_prefix[0]."/taxonomy/nodes.dmp";
+  die "$db_prefix[0]/taxonomy/names.dmp does not exist!" unless  -f $db_prefix[0]."/taxonomy/names.dmp";
+
+  my $cmd = "$CREATE_TAXDB $db_prefix[0]/taxonomy/names.dmp $db_prefix[0]/taxonomy/nodes.dmp > $db_prefix[0]/taxDB";
+  print STDERR "$cmd\n";
+  system $cmd;
+}
+
 # handle piping for decompression/merging
 my @pipe_argv;
 if ($paired) {
@@ -222,7 +239,6 @@ Usage: $PROG [options] <filename(s)>
 Options:
   --db NAME               Name for Kraken DB (default: $default_db)
   --report-file FILENAME  Write Kraken report to FILENAME
-  --uid-mapping           Map using UID database
   --threads NUM           Number of threads (default: $def_thread_ct)
   --fasta-input           Input is FASTA format
   --fastq-input           Input is FASTQ format
@@ -245,6 +261,9 @@ Options:
                           with each other; ignored if --paired is not specified
   --help                  Print this message
   --version               Print version information
+
+Experimental:
+  --uid-mapping           Map using UID database
 
 If none of the *-input or *-compressed flags are specified, and the 
 file is a regular file, automatic format detection is attempted.

@@ -33,7 +33,7 @@
 # ----------------------------------------------------------------------------
 
 # CXX      = CC -n32 -LANG:std   # for SGI Irix 6.5, MIPSpro CC version 7.30
-CXX      = g++   # for Linux RedHat 6.1, g++ version 2.95.2
+CXX      = g++-7   # for Linux RedHat 6.1, g++ version 2.95.2
 
 CPPFLAGS = -I. -O -fPIC
 LDFLAGS  = -L. -lgzstream -lz

@@ -34,7 +34,7 @@ namespace kraken {
   DNASequence FastaReader::next_sequence() {
     DNASequence dna;
 
-    if (! valid || ! file.good()) {
+    if (! file.good()) {
       valid = false;
       return dna;
     }

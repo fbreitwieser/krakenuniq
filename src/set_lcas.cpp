@@ -21,7 +21,7 @@
 #include "kraken_headers.hpp"
 #include "quickfile.hpp"
 #include "krakendb.hpp"
-#include "krakenhlltil.hpp"
+#include "krakenutil.hpp"
 #include "seqreader.hpp"
 #include "taxdb.h"
 #include "readcounts.hpp"

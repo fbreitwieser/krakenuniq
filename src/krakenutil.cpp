@@ -19,7 +19,7 @@
 
 #include "assert_helpers.h"
 #include "kraken_headers.hpp"
-#include "krakenhlltil.hpp"
+#include "krakenutil.hpp"
 #include <unordered_set>
 #include<algorithm>
 

@@ -69,6 +69,7 @@ inline uint64_t ranhash (uint64_t u) {
 /**
  * Avalanche mixer/finalizer from MurMurHash3
  * https://github.com/aappleby/smhasher
+ * from https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
  */
 inline uint64_t murmurhash3_finalizer (uint64_t key)  {
   key += 1; // murmurhash returns a hash value of 0 for the key 0 - avoid that.
@@ -152,6 +153,7 @@ void insert_hash(vector<uint32_t>& vec, uint32_t val) {
   }
 }
 
+/*
 inline 
 void merge_lists(vector<uint32_t>& vec1, const vector<uint32_t>& vec2) {
   auto it = std::lower_bound( vec.begin(), vec.end(), val); // find proper position in descending order
@@ -159,6 +161,7 @@ void merge_lists(vector<uint32_t>& vec1, const vector<uint32_t>& vec2) {
     vec.insert( it, val ); // insert before iterator it
   }
 }
+*/
 
 template<typename T>
 T extractBits(T bits, uint8_t hi) {

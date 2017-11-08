@@ -82,14 +82,16 @@ do
   fi
 done
 
-echo
-echo "Kraken installation complete."
-echo
-echo "To make things easier for you, you may want to copy/symlink the following"
-echo "files into a directory in your PATH:"
+echo -n "
+Kraken installation complete.
+
+To make things easier for you, you may want to copy/symlink the following
+files into a directory in your PATH:
+
+ln -s"
 for file in $KRAKEN_DIR/krakenhll*
 do
-  [ -x "$file" ] && echo "  $file"
+  [ -x "$file" ] && echo -n " $file"
 done
-
+echo " DEST_DIR"
 exit 0

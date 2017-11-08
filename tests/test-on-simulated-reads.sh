@@ -31,7 +31,7 @@ run_kraken() {
     CMD="kraken"
   elif [[ "$PROG" == "krakenhll" ]]; then
     CMD="$DIR/install/krakenhll --report-file $KFILE.report"
-  elif [[ "$PROG" == "krakenhllid" ]]; then
+  elif [[ "$PROG" == "krakenhull" ]]; then
     CMD="$DIR/install/krakenhll --report-file $KFILE.report --uid-mapping"
   else 
     echo "Unknown $PROG"
