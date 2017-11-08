@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
 
   if (!TaxDB_file.empty()) {
     // TODO: Define if the taxDB has read counts or not!!
-	  taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
+      taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
       Parent_map = taxdb.getParentMap();
   } else {
       cerr << "TaxDB argument is required!" << endl;
@@ -226,12 +226,20 @@ int main(int argc, char **argv) {
 
   if (Print_kraken_report) {
     for (size_t i = 0; i < DB_filenames.size(); ++i) {
-      const auto& fname = DB_filenames[i];
-      ifstream ifs(fname + ".counts");
+      const auto fname = DB_filenames[i] + ".counts";
+      ifstream ifs(fname);
       if (ifs.good()) {
         ifs.close();
-        taxdb.readGenomeSizes(fname+".counts");
+      } else {
+        ofstream ofs(fname);
+        cerr << "Writing kmer counts to " << fname << "... [only once for this database, may take a while] " << endl;
+        auto counts = KrakenDatabases[i]->count_taxons();
+        for (auto it = counts.begin(); it != counts.end(); ++it) {
+          ofs << it->first << '\t' << it->second << '\n';
+        }
+        ofs.close();
       }
+      taxdb.readGenomeSizes(fname);
     }
 
 	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
