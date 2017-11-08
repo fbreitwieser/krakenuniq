@@ -38,6 +38,7 @@ $ENV{"KRAKEN_DIR"} = $KRAKEN_DIR;
 $ENV{"PATH"} = "$KRAKEN_DIR:$ENV{PATH}";
 
 my $CLASSIFY = "$KRAKEN_DIR/classify";
+my $CREATE_TAXDB = "$KRAKEN_DIR/build_taxdb";
 my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
 my $BZIP2_MAGIC = "BZ";
 
@@ -90,6 +91,12 @@ if (! defined $threads) {
 if (! @ARGV) {
   print STDERR "Need to specify input filenames!\n";
   usage();
+}
+
+if (!defined $report_file) {
+  print STDERR "Need to specify a report file with --report-file!
+See --help for more details.\n";
+  exit 1;
 }
 
 eval { @db_prefix = map { krakenlib::find_db($_) } @db_prefix };
@@ -158,6 +165,16 @@ if ($uid_mapping) {
   push @flags, "-I", $uid_mapping_file; 
 } else {
 
+}
+
+if (! -f $db_prefix[0]."/taxDB") {
+  print STDERR "Taxonomy database not at ".$db_prefix[0]."/taxDB - creating it ...";
+  die "$db_prefix[0]/taxonomy/nodes.dmp does not exist!" unless  -f $db_prefix[0]."/taxonomy/nodes.dmp";
+  die "$db_prefix[0]/taxonomy/names.dmp does not exist!" unless  -f $db_prefix[0]."/taxonomy/names.dmp";
+
+  my $cmd = "$CREATE_TAXDB $db_prefix[0]/taxonomy/names.dmp $db_prefix[0]/taxonomy/nodes.dmp > $db_prefix[0]/taxDB";
+  print STDERR "$cmd\n";
+  system $cmd;
 }
 
 # handle piping for decompression/merging
