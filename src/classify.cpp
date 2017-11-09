@@ -115,19 +115,19 @@ ostream* cout_or_file(string file) {
 }
 
 void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename) {
-	QuickFile db_file;
-	db_file.open_file(DB_filename);
-	if (Populate_memory) {
-		db_file.load_file();
-	}
-	database = KrakenDB(db_file.ptr());
-	QuickFile idx_file;
-	idx_file.open_file(Index_filename);
-	if (Populate_memory)
-		idx_file.load_file();
+  QuickFile db_file;
+  db_file.open_file(DB_filename);
+  if (Populate_memory) {
+    db_file.load_file();
+  }
+  database = KrakenDB(db_file.ptr());
+  QuickFile idx_file;
+  idx_file.open_file(Index_filename);
+  if (Populate_memory)
+    idx_file.load_file();
 
-	KrakenDBIndex db_index(idx_file.ptr());
-	database.set_index(&db_index);
+  KrakenDBIndex db_index(idx_file.ptr());
+  database.set_index(&db_index);
 }
 
 int main(int argc, char **argv) {
@@ -243,18 +243,18 @@ int main(int argc, char **argv) {
       taxdb.readGenomeSizes(fname);
     }
 
-	TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
-	rep.setReportCols(vector<string> { 
-		"%",
-		"reads", 
+  TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
+  rep.setReportCols(vector<string> { 
+    "%",
+    "reads", 
     "taxReads",
     "kmers",
     "dup",
     "cov", 
-		"taxID", 
-		"rank", 
-		"taxName"});
-	rep.printReport("kraken","blu");
+    "taxID", 
+    "rank", 
+    "taxName"});
+  rep.printReport("kraken","blu");
   }
 
   for (size_t i = 0; i < Open_fstreams.size(); ++i) {
@@ -368,11 +368,11 @@ void process_file(char *filename) {
 
 inline
 uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& current_bin_key,
-		int64_t& current_min_pos, int64_t& current_max_pos) {
-	uint32_t* val_ptr = database.kmer_query(
-			database.canonical_representation(*kmer_ptr), &current_bin_key,
-			&current_min_pos, &current_max_pos);
-	return val_ptr ? *val_ptr : 0;
+    int64_t& current_min_pos, int64_t& current_max_pos) {
+  uint32_t* val_ptr = database.kmer_query(
+      database.canonical_representation(*kmer_ptr), &current_bin_key,
+      &current_min_pos, &current_max_pos);
+  return val_ptr ? *val_ptr : 0;
 }
 
 
@@ -513,10 +513,10 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
         taxon = get_taxon_for_kmer(*KrakenDatabases[i], kmer_ptr,
         db_statuses[i].current_bin_key, db_statuses[i].current_min_pos, db_statuses[i].current_max_pos);
 
-	  //uint32_t* val_ptr = KrakenDatabases[i]->kmer_query(
-		//	KrakenDatabases[i]->canonical_representation(*kmer_ptr), &db_statuses[i].current_bin_key,
-		//	&db_statuses[i].current_min_pos, &db_statuses[i].current_max_pos);
-	  //taxon = val_ptr ? *val_ptr : 0;
+        //uint32_t* val_ptr = KrakenDatabases[i]->kmer_query(
+        //  KrakenDatabases[i]->canonical_representation(*kmer_ptr), &db_statuses[i].current_bin_key,
+        //  &db_statuses[i].current_min_pos, &db_statuses[i].current_max_pos);
+        //taxon = val_ptr ? *val_ptr : 0;
           if (taxon) break;
         }
 

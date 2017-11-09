@@ -52,7 +52,6 @@ using namespace std;
 static const uint32_t threshold[] = {10, 20, 40, 80, 220, 400, 900, 1800, 3100,
                 6500, 11500, 20000, 50000, 120000, 350000};
 
-
 ///////////////////////
 
 //
@@ -118,7 +117,7 @@ double alpha(uint32_t m)  {
 /**
  * calculate the raw estimate as harmonic mean of the ranks in the register
  */
-double calculateEstimate(vector<uint8_t> M) {
+double calculateRawEstimate(vector<uint8_t> M) {
   double inverseSum = 0.0;
   for (size_t i = 0; i < M.size(); ++i) {
     // TODO: pre-calculate the power calculation
@@ -247,10 +246,6 @@ private:
   bool sparse;          // sparse representation of the data?
   SparseListType sparseList; // TODO: use a compressed list instead
 
-  // vectors containing data for bias correction
-  vector<vector<double> > rawEstimateData; // TODO: make this static
-  vector<vector<double> > biasData;
-
   // sparse versions of p and m
   static const uint8_t  pPrime = 25; // precision when using a sparse representation
                                      // fixed to 25, because 25 + 6 bits for rank + 1 flag bit = 32
@@ -266,12 +261,12 @@ public:
    * @param precision
    * @param sparse
    */
-  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true):p(precision),sparse(sparse) {
+  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true):p(precision),m(1<<precision),sparse(sparse) {
     if (precision > 18 || precision < 4) {
           throw std::invalid_argument("precision (number of register = 2^precision) must be between 4 and 18");
     }
 
-    this->m = 1 << precision;
+    //this->m = 1 << precision;
 
     if (sparse) {
       this->sparseList = SparseListType(); // TODO: if SparseListType is changed, initialize with appropriate size
@@ -436,39 +431,30 @@ public:
    */
   uint64_t cardinality(bool verbose=true) {
     if (sparse) {
-      // if we are still 'sparse', then use linear counting, which is more
-      //  accurate for low cardinalities, and use increased precision pPrime
+      // if we are 'sparse', then use linear counting with increased precision pPrime
       return uint64_t(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
     }
 
-    // initialize bias correction data
-    if (rawEstimateData.empty()) { initRawEstimateData(); }
-    if (biasData.empty())        { initBiasData(); }
+    // use linear counting (lc) estimate if there are zeros in the matrix
+    //  AND the lc estimate is smaller than an empirically defined threshold
+    uint32_t v = countZeros(M);
+    if (v != 0) {
+      uint64_t lc_estimate = linearCounting(m, v);
+      // check if the lc estimate is below the threshold
+      assert(lc_estimate >= 0);
+      if (lc_estimate <= double(threshold[p-4])) {
+        return lc_estimate;
+      }
+    }
 
     // calculate raw estimate on registers
     //double est = alpha(m) * harmonicMean(M, m);
-    double est = calculateEstimate(M);
-
+    double est = calculateRawEstimate(M);
     // correct for biases if estimate is smaller than 5m
     if (est <= double(m)*5.0) {
       est -= getEstimateBias(est);
     }
 
-    uint32_t v = countZeros(M);
-    if (v > 2) {
-      // calculate linear counting (lc) estimate if there are more than 2 zeros in the matrix
-      double lc_estimate = linearCounting(m, v);
-
-      // check if the lc estimate is below the threshold
-      if (lc_estimate <= double(threshold[p-4])) {
-        if (lc_estimate < 0) { throw; }
-        // return lc estimate of cardinality
-        return lc_estimate;
-      }
-      return lc_estimate; // always use lc_estimate when available
-    }
-
-    // return bias-corrected hyperloglog estimate of cardinality
     return uint64_t(est);
   }
 
@@ -516,57 +502,58 @@ private:
       return rank_val;
     }
 
-  void initRawEstimateData() {
-      rawEstimateData = vector<vector<double> >();
-
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision4,arr_len(rawEstimateData_precision4)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision5,arr_len(rawEstimateData_precision5)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision6,arr_len(rawEstimateData_precision6)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision7,arr_len(rawEstimateData_precision7)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision8,arr_len(rawEstimateData_precision8)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision9,arr_len(rawEstimateData_precision9)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision10,arr_len(rawEstimateData_precision10)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision11,arr_len(rawEstimateData_precision11)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision12,arr_len(rawEstimateData_precision12)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision13,arr_len(rawEstimateData_precision13)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision14,arr_len(rawEstimateData_precision14)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision15,arr_len(rawEstimateData_precision15)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision16,arr_len(rawEstimateData_precision16)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision17,arr_len(rawEstimateData_precision17)));
-      rawEstimateData.push_back(vector<double>(rawEstimateData_precision18,arr_len(rawEstimateData_precision18)));
-
+  vector<double> rawEstimateData(size_t p) {
+    switch (p) {
+      case  4: return vector<double>(rawEstimateData_precision4,arr_len(rawEstimateData_precision4));
+      case  5: return vector<double>(rawEstimateData_precision5,arr_len(rawEstimateData_precision5));
+      case  6: return vector<double>(rawEstimateData_precision6,arr_len(rawEstimateData_precision6));
+      case  7: return vector<double>(rawEstimateData_precision7,arr_len(rawEstimateData_precision7));
+      case  8: return vector<double>(rawEstimateData_precision8,arr_len(rawEstimateData_precision8));
+      case  9: return vector<double>(rawEstimateData_precision9,arr_len(rawEstimateData_precision9));
+      case 10: return vector<double>(rawEstimateData_precision10,arr_len(rawEstimateData_precision10));
+      case 11: return vector<double>(rawEstimateData_precision11,arr_len(rawEstimateData_precision11));
+      case 12: return vector<double>(rawEstimateData_precision12,arr_len(rawEstimateData_precision12));
+      case 13: return vector<double>(rawEstimateData_precision13,arr_len(rawEstimateData_precision13));
+      case 14: return vector<double>(rawEstimateData_precision14,arr_len(rawEstimateData_precision14));
+      case 15: return vector<double>(rawEstimateData_precision15,arr_len(rawEstimateData_precision15));
+      case 16: return vector<double>(rawEstimateData_precision16,arr_len(rawEstimateData_precision16));
+      case 17: return vector<double>(rawEstimateData_precision17,arr_len(rawEstimateData_precision17));
+      case 18: return vector<double>(rawEstimateData_precision18,arr_len(rawEstimateData_precision18));
+    }
+    return vector<double>();
   }
 
-  void initBiasData() {
-    biasData = vector<vector<double> >();
-
-    biasData.push_back(vector<double>(biasData_precision4,arr_len(biasData_precision4)));
-    biasData.push_back(vector<double>(biasData_precision5,arr_len(biasData_precision5)));
-    biasData.push_back(vector<double>(biasData_precision6,arr_len(biasData_precision6)));
-    biasData.push_back(vector<double>(biasData_precision7,arr_len(biasData_precision7)));
-    biasData.push_back(vector<double>(biasData_precision8,arr_len(biasData_precision8)));
-    biasData.push_back(vector<double>(biasData_precision9,arr_len(biasData_precision9)));
-    biasData.push_back(vector<double>(biasData_precision10,arr_len(biasData_precision10)));
-    biasData.push_back(vector<double>(biasData_precision11,arr_len(biasData_precision11)));
-    biasData.push_back(vector<double>(biasData_precision12,arr_len(biasData_precision12)));
-    biasData.push_back(vector<double>(biasData_precision13,arr_len(biasData_precision13)));
-    biasData.push_back(vector<double>(biasData_precision14,arr_len(biasData_precision14)));
-    biasData.push_back(vector<double>(biasData_precision15,arr_len(biasData_precision15)));
-    biasData.push_back(vector<double>(biasData_precision16,arr_len(biasData_precision16)));
-    biasData.push_back(vector<double>(biasData_precision17,arr_len(biasData_precision17)));
-    biasData.push_back(vector<double>(biasData_precision18,arr_len(biasData_precision18)));
+  vector<double> biasData(size_t p) {
+    switch(p) {
+      case  4: return vector<double>(biasData_precision4,arr_len(biasData_precision4));
+      case  5: return vector<double>(biasData_precision5,arr_len(biasData_precision5));
+      case  6: return vector<double>(biasData_precision6,arr_len(biasData_precision6));
+      case  7: return vector<double>(biasData_precision7,arr_len(biasData_precision7));
+      case  8: return vector<double>(biasData_precision8,arr_len(biasData_precision8));
+      case  9: return vector<double>(biasData_precision9,arr_len(biasData_precision9));
+      case 10: return vector<double>(biasData_precision10,arr_len(biasData_precision10));
+      case 11: return vector<double>(biasData_precision11,arr_len(biasData_precision11));
+      case 12: return vector<double>(biasData_precision12,arr_len(biasData_precision12));
+      case 13: return vector<double>(biasData_precision13,arr_len(biasData_precision13));
+      case 14: return vector<double>(biasData_precision14,arr_len(biasData_precision14));
+      case 15: return vector<double>(biasData_precision15,arr_len(biasData_precision15));
+      case 16: return vector<double>(biasData_precision16,arr_len(biasData_precision16));
+      case 17: return vector<double>(biasData_precision17,arr_len(biasData_precision17));
+      case 18: return vector<double>(biasData_precision18,arr_len(biasData_precision18));
+    }
+    return vector<double>();
   }
 
   /**
-   * Estimate the bias using empirically determined values.
+   * Estimate the bias of raw estimate using empirically determined values.
    * Uses weighted average of the two cells between which the estimate falls.
    * TODO: Check if nearest neighbor average gives better values, as proposed in the paper
    * @param est
    * @return correction value for
    */
   double getEstimateBias(double estimate) {
-    vector<double> rawEstimateTable = rawEstimateData[p-4];
-    vector<double> biasTable = biasData[p-4];
+    vector<double> rawEstimateTable = rawEstimateData(p);
+    vector<double> biasTable = biasData(p);
   
     // check if estimate is lower than first entry, or larger than last
     if (rawEstimateTable.front() >= estimate) { return rawEstimateTable.front() - biasTable.front(); }

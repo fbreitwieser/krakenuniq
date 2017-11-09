@@ -3,6 +3,7 @@
 
 # krakenhll-download.pl - based on centrifuge-download
 # (c) Florian Breitwieser, 2017
+# licensed under GPL-3
 
 use strict;
 use warnings;
