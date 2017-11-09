@@ -1,8 +1,9 @@
-/* Original work Copyright 2013 David Ainsworth
- * Modified work copyright 2017 Florian Breitwieser
+/* 
+ * Original work Copyright 2013 David Ainsworth
+ * Modified work copyright 2017 Florian Breitwieser 
  *
  * The original file is part of SLAM
- * The modified file is part of a modified Kraken version
+ * The modified file is part of KrakenHLL
  *
  * SLAM is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by

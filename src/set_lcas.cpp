@@ -1,6 +1,6 @@
-// vim: noai:ts=2:sw=2:expandtab:smarttab
 /*
- * Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
+ * Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
+ * Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
  *
  * This file is part of the Kraken taxonomic sequence classification system.
  *

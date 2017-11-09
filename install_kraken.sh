@@ -1,8 +1,7 @@
 #!/bin/bash
 
+# Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu>
 # Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
-#
-# This file is part of the Kraken taxonomic classification system.
 #
 # Kraken is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

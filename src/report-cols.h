@@ -1,8 +1,7 @@
 /*
  * report-cols.h
- * Copyright (C) 2017 fbreitwieser <fbreitwieser@sherman>
- *
- * Distributed under terms of the MIT license.
+ * Copyright (C) 2017 fbreitwieser
+ * licensed under GPL3
  */
 
 #ifndef REPORT_COLS_H

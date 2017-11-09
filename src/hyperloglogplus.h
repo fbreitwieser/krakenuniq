@@ -1,4 +1,22 @@
 /*
+ * Copyright 2017, Florian Breitwieser
+ *
+ * This file is part of the KrakenHLL taxonomic sequence classification system.
+ *
+ * KrakenHLL is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * KrakenHLL is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/*
  * hyperloglogplus.h
  *
  * Implementation of HyperLogLog++ algorithm described by Stefan Heule et al.
@@ -99,16 +117,14 @@ double alpha(uint32_t m)  {
 
 /**
  * calculate the raw estimate as harmonic mean of the ranks in the register
- * @param array
- * @return
  */
-double calculateEstimate(vector<uint8_t> array) {
+double calculateEstimate(vector<uint8_t> M) {
   double inverseSum = 0.0;
-  for (size_t i = 0; i < array.size(); ++i) {
+  for (size_t i = 0; i < M.size(); ++i) {
     // TODO: pre-calculate the power calculation
-    inverseSum += pow(2,-array[i]);
+    inverseSum += pow(2,-M[i]);
   }
-  return alpha(array.size()) * double(array.size() * array.size()) * 1 / inverseSum;
+  return alpha(M.size()) * double(M.size() * M.size()) * 1 / inverseSum;
 }
 
 uint32_t countZeros(vector<uint8_t> s) {
@@ -117,10 +133,6 @@ uint32_t countZeros(vector<uint8_t> s) {
 
 /**
  * Extract bits (from uint32_t or uint64_t) using LSB 0 numbering from hi to lo, including lo
- * @param bits
- * @param hi
- * @param lo
- * @return
  */
 template<typename T>
 T extractBits(T value, uint8_t hi, uint8_t lo, bool shift_left = false) {
@@ -198,19 +210,16 @@ inline uint32_t clz(const uint32_t x) {
 }
 
 inline uint32_t clz(const uint64_t x) {
-    uint32_t u32 = (x >> 32);
+  return __builtin_clzl(x);
+/*    uint32_t u32 = (x >> 32);
     uint32_t result = u32 ? __builtin_clz(u32) : 32;
     if (result == 32) {
         u32 = x & 0xFFFFFFFFUL;
         result += (u32 ? __builtin_clz(u32) : 32);
     }
-    return result;
+    return result; */
 }
 //#else
-
-uint32_t clz_log2(const uint64_t w) {
-  return 63 - floor(log2(w));
-}
 //#endif
 
 
