@@ -14,7 +14,7 @@ install: $(PROGS)
 	cp $(PROGS) $(KRAKEN_DIR)/
 
 clean:
-	rm -f $(PROGS) *.o
+	rm -rf $(PROGS) *.o *.dSYM
 
 db_shrink: krakendb.o quickfile.o
 

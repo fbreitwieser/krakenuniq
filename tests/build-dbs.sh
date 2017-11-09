@@ -106,7 +106,7 @@ for VAR in $@; do
       [[ -d $EUKD ]] || mkdir -p $EUKD
       [[ -f $EUKD/taxDB ]] || cp -v $DB_DIR/taxDB $EUKD
       build_db $K euk-oct2017 fungi protozoa ;;
-  *) echo "$USAGE"
+  *) echo -e "Unknown database $VAR!\n$USAGE"
      exit 1 ;;
   esac
 done
