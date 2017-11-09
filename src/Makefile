@@ -1,9 +1,10 @@
 CXX = g++
 FOPENMP?=-fopenmp
-CXXFLAGS = -Wall -std=c++0x $(FOPENMP) -O2 -Wfatal-errors ${CPPFLAGS}
+CXXFLAGS = -Wall -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAGS}
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
 PROGS = classify db_sort set_lcas make_seqid_to_taxid_map db_shrink build_taxdb grade_classification dump_taxdb read_uid_mapping
-LIBFLAGS = -L. -I./gzstream -L./gzstream -lz -lgzstream ${LDFLAGS}
+#LIBFLAGS = -L. -lz -lgzstream ${LDFLAGS}
+LIBFLAGS = -L. -lz ${LDFLAGS}
 
 .PHONY: all install clean
 
@@ -25,7 +26,7 @@ grade_classification: taxdb.h report-cols.h
 
 read_uid_mapping: quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o hyperloglogplus.h taxdb.h report-cols.h
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.h taxdb.h report-cols.h
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
 build_taxdb: taxdb.h report-cols.h quickfile.o
@@ -42,6 +43,9 @@ krakendb.o: krakendb.cpp krakendb.hpp quickfile.hpp
 
 seqreader.o: seqreader.cpp seqreader.hpp quickfile.hpp
 	$(CXX) $(CXXFLAGS) -c seqreader.cpp
+
+gzstream.o: gzstream/gzstream.C gzstream/gzstream.h
+	$(CXX) $(CXXFLAGS) -c -O gzstream/gzstream.C
 
 quickfile.o: quickfile.cpp quickfile.hpp
 	$(CXX) $(CXXFLAGS) -c quickfile.cpp
