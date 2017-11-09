@@ -45,6 +45,16 @@ namespace kraken {
       kmers += b.kmers;
       return *this;
     }
+
+    bool operator<(const ReadCounts& rc) {
+      if (n_reads < rc.n_reads) {
+        return true;
+      }
+      if (n_reads == rc.n_reads && n_kmers < rc.n_kmers) {
+        return true;
+      }
+      return false;
+    }
   };
   
   uint64_t reads(const ReadCounts& read_count) {
