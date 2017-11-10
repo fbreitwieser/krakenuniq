@@ -2,7 +2,8 @@ CXX = g++
 FOPENMP?=-fopenmp
 CXXFLAGS = -Wall -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAGS}
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
-PROGS = classify db_sort set_lcas db_shrink build_taxdb grade_classification dump_taxdb read_uid_mapping
+PROGS = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique
+TEST_PROGS = grade_classification dump_taxdb test_hll_on_db
 #LIBFLAGS = -L. -lz -lgzstream ${LDFLAGS}
 LIBFLAGS = -L. -lz ${LDFLAGS}
 
@@ -10,11 +11,13 @@ LIBFLAGS = -L. -lz ${LDFLAGS}
 
 all: $(PROGS)
 
+allall: $(PROGS) $(TEST_PROGS)
+
 install: $(PROGS)
 	cp $(PROGS) $(KRAKEN_DIR)/
 
 clean:
-	rm -rf $(PROGS) *.o *.dSYM
+	rm -rf $(PROGS) $(TEST_PROGS) *.o *.dSYM *.gch
 
 db_shrink: krakendb.o quickfile.o
 
@@ -25,6 +28,10 @@ set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
 grade_classification: taxdb.h report-cols.h
 
 read_uid_mapping: quickfile.o
+
+count_unique: hyperloglogplus.h
+
+test_hll_on_db: krakendb.o hyperloglogplus.h quickfile.o
 
 classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.h taxdb.h report-cols.h
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)

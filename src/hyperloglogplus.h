@@ -117,7 +117,7 @@ double alpha(uint32_t m)  {
 /**
  * calculate the raw estimate as harmonic mean of the ranks in the register
  */
-double calculateRawEstimate(vector<uint8_t> M) {
+inline double calculateRawEstimate(const vector<uint8_t>& M) {
   double inverseSum = 0.0;
   for (size_t i = 0; i < M.size(); ++i) {
     // TODO: pre-calculate the power calculation
@@ -159,7 +159,7 @@ T extractBits(T value, uint8_t hi, uint8_t lo, bool shift_left = false) {
 inline 
 void insert_hash(vector<uint32_t>& vec, uint32_t val) {
   auto it = std::lower_bound( vec.begin(), vec.end(), val); // find proper position in descending order
-  if (it == vec.end()) {
+  if (it == vec.end() || *it != val) {
     vec.insert( it, val ); // insert before iterator it
   }
 }
@@ -429,7 +429,7 @@ public:
    *
    * @return cardinality estimate
    */
-  uint64_t cardinality(bool verbose=true) {
+  uint64_t cardinality(bool verbose=true) const {
     if (sparse) {
       // if we are 'sparse', then use linear counting with increased precision pPrime
       return uint64_t(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
@@ -502,7 +502,7 @@ private:
       return rank_val;
     }
 
-  vector<double> rawEstimateData(size_t p) {
+  vector<double> rawEstimateData(size_t p) const {
     switch (p) {
       case  4: return vector<double>(rawEstimateData_precision4,arr_len(rawEstimateData_precision4));
       case  5: return vector<double>(rawEstimateData_precision5,arr_len(rawEstimateData_precision5));
@@ -523,7 +523,7 @@ private:
     return vector<double>();
   }
 
-  vector<double> biasData(size_t p) {
+  vector<double> biasData(size_t p) const {
     switch(p) {
       case  4: return vector<double>(biasData_precision4,arr_len(biasData_precision4));
       case  5: return vector<double>(biasData_precision5,arr_len(biasData_precision5));
@@ -551,7 +551,7 @@ private:
    * @param est
    * @return correction value for
    */
-  double getEstimateBias(double estimate) {
+  double getEstimateBias(double estimate) const {
     vector<double> rawEstimateTable = rawEstimateData(p);
     vector<double> biasTable = biasData(p);
   
