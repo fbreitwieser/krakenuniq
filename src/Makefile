@@ -2,8 +2,9 @@ CXX = g++
 FOPENMP?=-fopenmp
 CXXFLAGS = -Wall -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAGS}
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
-PROGS = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique
+PROGS1 = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique
 TEST_PROGS = grade_classification dump_taxdb test_hll_on_db
+PROGS = $(PROGS1) $(TEST_PROGS)
 #LIBFLAGS = -L. -lz -lgzstream ${LDFLAGS}
 LIBFLAGS = -L. -lz ${LDFLAGS}
 

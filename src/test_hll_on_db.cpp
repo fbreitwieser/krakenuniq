@@ -43,14 +43,23 @@ int main(int argc, char **argv) {
   char *db_name = argv[1];
   QuickFile db_file;
   db_file.open_file(db_name);
-  //db_file.load_file();
+  db_file.load_file();
+  cerr << "Fully loaded\n";
   KrakenDB db(db_file.ptr());
 
   size_t p = stoi(argv[2]);
   bool sparse = bool(stoi(argv[3]));
   size_t nr = stoi(argv[4]);
 
-  HyperLogLogPlusMinus<uint64_t> hll(p, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll10(10, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll11(11, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll12(12, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll13(13, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll14(14, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll15(15, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll16(16, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll17(17, sparse); // unique k-mer count per taxon
+  HyperLogLogPlusMinus<uint64_t> hll18(18, sparse); // unique k-mer count per taxon
 
   char* ptr = db.get_ptr();
   //char* pair_ptr = db.get_pair_ptr();
@@ -73,6 +82,7 @@ int main(int argc, char **argv) {
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
   std::uniform_real_distribution<> dis(0.0, 1.0);
 
+  cout << "precision\ttrue_count\testimate\n";
   size_t ctr = 0;
   for (uint64_t i = 0; i < key_ct; i++) {
     if (dis(gen) < prob) {
@@ -80,10 +90,26 @@ int main(int argc, char **argv) {
       //uint32_t* taxon = (uint32_t *) (ptr + pair_sz * i + key_len);
       //if (taxon == NULL) {
       //  std::cerr << "taxon is NULL (i is " << i << " and key_ct is " << key_ct << ")" << std::endl;
-      hll.add(*kmer);
+      hll10.add(*kmer);
+      hll11.add(*kmer);
+      hll12.add(*kmer);
+      hll13.add(*kmer);
+      hll14.add(*kmer);
+      hll15.add(*kmer);
+      hll16.add(*kmer);
+      hll17.add(*kmer);
+      hll18.add(*kmer);
       ++ctr;
       if (ctr < 10 || floor(log10(ctr)) == log10(ctr)) {
-        cout << ctr << '\t' << hll.cardinality() << '\n';
+        cout << 10 << '\t' << ctr << '\t' << hll10.cardinality() << '\n';
+        cout << 11 << '\t' << ctr << '\t' << hll11.cardinality() << '\n';
+        cout << 12 << '\t' << ctr << '\t' << hll12.cardinality() << '\n';
+        cout << 13 << '\t' << ctr << '\t' << hll13.cardinality() << '\n';
+        cout << 14 << '\t' << ctr << '\t' << hll14.cardinality() << '\n';
+        cout << 15 << '\t' << ctr << '\t' << hll15.cardinality() << '\n';
+        cout << 16 << '\t' << ctr << '\t' << hll16.cardinality() << '\n';
+        cout << 17 << '\t' << ctr << '\t' << hll17.cardinality() << '\n';
+        cout << 18 << '\t' << ctr << '\t' << hll18.cardinality() << '\n';
       }
     }
   }
