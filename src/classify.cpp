@@ -152,15 +152,6 @@ int main(int argc, char **argv) {
     //}
   }
 
-  if (!TaxDB_file.empty()) {
-    // TODO: Define if the taxDB has read counts or not!!
-      taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
-      Parent_map = taxdb.getParentMap();
-  } else {
-      cerr << "TaxDB argument is required!" << endl;
-      return 1;
-  }
-
   if (Populate_memory)
     cerr << "Loading database(s)... " << endl;
 
@@ -189,6 +180,16 @@ int main(int argc, char **argv) {
 
   if (Populate_memory)
     cerr << "\ncomplete." << endl;
+
+
+  if (!TaxDB_file.empty()) {
+    // TODO: Define if the taxDB has read counts or not!!
+      taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
+      Parent_map = taxdb.getParentMap();
+  } else {
+      cerr << "TaxDB argument is required!" << endl;
+      return 1;
+  }
 
   if (Print_classified) {
     Classified_output = cout_or_file(Classified_output_file);
@@ -612,7 +613,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -630,6 +631,9 @@ void parse_command_line(int argc, char **argv) {
         Num_threads = sig;
         omp_set_num_threads(Num_threads);
         #endif
+        break;
+      case 'p' :
+        ReadCounts::HLL_PRECISION = stoi(optarg);
         break;
       case 'q' :
         Quick_mode = true;
@@ -693,7 +697,7 @@ void parse_command_line(int argc, char **argv) {
     cerr << "Missing mandatory option -i" << endl;
     usage();
   }
-  if (optind == argc) {
+  if (optind == argc && !Populate_memory) {
     cerr << "No sequence data files specified" << endl;
   }
 }
@@ -708,6 +712,7 @@ void usage(int exit_code) {
        << "  -r filename      Output file for Kraken report output" << endl
        << "  -a filename      TaxDB" << endl
        << "  -I filename      UID to TaxId map" << endl
+       << "  -p #             Precision for unique k-mer counting, between 10 and 18" << endl
        << "  -t #             Number of threads" << endl
        << "  -u #             Thread work unit size (in bp)" << endl
        << "  -q               Quick operation" << endl
