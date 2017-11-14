@@ -83,7 +83,7 @@ WHEN USING database refseq OR genbank:
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
                     See the assembly project FTP site for available sequences
  -u                 Filter unplaced sequences.
- -m                 Mask low-complexity regions using dustmasker.
+ --dust, -D         Mask low-complexity regions using dustmasker.
  -l                 Modify sequence header to include taxonomy ID for Kraken (i.e. add '>kraken:taxid|TAXID' to each sequence).
  --include-viral-neighbors  Include neighbors for viral genomes as defined at https://www.ncbi.nlm.nih.gov/genome/viruses/.
                             Only works if refseq viral is downloaded in the same session!
@@ -103,7 +103,7 @@ GetOptions(
   "rsync|R" => \$DL_MOD_RSYNC,
   "include-viral-neighbors" => \$INCLUDE_VIRAL_NEIGHBORS,
   "filter-unplaced|u" => \$FILTER_UNPLACED,
-  "mask|m" => \$DO_DUST,
+  "dust|D" => \$DO_DUST,
   "change-header|l" => \$CHANGE_HEADER,
   "force" => \$OVERWRITE_FILES,
   "verbose|v" => \$VERBOSE) or die "Error in command line arguments";

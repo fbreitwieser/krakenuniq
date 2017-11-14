@@ -41,7 +41,7 @@ my $DEF_MINIMIZER_LEN = 15;
 my $DEF_KMER_LEN = 31;
 my $DEF_THREAD_CT = 1;
 
-my @VALID_LIBRARY_TYPES = qw/bacteria plasmids viruses human/;
+my @VALID_LIBRARY_TYPES = qw|refseq/bacteria refseq/archaea refseq/viral|;
 
 # Option/task option variables
 my (
@@ -221,14 +221,14 @@ exit -1;
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
+  my $types = '"'.join('", "', @VALID_LIBRARY_TYPES).'"';
   print STDERR <<EOF;
 Usage: $PROG [task option] [options]
 
 Task options (exactly one must be selected):
   --download-taxonomy        Download NCBI taxonomic information
-  --download-library TYPE    Download partial library
-                             (TYPE = one of "bacteria", "plasmids", 
-                             "viruses", "human")
+  --download-library TYPE    Download partial library (TYPE = one of $typers). 
+                             Use krakenhll-download for more options.
   --add-to-library FILE      Add FILE to library
   --build                    Create DB from library
                              (requires taxonomy d/l'ed and at least one file
@@ -238,8 +238,6 @@ Task options (exactly one must be selected):
   --clean                    Remove unneeded files from a built database
   --shrink NEW_CT            Shrink an existing DB to have only NEW_CT k-mers
   --standard                 Download and create default database
-  --upgrade                  Upgrade an existing older database to use scrambled
-                             minimizer ordering (see README for details)
   --help                     Print this message
   --version                  Print version information
 
@@ -291,7 +289,7 @@ sub display_version {
 }
 
 sub download_taxonomy {
-  exec "krakenhll-download_taxonomy.sh";
+  exec "krakenhll-download --db $db taxonomy";
 }
 
 sub download_library {
@@ -300,7 +298,7 @@ sub download_library {
     warn "Unknown library type \"$type\"\n";
     usage();
   }
-  exec "krakenhll-download_genomic_library.sh", $type;
+  exec "krakenhll-download", $type;
 }
 
 sub add_to_library {
