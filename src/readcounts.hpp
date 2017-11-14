@@ -24,11 +24,11 @@
 #include "hyperloglogplus.h"
 
 namespace kraken {
+  static size_t HLL_PRECISION = 12;
   struct ReadCounts {
     uint64_t n_reads;
     uint64_t n_kmers;
     HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
-    static size_t HLL_PRECISION = 12;
 
     ReadCounts() : n_reads(0), n_kmers(0), kmers(HyperLogLogPlusMinus<uint64_t>(HLL_PRECISION)) { }
 

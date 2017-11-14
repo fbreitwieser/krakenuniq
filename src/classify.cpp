@@ -633,7 +633,7 @@ void parse_command_line(int argc, char **argv) {
         #endif
         break;
       case 'p' :
-        ReadCounts::HLL_PRECISION = stoi(optarg);
+        HLL_PRECISION = stoi(optarg);
         break;
       case 'q' :
         Quick_mode = true;
