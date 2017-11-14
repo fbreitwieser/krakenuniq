@@ -159,7 +159,7 @@ push @flags, "-M" if $preload;
 push @flags, "-r", $report_file if defined $report_file;
 push @flags, "-a", $db_prefix[0]."/taxDB";
 push @flags, "-s" if $print_sequence;
-push @flags, "-p" $precision;
+push @flags, "-p", $hll_precision;
 if ($uid_mapping) {
   my $uid_mapping_file = "$db_prefix[0]/uid_to_taxid.map";
   if (!-f $uid_mapping_file) {

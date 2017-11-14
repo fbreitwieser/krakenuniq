@@ -227,7 +227,7 @@ Usage: $PROG [task option] [options]
 
 Task options (exactly one must be selected):
   --download-taxonomy        Download NCBI taxonomic information
-  --download-library TYPE    Download partial library (TYPE = one of $typers). 
+  --download-library TYPE    Download partial library (TYPE = one of $types). 
                              Use krakenhll-download for more options.
   --add-to-library FILE      Add FILE to library
   --build                    Create DB from library

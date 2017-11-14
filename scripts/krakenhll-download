@@ -304,6 +304,9 @@ sub download_viral_neighbors(@) {
   print STDERR "Reading names file ...\n";
   my $dir = get_dir($BASE_DIR,"taxonomy");
   my $names_file = "$dir/names.dmp";
+  if (!-f $names_file) {
+    download_taxonomy($dir);
+  }
   open (my $N, "<", $names_file);
   while (<$N>) {
     next unless /scientific name/;
