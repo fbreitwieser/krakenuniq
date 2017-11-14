@@ -150,13 +150,14 @@ if ($task_options > 1) {
   warn "More than one task option selected.\n";
   usage();
 }
-if ($task_options == 0) {
-  warn "Must select a task option.\n";
-  usage();
-}
+#if ($task_options == 0) {
+#  warn "Must select a task option.\n";
+#  usage();
+#}
 
 if (! defined $db) {
-  die "Must specify a database name\n";
+  warn "Must specify a database name\n";
+  usage()
 }
 if ($threads <= 0) {
   die "Can't use nonpositive thread count of $threads\n";
@@ -213,7 +214,8 @@ elsif ($upgrade) {
   upgrade_database();
 }
 else {
-  usage();
+  # Build by default
+  build_database();
 }
 
 exit -1;
@@ -225,14 +227,13 @@ sub usage {
   print STDERR <<EOF;
 Usage: $PROG [task option] [options]
 
-Task options (exactly one must be selected):
+Task options (exactly one can be selected -- default is build):
   --download-taxonomy        Download NCBI taxonomic information
   --download-library TYPE    Download partial library (TYPE = one of $types). 
                              Use krakenhll-download for more options.
   --add-to-library FILE      Add FILE to library
-  --build                    Create DB from library
-                             (requires taxonomy d/l'ed and at least one file
-                             in library)
+  --build                    Create DB from library (requires taxonomy d/l'ed and at 
+                             least one file in library)
   --rebuild                  Create DB from library like --build, but remove
                              existing non-library/taxonomy files before build
   --clean                    Remove unneeded files from a built database
@@ -328,7 +329,7 @@ sub build_database {
       exit(1);
     }
   }
-  if (! -d $taxonomy_dir) {
+  if (defined $taxonomy_dir && ! -d $taxonomy_dir) {
     print STDERR "Taxonomy directory $taxonomy_dir does not exist!\n";
     exit(1);
   }

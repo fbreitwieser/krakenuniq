@@ -517,39 +517,35 @@ sub download_domain(@) {
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
       my $fname = $bfname.".fna";
+      my $fullfname1 = $DO_DUST? "$domain_dir/${bfname}_dustmasked.fna" : "$domain_dir/$fname";
 
-      if (!$OVERWRITE_FILES && -s "$domain_dir/$fname") {
-        ++$existing_files;
-      } else {
-        ++$downloaded_files;
-      }
-
-      if (!$OVERWRITE_FILES && -s "$domain_dir/$fname") {
+      if (!$OVERWRITE_FILES && -s $fullfname1) {
         print STDERR "$domain_dir/$fname exists - not downloading.. \n" if $VERBOSE;
+        ++$existing_files;
       } else {
         start_fork() and next;
         download($full_ftp_path, "$domain_dir/$fname.gz", "$domain_dir/$fname");
         end_fork();
+        ++$downloaded_files;
       }
 
       if ($CHANGE_HEADER) {
         system("sed -i 's/^>/>kraken:taxid|$taxid /' '$domain_dir/$fname'");
       }
       if ($FILTER_UNPLACED) {
-        ## Not implemented yet!
+        die("Not implemented");
       }
 
-      ## Output sequenceID to taxonomy ID map to STDOUT
-      
-      print_header_lines("$domain_dir/$fname", $taxid, "$assembly_accession $organism_name");
-
-      if ($DO_DUST) {
+      if ($DO_DUST || !-s $fullfname1) {
         start_fork() and next;
         ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
-        system("dustmasker -infmt fasta -in '$domain_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$domain_dir/${bfname}_dustmasked.fna'");
+        system("dustmasker -infmt fasta -in '$domain_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$fullfname1'");
         unlink("$domain_dir/$fname");
         end_fork();
       }
+
+      ## Output sequenceID to taxonomy ID map
+      print_header_lines($fullfname1, $taxid, "$assembly_accession $organism_name");
     }
   }
 
