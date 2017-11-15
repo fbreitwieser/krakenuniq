@@ -31,7 +31,7 @@ then
   WOD_FLAG="--work-on-disk"
 fi
 
-krakenhll-check_for_jellyfish.sh
+#krakenhll-check_for_jellyfish.sh
 krakenhll-download --db $KRAKEN_DB_NAME taxonomy contaminants
 krakenhll-download --db $KRAKEN_DB_NAME --dust  --include-viral-neighbors refseq/viral/Any refseq/archaea refseq/bacteria
 krakenhll-build --db $KRAKEN_DB_NAME --build --threads $KRAKEN_THREAD_CT \

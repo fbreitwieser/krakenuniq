@@ -4,15 +4,16 @@ CXXFLAGS = -Wall -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAG
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
 PROGS1 = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique
 TEST_PROGS = grade_classification dump_taxdb test_hll_on_db
-PROGS = $(PROGS1) $(TEST_PROGS)
+#PROGS = $(PROGS1) $(TEST_PROGS)
+PROGS = $(PROGS1)
 #LIBFLAGS = -L. -lz -lgzstream ${LDFLAGS}
 LIBFLAGS = -L. -lz ${LDFLAGS}
 
 .PHONY: all install clean
 
-all: $(PROGS)
+all: $(PROGS1)
 
-allall: $(PROGS) $(TEST_PROGS)
+allall: $(PROGS1) $(TEST_PROGS)
 
 install: $(PROGS)
 	cp $(PROGS) $(KRAKEN_DIR)/

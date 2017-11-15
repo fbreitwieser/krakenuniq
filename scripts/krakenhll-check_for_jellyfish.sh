@@ -25,20 +25,20 @@ set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
-JELLYFISH_BIN=""
-for JF in $(dirname $0)/jellyfish/bin/jellyfish  /usr/local/opt/jellyfish-1.1/bin/jellyfish jellyfish1 jellyfish; do
-  if test -f $JF || hash $JF 2>/dev/null; then
-    JELLYFISH_BIN=$JF;
+JELLYFISH1_BIN=""
+for JF in $JELLYFISH_BIN $(dirname $0)/jellyfish/bin/jellyfish  /usr/local/opt/jellyfish-1.1/bin/jellyfish jellyfish1 jellyfish; do
+  if test -f $JF || command -v $JF 2>/dev/null; then
+    JELLYFISH1_BIN=$JF;
     break
   fi
 done
 
-if [ "$JELLYFISH_BIN" == "" ]; then
+if [ "$JELLYFISH1_BIN" == "" ]; then
     echo "Did not find jellyfish!" 1>&2
     exit 1
 fi
 
-JELLYFISH_VERSION=$( $JELLYFISH_BIN --version | awk '{print $2}')
+JELLYFISH_VERSION=$( $JELLYFISH1_BIN --version | awk '{print $2}')
 if [[ $JELLYFISH_VERSION =~ ^1\. ]]
 then
   echo "Found jellyfish v$JELLYFISH_VERSION" 1>&2
@@ -47,4 +47,4 @@ else
   echo "Kraken requires jellyfish version 1" 1>&2
   exit 1
 fi
-echo $JELLYFISH_BIN
+echo $JELLYFISH1_BIN

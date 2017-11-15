@@ -284,7 +284,9 @@ sub download_viral_neighbors2(@) {
   download($url, "$dir/nucl_gb.accession2taxid.gz");
 
   print STDERR "Sorting mapping file ...\n";
-  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | sort --parallel $N_PROC > $dir/nucl_gb.accession2taxid.sorted") unless -s "$dir/nucl_gb.accession2taxid.sorted";
+  my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
+  print STDERR "SORT CMD: $sort_cmd\n";
+  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd > $dir/nucl_gb.accession2taxid.sorted") unless -s "$dir/nucl_gb.accession2taxid.sorted";
 
   if (!-f "$nbr_dir/all-nbrs.fa"){
   my $FMT="fasta";
@@ -321,7 +323,8 @@ sub download_viral_neighbors(@) {
 
   my $sorted_map_f = "$dir/nucl_gb.accession2taxid.sorted";
   print STDERR "Sorting mapping file ...\n";
-  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | sort --parallel $N_PROC > $sorted_map_f") unless -s $sorted_map_f;
+  my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
+  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd > $sorted_map_f") unless -s $sorted_map_f;
 
   print STDERR "Downloading viral neighbors into $nbr_dir ...\n";
   my $url1 = "https://www.ncbi.nlm.nih.gov/genomes/GenomesGroup.cgi?taxid=10239&cmd=download2";

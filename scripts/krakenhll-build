@@ -50,6 +50,7 @@ my (
   $minimizer_len,
   $kmer_len,
   $new_db,
+  $jellyfish_bin,
   $hash_size,
   $max_db_size,
   $work_on_disk,
@@ -113,6 +114,7 @@ GetOptions(
   "kmer-len=i", \$kmer_len,
   "new-db=s", \$new_db,
   "jellyfish-hash-size=s", \$hash_size,
+  "jellyfish-bin=s", \$jellyfish_bin,
   "max-db-size=s", \$max_db_size,
   "work-on-disk", \$work_on_disk,
   "shrink-block-offset=i", \$shrink_block_offset,
@@ -181,6 +183,7 @@ if ($max_db_size !~ /^$/ && $max_db_size <= 0) {
   die "Can't have negative max database size.\n";
 }
 
+$ENV{"JELLYFISH_BIN"} = $jellyfish_bin;
 $ENV{"KRAKEN_DB_NAME"} = $db;
 $ENV{"KRAKEN_THREAD_CT"} = $threads;
 $ENV{"KRAKEN_MINIMIZER_LEN"} = $minimizer_len;
@@ -254,6 +257,7 @@ Options:
                              def: $DEF_MINIMIZER_LEN)
   --jellyfish-hash-size STR  Pass a specific hash size argument to jellyfish
                              when building database (build task only)
+  --jellyfish-bin STR        Use STR as Jellyfish 1 binary.
   --max-db-size SIZE         Shrink the DB before full build, making sure
                              database and index together use <= SIZE gigabytes
                              (build task only)
@@ -284,8 +288,9 @@ sub display_help {
 }
 
 sub display_version {
-  print "Kraken version #####=VERSION=#####\n";
-  print "Copyright 2013-2015, Derrick Wood (dwood\@cs.jhu.edu)\n";
+  print "KrakenHLL version #####=VERSION=#####\n";
+  print "Copyright 2017, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
+  print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }
 
