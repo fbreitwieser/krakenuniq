@@ -50,6 +50,7 @@ VERBOSE=false
 HELP=false
 DRY_RUN=false
 K=31
+M=15
 THREADS=10
 PATH1="."
 
@@ -57,11 +58,12 @@ USAGE="
 `basename $0` [options] {kraken,kaiju} {viral|all-viral|prok|oct2017|euk-oct2017|archaea}
 
 Options:
-  -k KMER_SIZE     default $K
-  -t THREADS       default $THREADS
+  -k KMER_SIZE       default $K
+  -m MINIMIZER_SIZE  default $M
+  -t THREADS         default $THREADS
 "
 
-OPTS=`getopt -o vhnk:t:p: --long verbose,dry-run,help,threads:,path: -n 'parse-options' -- "$@"`
+OPTS=`getopt -o vhnk:t:p:m: --long verbose,dry-run,help,threads:,path: -n 'parse-options' -- "$@"`
 if [ $? != 0 ] ; then echo "Failed parsing options. Usage: $USAGE" >&2 ; exit 1 ; fi
 eval set -- "$OPTS"
 
@@ -71,6 +73,7 @@ while true; do
     -h | --help )    HELP=true; shift ;;
     -n | --dry-run ) DRY_RUN=true; shift ;;
     -k | --kmer-size ) K="$2"; shift; shift ;;
+    -m | --minimizer-size ) M="$2"; shift; shift ;;
     -t | --threads ) THREADS="$2"; shift; shift ;;
     -p | --path ) PATH1="$2"; shift; shift ;;
     -- ) shift; break ;;
@@ -90,11 +93,11 @@ PROG=$1
 shift
 for VAR in $@; do
   case "$VAR" in
-    viral)     build_db $PROG $K 12 viral viral ;;
-    all-viral) build_db $PROG $K 12 all-viral viral viral-neighbors  ;;
-    prok)      build_db $PROG $K 15 prok archaea-dusted bacteria-dusted ;;
-    archaea)   build_db $PROG $K 15 archaea archaea ;;
-    oct2017)   build_db $PROG $K 15 oct2017 archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
+    viral)     build_db $PROG $K $M viral viral ;;
+    all-viral) build_db $PROG $K $M all-viral viral viral-neighbors  ;;
+    prok)      build_db $PROG $K $M prok archaea-dusted bacteria-dusted ;;
+    archaea)   build_db $PROG $K $M archaea archaea ;;
+    oct2017)   build_db $PROG $K $M oct2017 archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
                                vertebrate_mammalian contaminants ;;
     euk-oct2017)
       DB_DIR=$DIR/dbs/refseq-oct2017-k31
