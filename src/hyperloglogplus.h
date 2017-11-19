@@ -38,7 +38,6 @@
 #include<bitset>
 
 #include "hyperloglogbias.h"
-#include "third_party/MurmurHash3.cpp"
 #include "assert_helpers.h"
 
 using namespace std;
@@ -49,8 +48,23 @@ using namespace std;
 #define arr_len(a) (a + sizeof a / sizeof a[0])
 
 // experimentally determined threshold values for  p - 4
-static const uint32_t threshold[] = {10, 20, 40, 80, 220, 400, 900, 1800, 3100,
-                6500, 11500, 20000, 50000, 120000, 350000};
+static const uint32_t threshold[] = {
+  10,      // precision 4
+  20, 
+  40, 
+  80, 
+  220, 
+  400, 
+  900, 
+  1800, 
+  3100,
+  6500, 
+  11500, 
+  20000, 
+  50000, 
+  120000, 
+  350000  // precision 18
+};
 
 ///////////////////////
 
@@ -120,10 +134,9 @@ double alpha(uint32_t m)  {
 inline double calculateRawEstimate(const vector<uint8_t>& M) {
   double inverseSum = 0.0;
   for (size_t i = 0; i < M.size(); ++i) {
-    // TODO: pre-calculate the power calculation
-    inverseSum += pow(2,-M[i]);
+    inverseSum += 1. / (1ull << M[i]);
   }
-  return alpha(M.size()) * double(M.size() * M.size()) * 1 / inverseSum;
+  return alpha(M.size()) * double(M.size() * M.size()) * 1. / inverseSum;
 }
 
 uint32_t countZeros(vector<uint8_t> s) {
@@ -156,11 +169,36 @@ T extractBits(T value, uint8_t hi, uint8_t lo, bool shift_left = false) {
     return result;  
 }
 
+
+
+inline uint64_t extractHighBits(uint64_t bits, uint8_t hi) {
+  return bits >> (64u - hi);
+}
+
+inline uint32_t extractHighBits(uint32_t bits, uint8_t hi) {
+  return bits >> (32u - hi);
+}
+
+
 inline 
-void insert_hash(vector<uint32_t>& vec, uint32_t val) {
+void insert_hash(vector<uint32_t>& vec, const uint32_t val, const uint8_t pPrime) {
   auto it = std::lower_bound( vec.begin(), vec.end(), val); // find proper position in descending order
-  if (it == vec.end() || *it != val) {
+  if (it == vec.end()) { // position at the end
     vec.insert( it, val ); // insert before iterator it
+  } else if (*it != val) {      // val not in the vector
+    if (extractHighBits(val,pPrime) == extractHighBits(*it,pPrime)) { //the values have the same index
+      if ((*it & 1) == (val & 1)) { // if both are in the same category
+        if ((val & 1) == 1) { // both have ones as lsb - replace if val is greater
+          if (val > *it) *it = val;
+        } else {           // both have zeros as lsb - replace if val is smaller
+          if (val < *it) *it = val;
+        }
+      } else if ((val & 1) == 1) { // replace if lsb of val is 1
+        *it = val;
+      }
+    } else {
+      vec.insert( it, val ); // insert before iterator it
+    }
   }
 }
 
@@ -173,14 +211,6 @@ void merge_lists(vector<uint32_t>& vec1, const vector<uint32_t>& vec2) {
   }
 }
 */
-
-template<typename T>
-T extractBits(T bits, uint8_t hi) {
-    // create a bitmask for first hi bits (LSB 0 numbering)
-  T bitmask = T(-1) << (sizeof(T)*8 - hi);
-
-  return (bits & bitmask);
-}
 
 // functions for counting the number of leading 0-bits (clz)
 //           and counting the number of trailing 0-bits (ctz)
@@ -204,19 +234,12 @@ static int clz_manual(uint64_t x)
 }
 #endif
 
-inline uint32_t clz(const uint32_t x) {
+inline uint8_t clz(const uint32_t x) {
   return __builtin_clz(x);
 }
 
-inline uint32_t clz(const uint64_t x) {
+inline uint8_t clz(const uint64_t x) {
   return __builtin_clzl(x);
-/*    uint32_t u32 = (x >> 32);
-    uint32_t result = u32 ? __builtin_clz(u32) : 32;
-    if (result == 32) {
-        u32 = x & 0xFFFFFFFFUL;
-        result += (u32 ? __builtin_clz(u32) : 32);
-    }
-    return result; */
 }
 //#else
 //#endif
@@ -280,20 +303,10 @@ public:
    * @param item
    */
   void add(T_KEY item) {
-    add(item, sizeof(T_KEY));
-  }
-
-  /**
-   * Add a new item to the counter.
-   * @param item
-   * @param size  size of item
-   */
-  void add(T_KEY item, size_t size) {
-
     // compute hash for item
     HashSize hash_value = murmurhash3_finalizer(item);
 
-#ifdef HLL_DEBUG
+#ifdef HLL_DEBUG2
     cerr << "Value: " << item << "; hash(value): " << hash_value << endl;
     cerr << bitset<64>(hash_value) << endl;
 #endif
@@ -301,9 +314,10 @@ public:
     if (sparse) {
       // sparse mode: put the encoded hash into sparse list
       uint32_t encoded_hash_value = encodeHashIn32Bit(hash_value);
-      insert_hash(sparseList, encoded_hash_value);
+      insert_hash(sparseList, encoded_hash_value, pPrime);
 
-#ifdef HLL_DEBUG
+#ifdef HLL_DEBUG2
+      cerr << "encoded hash:   " << bitset<32>(encoded_hash_value) << endl;
       idx_n_rank ir = getIndexAndRankFromEncodedHash(encoded_hash_value);
       assert_eq(ir.idx,get_index(hash_value, p));
       assert_eq(ir.rank, get_rank(hash_value, p));
@@ -348,7 +362,7 @@ public:
   void switchToNormalRepresentation() {
 #ifdef HLL_DEBUG
     cerr << "switching to normal representation" << endl;
-    cerr << " est before: " << cardinality(true) << endl;
+    cerr << " est before: " << cardinality() << endl;
 #endif
     this->sparse = false;
     this->M = vector<uint8_t>(this->m);
@@ -357,7 +371,7 @@ public:
       this->sparseList.clear();
     }
 #ifdef HLL_DEBUG
-    cerr << " est after: " << cardinality(true) << endl;
+    cerr << " est after: " << cardinality() << endl;
 #endif
   }
 
@@ -396,7 +410,7 @@ public:
       } else {
         
         for (const auto val : other->sparseList) {
-          insert_hash(this->sparseList, val);
+          insert_hash(this->sparseList, val, pPrime);
         }
       }
     } else if (other->sparse) {
@@ -429,7 +443,7 @@ public:
    *
    * @return cardinality estimate
    */
-  uint64_t cardinality(bool verbose=true) const {
+  uint64_t cardinality() const {
     if (sparse) {
       // if we are 'sparse', then use linear counting with increased precision pPrime
       return uint64_t(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
@@ -460,44 +474,37 @@ public:
 
 private:
 
-    uint8_t rank(HashSize x, uint8_t b) {
-        uint8_t v = 1;
-        while (v <= b && !(x & 0x80000000)) {
-            v++;
-            x <<= 1;
-        }
-        return v;
-    }
-
-    template<typename T> inline uint32_t get_index(const T hash_value, const uint8_t p, const uint8_t size) const {
-      // take first p bits as index  {x63,...,x64-p}
-      assert_lt(p,size);
-      uint32_t idx = hash_value >> (size - p);
-      return idx;
-    }
-
     inline uint32_t get_index(const uint64_t hash_value, const uint8_t p) const {
-        return get_index(hash_value, p, 64);
+      // take first p bits as index  {x63,...,x64-p}
+      return hash_value >> (64 - p);
     }
 
     inline uint32_t get_index(const uint32_t hash_value, const uint8_t p) const {
-      return get_index(hash_value, p, 32);
+      // take first p bits as index  {x31,...,x32-p}
+      return hash_value >> (32 - p);
     }
 
     template<typename T> inline
-  T get_trailing_ones(const uint8_t p) const {
+    T get_trailing_ones(const uint8_t p) const {
       return (T(1) << p ) - 1;
     }
 
-    template<typename T> inline
-    uint8_t get_rank(const T hash_value, const uint8_t p) const {
+    uint8_t get_rank(const uint32_t hash_value, const uint8_t p) const {
       // shift p values off, and count leading zeros of the remaining string {x63-p,...,x0}
-      T_KEY rank_bits = (hash_value << p | get_trailing_ones<T>(p));
-#ifdef HLL_DEBUG
-      cerr << "rank bits: " << bitset<32>(rank_bits) << endl;
-#endif
+      uint32_t rank_bits (hash_value << p | get_trailing_ones<uint32_t>(p));
 
-      uint8_t rank_val = (uint8_t) (clz(rank_bits)) + 1;
+      // __builtin_clz is undefined when val is zero, but that will not happen here
+      uint8_t rank_val = clz(rank_bits) + 1;
+      assert_leq(rank_val,32-p+1);
+      return rank_val;
+    }
+
+
+    uint8_t get_rank(const uint64_t hash_value, const uint8_t p) const {
+      // shift p values off, and count leading zeros of the remaining string {x63-p,...,x0}
+      T_KEY rank_bits (hash_value << p | get_trailing_ones<uint64_t>(p));
+
+      uint8_t rank_val = (clz(rank_bits)) + 1;
       assert_leq(rank_val,64-p+1);
       return rank_val;
     }
@@ -582,20 +589,24 @@ private:
    * @param x the hash bits
    * @return encoded hash value
    */
+  inline
   uint32_t encodeHashIn32Bit(uint64_t hash_value) {
-    // extract first pPrime bits, and shift them onto a 32-bit integer
-    uint32_t idx = (uint32_t)(extractBits(hash_value,pPrime) >> 32);
+    // extract first pPrime bits as index
+    uint32_t idx = (uint32_t)(extractHighBits(hash_value,pPrime) << (32-pPrime));
 
-#ifdef HLL_DEBUG
-    cerr << "value:  " << bitset<64>(hash_value) << endl;
-        cerr << "index: " << std::bitset<32>(idx) << " ( bits from 64 to " << 64-pPrime << "; " << idx << ")" << endl;
+#ifdef HLL_DEBUG2
+    cerr << "encoding hash:  " << bitset<64>(hash_value) << endl;
+    cerr << "index':         " << bitset<32>(idx) << " ( bits from 64 to " << 64-pPrime << "; " << idx << ")" << endl;
 #endif
 
-    // are the bits {63-p, ..., 63-p'} all 0?
-    if (extractBits(hash_value, 64-this->p, 64-pPrime) == 0) {
+    // are the bits after bit p in index' all 0?
+    if (idx << p == 0) {
       // compute the additional rank (minimum rank is already p'-p)
       // the maximal size will be below 2^6=64. We thus combine the 25 bits of the index with 6 bits for the rank, and one bit as flag
       uint8_t additional_rank = get_rank(hash_value, pPrime); // this is rank - (p'-p), as we know that positions p'...p are 0
+#ifdef HLL_DEBUG2
+      cerr << "All zero " << endl;
+#endif
       return idx | uint32_t(additional_rank<<1) | 1;
     } else {
       // else, return the idx, only - it has enough length to calculate the rank (left-shifted, last bit = 0)
@@ -618,7 +629,7 @@ private:
   //
   /**
    * Decode hash from sparse representation.
-   * Returns the index and number of leading zeros (nlz) with precision p stored in k
+   * Returns the index and number of leading zeros with precision p stored in k
    * @return index and rank in non-sparse format
    */
   idx_n_rank getIndexAndRankFromEncodedHash(const uint32_t encoded_hash_value) const  {
@@ -627,7 +638,7 @@ private:
     uint32_t idx = get_index(encoded_hash_value, p);
     uint8_t rank_val;
 
-    // check if the last bit is 1
+    // check if the least significant bit is 1
     if ( (encoded_hash_value & 1) == 1) {
       // if yes: the hash was stored with higher precision, bits p to pPrime were 0
       uint8_t additional_rank = pPrime - p;
@@ -636,8 +647,7 @@ private:
       rank_val = get_rank(encoded_hash_value,p);
 
       // clz counts 64 bit only, it seems
-      if (rank_val > 32)
-        rank_val -= 32;
+      //assert_leq(rank_val,32);
     }
 
     return(idx_n_rank(idx,rank_val));
