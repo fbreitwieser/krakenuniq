@@ -5,6 +5,7 @@ set -eu
 #[[ "$#" -ne 1 ]] && DIR=`pwd` || DIR=$1
 DIR=`pwd`
 [[ `uname` == "Darwin" ]] && THREADS=4 || THREADS=10
+TAXDB=""
 
 build_db() {
   local PROG=$1; shift
@@ -28,20 +29,31 @@ build_db() {
     for L in $@; do
       CMD="$CMD  $DIR/data/all-$L.fna"
     done
+  else 
+    echo "Unknown command $PROG"
+    exit 1
   fi
-  if [[ ! -f "$DB_DIR-is.busy" ]]; then
+  if [[ -f "$TAXDB"  &&  ! -f "$DB_DIR/taxDB" ]]; then
+    mkdir -p $DB_DIR
+    echo "#################### Copying taxDB $TAXDB"
+    cp -v $TAXDB $DB_DIR
+  fi
+
+  #if [[ ! -f "$DB_DIR-is.busy" ]]; then
     echo "EXECUTING $CMD"
     touch $DB_DIR-is.busy
-    $CMD 2>&1 | tee $DIR/dbs-$PROG/$DB_NAM-build.log
+    echo "#### KrakenBuild at "`date` >> $DB_DIR-build.log
+    $CMD 2>&1 | tee -a $DB_DIR-build.log
     if [[ $PROG == "kraken" && ! -f "$DB_DIR/taxonomy/nodes.dmp" ]]; then
       mkdir -p $DB_DIR/taxonomy
       echo "EXECUTING dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp"
-      dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/nodes.dmp
+      dump_taxdb $DB_DIR/taxDB $DB_DIR/taxonomy/names.dmp $DB_DIR/taxonomy/nodes.dmp
     fi
-    rm $DB_DIR/is.busy
-  else 
-    echo "$DB_DIR-is.busy exists, ignoring directory."
-  fi
+    export TAXDB="$DB_DIR/taxDB"
+    rm $DB_DIR-is.busy
+  #else 
+  #  echo "$DB_DIR-is.busy exists, ignoring directory."
+  #fi
 }
 
 
@@ -55,7 +67,7 @@ THREADS=10
 PATH1="."
 
 USAGE="
-`basename $0` [options] {kraken,kaiju} {viral|all-viral|prok|oct2017|euk-oct2017|archaea}
+`basename $0` [options] {kraken,kaiju} {viral|all-viral|prok|std|euk|archaea}
 
 Options:
   -k KMER_SIZE       default $K
@@ -93,22 +105,14 @@ PROG=$1
 shift
 for VAR in $@; do
   case "$VAR" in
+    human)     build_db $PROG $K $M human contaminants vertebrate_mammalian ;;
     viral)     build_db $PROG $K $M viral viral ;;
     all-viral) build_db $PROG $K $M all-viral viral viral-neighbors  ;;
     prok)      build_db $PROG $K $M prok archaea-dusted bacteria-dusted ;;
     archaea)   build_db $PROG $K $M archaea archaea ;;
-    oct2017)   build_db $PROG $K $M oct2017 archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
+    std)   build_db $PROG $K $M std archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
                                vertebrate_mammalian contaminants ;;
-    euk-oct2017)
-      DB_DIR=$DIR/dbs/refseq-oct2017-k31
-      EUKD=$DIR/dbs/refseq-euk-oct2017-k31
-      if [[ ! -f "$DB_DIR/taxDB" ]]; then
-        echo "Build oct2017 database first!";
-        exit 1;
-      fi
-      [[ -d $EUKD ]] || mkdir -p $EUKD
-      [[ -f $EUKD/taxDB ]] || cp -v $DB_DIR/taxDB $EUKD
-      build_db $K euk-oct2017 fungi protozoa ;;
+    euk)       build_db $K euk fungi-dusted protozoa-dusted ;;
   *) echo -e "Unknown database $VAR!\n$USAGE"
      exit 1 ;;
   esac
