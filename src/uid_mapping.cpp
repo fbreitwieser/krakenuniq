@@ -202,6 +202,73 @@ namespace kraken {
     return max_taxon;
   }
 
+
+  // Tree resolution: take all hit taxa (plus ancestors), then
+  // return leaf of highest weighted leaf-to-root path.
+  // This version saves observed mappings in a map
+  // Doesn't seem to give big runtime improvements I've hope for, so far 
+  uint32_t resolve_uids3(
+      const unordered_map<uint32_t, uint32_t> &uid_hit_counts,
+      const unordered_map<uint32_t, uint32_t> &parent_map,
+      unordered_map<uint32_t, vector<uint32_t> > &uid_dict,
+      const char* fptr, const size_t fsize) {
+
+    unordered_map<uint32_t, uint32_t> taxid_counts;
+    unordered_map<uint32_t, double> frac_taxid_counts;
+
+    if (uid_hit_counts.size() == 0) {
+      return(0);
+    }
+
+    for (auto it1=uid_hit_counts.begin(); it1 != uid_hit_counts.end(); ++it1) { // supporting gcc 4.4
+      const auto &it = *it1;
+      if (it.first == 0) {
+        continue;
+      }
+      // TODO: Just get a uint64_t and shift the bits, probably faster
+      vector<uint32_t> taxids = get_taxids_for_uid_from_map(it.first, fptr, uid_dict);
+
+      double frac_count = (double)it.second / (double)taxids.size();
+      for (size_t i = 0; i < taxids.size(); ++i) { // supporting gcc 4.4
+        uint32_t taxid = taxids[i];
+        frac_taxid_counts[taxid] += frac_count;
+        taxid_counts[taxid] += it.second;
+      }
+    }
+
+    if (taxid_counts.size() == 0) {
+      return(0);
+    }
+    vector<uint32_t> max_taxids;
+    uint32_t max_count = 0;
+    double max_frac_count = 0;
+    for (auto it1 = taxid_counts.begin(); it1 != taxid_counts.end(); ++it1) {
+      const auto& it = *it1;
+      if (it.second == max_count) {
+        if (frac_taxid_counts[it.first] == max_frac_count) {
+          max_taxids.push_back(it.first);
+        } else if (frac_taxid_counts[it.first] > max_frac_count) {
+          max_frac_count = frac_taxid_counts[it.first];
+          max_taxids = { it.first };
+        }
+      } else if (it.second > max_count) {
+        max_taxids = { it.first };
+        max_count = it.second;
+        max_frac_count = frac_taxid_counts[it.first];
+      }
+    }
+
+    uint32_t max_taxon = max_taxids[0];
+    auto sit = max_taxids.begin();
+    for (++sit; sit != max_taxids.end(); ++sit) {
+      max_taxon = lca(parent_map, max_taxon, *sit);
+
+    }
+
+    // return the taxid that appeared most often
+    return max_taxon;
+  }
+
 }
 
 vector<uint32_t> get_taxids_for_uid(const uint32_t uid, const char* fptr) {
@@ -214,6 +281,7 @@ vector<uint32_t> get_taxids_for_uid(const uint32_t uid, const char* fptr) {
   vector<uint32_t> taxids = {taxid};
   while (parent_uid != 0) {
     // TODO: Consider checking if the accessed meory is out of range. 
+      // assert((parent_uid-1)*block_size <= fsize);
       // if (offset >= fsize) {
       //   cerr << "It seems you are trying to access a block after the file end: \n" <<
       //      " fptr: " << fptr << "; uid: " << next_uid << "; " << " addr: " << (offset + INT_SIZE) << endl;
@@ -227,7 +295,7 @@ vector<uint32_t> get_taxids_for_uid(const uint32_t uid, const char* fptr) {
   return(taxids);
 }
 
-vector<uint32_t> get_taxids_for_uid_from_map(uint32_t uid, char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map ) {
+vector<uint32_t> get_taxids_for_uid_from_map(const uint32_t uid, const char* fptr, unordered_map<uint32_t, vector<uint32_t> >& uid_map ) {
   auto it = uid_map.find(uid);
   if (it != uid_map.end()) {
     return it->second;

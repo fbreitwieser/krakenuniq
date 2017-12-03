@@ -19,7 +19,8 @@
 /*
  * hyperloglogplus.h
  *
- * Implementation of HyperLogLog++ algorithm described by Stefan Heule et al.
+ * Implementation of HyperLogLog++ algorithm by Flajolet et al., 
+ *   with extensions described by Stefan Heule et al. and Otmar Ertl
  *
  *  Created on: Apr 25, 2015
  *      Author: fbreitwieser
@@ -28,7 +29,6 @@
 #ifndef HYPERLOGLOGPLUS_H_
 #define HYPERLOGLOGPLUS_H_
 
-#include<set>
 #include<vector>
 #include<stdexcept>
 #include<iostream>
@@ -44,7 +44,15 @@ using namespace std;
 
 //#define HLL_DEBUG
 //#define NDEBUG
-//#define NDEBUG2
+//#define HLL_DEBUG2
+
+#ifdef HLL_DEBUG 
+#define D(x) x
+#else 
+#define D(x)
+#endif
+
+
 #define arr_len(a) (a + sizeof a / sizeof a[0])
 
 // experimentally determined threshold values for  p - 4
@@ -76,7 +84,7 @@ static const uint32_t threshold[] = {
  * @param v number of non-zero bins
  * @return
  */
-double linearCounting(uint32_t m, uint32_t v) {
+double linearCounting(const uint32_t m, const uint32_t v) {
   if (v > m) {
       throw std::invalid_argument("number of v should not be greater than m");
   }
@@ -109,6 +117,22 @@ inline uint64_t murmurhash3_finalizer (uint64_t key)  {
   key ^= key >> 33;
   key *= 0xc4ceb9fe1a85ec53;
   key ^= key >> 33;
+  return key;
+}
+
+/*
+  64-bit mixer developed by Thomas Wang
+  Proposed for HLL by https://github.com/dnbaker/hll
+  https://gist.github.com/badboy/6267743
+*/
+inline uint64_t wang_mixer(uint64_t key) {
+  key = (~key) + (key << 21); // key = (key << 21) - key - 1;
+  key = key ^ (key >> 24);
+  key = (key + (key << 3)) + (key << 8); // key * 265
+  key = key ^ (key >> 14);
+  key = (key + (key << 2)) + (key << 4); // key * 21
+  key = key ^ (key >> 28);
+  key = key + (key << 31);
   return key;
 }
 
@@ -187,6 +211,13 @@ void insert_hash(vector<uint32_t>& vec, const uint32_t val, const uint8_t pPrime
     vec.insert( it, val ); // insert before iterator it
   } else if (*it != val) {      // val not in the vector
     if (extractHighBits(val,pPrime) == extractHighBits(*it,pPrime)) { //the values have the same index
+	  // it's pretty unlikely to observe different hashes with the same index
+	  // pPrime is 25, which means that the chance of another random number
+	  // having the same index is 1/2^25 or about 1/33,500,000. Sparse representation
+	  // doesn't go that high, though.
+	  // Maybe a hash should be added even if it has the same index? 
+	  // (TODO: Check how often this occurs and the relative errors of the estimates)
+	  
       if ((*it & 1) == (val & 1)) { // if both are in the same category
         if ((val & 1) == 1) { // both have ones as lsb - replace if val is greater
           if (val > *it) *it = val;
@@ -234,11 +265,19 @@ static int clz_manual(uint64_t x)
 }
 #endif
 
+#ifdef WIN32
+#include <intrin.h>
+#define __builtin_clz(x) __lzcnt(x)
+#define __builtin_clzl(x) __lzcnt64(x)
+#endif
+
 inline uint8_t clz(const uint32_t x) {
+  if (x == 0) { return 32; }
   return __builtin_clz(x);
 }
 
 inline uint8_t clz(const uint64_t x) {
+  if (x == 0) { return 64; }
   return __builtin_clzl(x);
 }
 //#else
@@ -247,27 +286,24 @@ inline uint8_t clz(const uint64_t x) {
 
 // TODO: the sparse list may be encoded with variable length encoding
 //   see Heule et al., section 5.3.2
-// Also, using sets might give a larger overhead as each insertion costs more
-//  consider using vector and sort/unique when merging.
 typedef vector<uint32_t> SparseListType;
-typedef uint64_t HashSize;
 
 /**
  * HyperLogLogPlusMinus class
  * typename T corresponds to the hash size - usually either uint32_t or uint64_t (implemented for uint64_t)
  */
-
 typedef uint64_t T_KEY;
 template <typename T_KEY>
 class HyperLogLogPlusMinus {
 
 private:
 
-  vector<uint8_t> M;  // registers (M) of size m
+  vector<uint8_t> M;    // registers, size m
   uint8_t p;            // precision
-  uint32_t m;           // number of registers
+  uint32_t m = 1 << p;  // number of registers
   bool sparse;          // sparse representation of the data?
-  SparseListType sparseList; // TODO: use a compressed list instead
+  SparseListType sparseList;
+  uint64_t  (*bit_mixer) (uint64_t);
 
   // sparse versions of p and m
   static const uint8_t  pPrime = 25; // precision when using a sparse representation
@@ -284,7 +320,8 @@ public:
    * @param precision
    * @param sparse
    */
-  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true):p(precision),m(1<<precision),sparse(sparse) {
+  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true, uint64_t  (*bit_mixer) (uint64_t) = murmurhash3_finalizer):
+      p(precision), m(1<<precision), sparse(sparse), bit_mixer(bit_mixer) {
     if (precision > 18 || precision < 4) {
           throw std::invalid_argument("precision (number of register = 2^precision) must be between 4 and 18");
     }
@@ -304,7 +341,7 @@ public:
    */
   void add(T_KEY item) {
     // compute hash for item
-    HashSize hash_value = murmurhash3_finalizer(item);
+    uint64_t hash_value = bit_mixer(item);
 
 #ifdef HLL_DEBUG2
     cerr << "Value: " << item << "; hash(value): " << hash_value << endl;
@@ -446,6 +483,7 @@ public:
   uint64_t cardinality() const {
     if (sparse) {
       // if we are 'sparse', then use linear counting with increased precision pPrime
+      D(cerr << "sparse representation - return linear counting estimate" << endl; )
       return uint64_t(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
     }
 
@@ -454,23 +492,161 @@ public:
     uint32_t v = countZeros(M);
     if (v != 0) {
       uint64_t lc_estimate = linearCounting(m, v);
+      D(cerr << "linear counting estimate: " << lc_estimate << endl;)
       // check if the lc estimate is below the threshold
       assert(lc_estimate >= 0);
       if (lc_estimate <= double(threshold[p-4])) {
+        D(cerr << "below threshold - return it " << endl;)
         return lc_estimate;
       }
+      D(cerr << "above threshold of " << threshold[p-4] << " - calculate raw estimate " << endl;)
     }
 
     // calculate raw estimate on registers
     //double est = alpha(m) * harmonicMean(M, m);
     double est = calculateRawEstimate(M);
+    D(cerr << "raw estimate: " << est << endl;)
     // correct for biases if estimate is smaller than 5m
     if (est <= double(m)*5.0) {
+      D(cerr << "correct bias; subtract " << getEstimateBias(est) << endl;)
+      assert(est > getEstimateBias(est));
       est -= getEstimateBias(est);
     }
 
-    return uint64_t(est);
+    return std::round(est);
   }
+
+  // HyperLogLog++ cardinality estimator of Heule et al., 2015
+  uint64_t heuleCardinality() {
+    return cardinality();
+  }
+
+  // returns a 'register histogram' vector C,
+  //  where C[i] is the number of elements in M with value i
+  //  it's size is q+1 = 64-p+1
+  // used in Ertl's improved estimator
+  vector<int> registerHistogram(const vector<uint8_t>& M, size_t q) {
+    vector<int> C(q+2, 0);
+    for (size_t i = 0; i < m; ++i) {
+      if (M[i] >= q+1) {
+        cerr << "M["<<i<<"] == " << M[i] << "! larger than " << (q+1) << endl;
+      }
+      ++C[M[i]]; 
+    }
+    #ifdef HLL_DEBUG
+    cerr << "C = {";
+    for (size_t i = 0; i < C.size(); ++i) {
+      cerr <<C[i] << ';';
+    }
+    cerr << "}" << endl;
+    #endif
+    assert(std::accumulate(C.begin(), C.end(), 0) == m);
+    return C;
+  }
+
+  vector<int> sparseRegisterHistogram(const SparseListType& sparseList, size_t m, size_t q) {
+    vector<int> C(q+2, 0);
+    C[0] = m;
+    for (const auto& enc_hash : sparseList) {
+      idx_n_rank ir  = getIndexAndRankFromEncodedHash(enc_hash);
+      ++C[ir.rank]; 
+      --C[0];
+    }
+    return C;
+  }
+
+  // Ertl - calculation of sigma correction for 0-registers in M
+  //  x is the proportion of 0-registers, thus x \in [0, 1]
+  //  sigma := x + sum[from k=1 to Inf] ( x^(2^k) * 2^(k-1) )
+  double sigma(double x) {
+    assert(x >= 0.0 && x <= 1.0);
+    if (x == 1.0) { return std::numeric_limits<double>::infinity(); }
+    
+    double prev_sigma_x;
+    double sigma_x = x;
+    double y  = 1.0;
+    do { // loop until sigma_x does not change anymore
+      prev_sigma_x = sigma_x;
+      x *= x; // gives x^(2^k)
+      sigma_x += x * y;
+      y += y; // gives 2^(k-1)
+    } while (sigma_x != prev_sigma_x);
+    return sigma_x;
+  }
+
+  double sigma_mod(double x) {
+    assert(x >= 0.0 && x <= 1.0);
+    if (x == 1.0) { return std::numeric_limits<double>::infinity(); }
+    
+    double sigma_x = x;
+    for (double x_sq = x*x, two_exp = 1.0;
+         x_sq > std::numeric_limits<double>::epsilon();
+         x_sq *= x_sq, two_exp += two_exp) {
+      sigma_x += x_sq * two_exp;
+    } 
+    return sigma_x;
+  }
+
+  // Ertl - calculation of tau correction for values higher then q in M
+  //  x is the proportion of registers with a value below q in M, thus x \in [0,1]
+  //  tau := 1/3 (1 - x - sum[from k=1 to Inf](1-x^(2^(-k))^2 * 2^(-k) )) 
+  double tau(double x) {
+    assert(x >= 0.0 && x <= 1.0);
+    if (x == 0.0 || x == 1.0) { return 0.0; }
+    
+    double prev_tau_x;
+    double y = 1.0;
+    double tau_x = 1 - x; 
+    do { // loop until tau_x does not change anymore
+      prev_tau_x = tau_x;
+      x = std::sqrt(x); // gives x^(2^-k)
+      y /= 2.0;         // gives 2^(-k)
+      tau_x -= std::pow(1-x, 2) * y;
+    } while (tau_x != prev_tau_x);
+    return tau_x / 3.0;
+  }
+
+  // Improved cardinality estimator of Ertl, 2017 (arXiv, section 4)
+  //  Based on the underlying distribution, the estimator employs correction 
+  //  factors for zero and 'over-subscribed' registers. It does not depend on 
+  //  emprically defined bias correction values or a switch between linear 
+  //  counting and loglog estimation
+
+  // Formula:
+  //                                 alpha_inf * m^2 
+  // --------------------------------------------------------------------------------------
+  // ( m * sigma(C_0/m) + sum[from k=1 to q] C_k * 2^(-k) + m * tau(1-C_(q+1)/m) * 2^(-q)
+  uint64_t ertlCardinality() {
+    size_t q, m;
+    vector<int> C;
+    if (sparse) {
+      q = 64  - pPrime;
+      m = mPrime;
+      C = sparseRegisterHistogram(sparseList, m, q);
+    } else {
+      q = 64 - p;
+      m = this->m;
+      C = registerHistogram(M, q);
+    }
+  
+    D(cerr << "\n1. hist. q=" << q << "; m=" << m << endl;)
+    D(cerr << "2. m * tau(m*(1.0 - "<<C[q+1]<<"/m) = "; )
+    double est_denominator = m * tau(1.0-double(C[q+1])/double(m));
+    D(cerr << est_denominator << endl;)
+    D(cerr << "3. loop! " ;)
+    for (int k = q; k >= 1; --k) {
+      est_denominator += C[k];
+      est_denominator *= 0.5;
+    }
+    D(cerr << est_denominator << endl; )
+    D(cerr << "4. sigma(" << C[0] << "/m) = " << sigma(double(C[0])/double(m)); )
+    est_denominator += m * sigma(double(C[0])/double(m));
+    D(cerr << endl;)
+    double m_sq_alpha_inf = (m / (2.0*std::log(2))) * m;
+    return std::round(m_sq_alpha_inf / est_denominator);
+    
+  }
+
 
 private:
 
@@ -563,8 +739,8 @@ private:
     vector<double> biasTable = biasData(p);
   
     // check if estimate is lower than first entry, or larger than last
-    if (rawEstimateTable.front() >= estimate) { return rawEstimateTable.front() - biasTable.front(); }
-    if (rawEstimateTable.back()  <= estimate) { return rawEstimateTable.back() - biasTable.back(); }
+    if (rawEstimateTable.front() >= estimate) { return biasTable.front(); }
+    if (rawEstimateTable.back()  <= estimate) { return biasTable.back(); }
   
     // get iterator to first element that is not smaller than estimate
     vector<double>::const_iterator it = lower_bound(rawEstimateTable.begin(),rawEstimateTable.end(),estimate);
@@ -574,7 +750,8 @@ private:
     double e2 = rawEstimateTable[pos];
   
     double c = (estimate - e1) / (e2 - e1);
-
+    D(cerr << "bias correction factor c: (estimate - e1)/ (e2 - e1) = (" << estimate << " - " << e1 << ")/(" << e2 << " - " << e1 << ")" << endl;) 
+    D(cerr << "biasTable[" << pos-1 << "]*(1-c) + biasTable[" << pos << "]*c" << endl; )
     return biasTable[pos-1]*(1-c) + biasTable[pos]*c;
   }
   

@@ -20,36 +20,142 @@
 #include "hyperloglogplus.h"
 #include <iostream>
 #include <fstream>
+#include <random>
+#include <limits>
+
+ #include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 
 using namespace std;
 
-int main(int argc, char **argv) {
-  if (argc != 4) {
-    std::cerr << "USAGE:\n" 
-      << "count_unique PRECISION SPARSE TEST_MODE\n"
-      << "\n"
-      << "Valid precision values: 10-18. SPARSE can be 0 or 1. If TEST_MODE is 1, then a HLL estimate is given with each number. \n"
-      << "Returns the cardinality of the input stream (has to be uint64_t)\n";
-    return 1;
+int usage(int exit_code) {
+  std::cerr << 
+"count_unique: Get cardinality of 64-bit input stream\n"
+"\n"
+"Usage: count_unique OPTIONS\n"
+"\n"
+"OPTIONS:\n"
+"  -p PRECISION   Precision in range of 10 to 18 (required)\n"
+"  -r INT         Create INT random numbers, instead of counting from STDIN\n"
+"  -s             Use sparse representation for smaller cardinalities\n"
+"  -t             Test mode - print cardinalities after every item\n"
+"  -e             Use improved cardinality estimator by Otmar Ertl, too\n";
+    return exit_code;
   }
 
-  size_t p = stoi(argv[1]);
-  bool sparse = bool(stoi(argv[2]));
-  bool test_mode = bool(stoi(argv[3]));
-  HyperLogLogPlusMinus<uint64_t> hll(p, sparse); // unique k-mer count per taxon
-  uint64_t nr;
-  uint64_t ctr = 0;
-  if (test_mode) {
-    cout << "observed\testimated\n";
+double rel_error(uint64_t est, uint64_t truth) {
+  if (est > truth) 
+    return double(est - truth)/double(truth);
+  else
+  return -double(truth - est)/double(truth);
+}
+
+void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool ertl_too, bool show_rel_error) { 
+  
+    uint64_t esth = hll.cardinality();
+    uint64_t este = hll.ertlCardinality();
+    cout << esth;
+    if (ertl_too) 
+      cout << '\t' << este;
+  
+  if (show_rel_error) {
+    cout << '\t' << rel_error(esth, ctr);
+    if (ertl_too) {
+      cout << '\t' << rel_error(este, ctr);
+      if (abs(rel_error(este, ctr)) == abs(rel_error(esth, ctr))) {
+        cout << "\tequal";
+      } else if (abs(rel_error(este, ctr)) < abs(rel_error(esth, ctr))) {
+        cout << "\tErtl won!";
+      } else {
+        cout << "\tHeule won!";
+      }
+    }
   }
-  while (cin >> nr) {
-    hll.add(nr);
-    if (test_mode) {
-      cout << ++ctr << '\t' << hll.cardinality() << '\n';
+  cout << '\n';
+}
+
+
+void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr, bool test_mode, bool ertl_too, bool show_rel_error) {
+  hll.add(nr);
+  ++ctr;
+  if (test_mode) {
+     print_card(hll, ctr, ertl_too, show_rel_error);
+  }
+}
+
+
+int main(int argc, char **argv) {
+
+  size_t p = 10;
+  bool sparse = false;
+  bool test_mode = false;
+  bool ertl_too = false;
+  bool show_rel_error = false;
+  bool use_stdin = true;
+  size_t n_rand;
+
+  int c;
+
+  while ((c = getopt (argc, argv, "shtep:r:y")) != -1)
+    switch (c) {
+      case 's': sparse = true; break;
+      case 't': test_mode = true; break;
+      case 'e': ertl_too = true; break;
+      case 'y': show_rel_error = true; break;
+      case 'p': p = stoi(optarg); break;
+      case 'r': use_stdin = false; 
+                n_rand = stoi(optarg); 
+                break;
+      case 'h': return usage(0); break;
+      case '?':
+        if (optopt == 'p' || optopt == 'r')
+          fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+        else if (isprint (optopt))
+          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+        else
+          fprintf (stderr,
+                   "Unknown option character `\\x%x'.\n",
+                   optopt);
+        return 1;
+      default:
+        abort ();
+      }
+
+  HyperLogLogPlusMinus<uint64_t> hll(p, sparse); // unique k-mer count per taxon
+  //HyperLogLogPlusMinus<uint64_t> hll(p, sparse, wang_mixer); // unique k-mer count per taxon
+
+  if (test_mode) {
+    cout << "observed\testimated";
+    if (ertl_too) {
+      cout << "\tertl_estimated";
+    }
+    cout << '\n';
+  } 
+  uint64_t ctr = 0;
+  
+  if (use_stdin) {
+    uint64_t nr;
+    while (cin >> nr) {
+      add_to_hll(hll, nr, ctr, test_mode, ertl_too, show_rel_error);
+    }
+  } else {
+    // get random seed from random_device RNG
+    std::random_device rd;
+    // use 64-bit Mersenne Twister 19937 as RNG, seed with rd()
+    std::mt19937_64 rng(rd()); 
+    
+    // Define output distribution (default range for unsigned: 0 to MAX)
+    std::uniform_int_distribution<uint64_t> distr;
+
+    for(size_t i = 0; i < n_rand; i++) {
+      add_to_hll(hll, distr(rng), ctr, test_mode, ertl_too, show_rel_error);
     }
   }
   if (!test_mode) {
-    cout << hll.cardinality() << endl;
+    print_card(hll, ctr, ertl_too, show_rel_error);
   }
   
 }
