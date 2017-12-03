@@ -112,7 +112,7 @@ for VAR in $@; do
     archaea)   build_db $PROG $K $M archaea archaea ;;
     std)   build_db $PROG $K $M std archaea-dusted bacteria-dusted viral-dusted viral-neighbors-dusted \
                                vertebrate_mammalian contaminants ;;
-    euk)       build_db $K euk fungi-dusted protozoa-dusted ;;
+    euk)       build_db $PROG $K $M euk fungi-dusted protozoa-dusted ;;
   *) echo -e "Unknown database $VAR!\n$USAGE"
      exit 1 ;;
   esac

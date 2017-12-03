@@ -200,9 +200,11 @@ int main(int argc, char **argv) {
   }
 
   if (! Kraken_output_file.empty()) {
-    if (Kraken_output_file == "off")
+    if (Kraken_output_file == "off" || Kraken_output_file == "-") {
       Print_kraken = false;
-    else {
+    //else if (Kraken_output_file == "-") {
+    //  Kraken_output = &cout;
+    } else {
       cerr << "Writing Kraken output to " << Kraken_output_file << endl;
       Kraken_output = cout_or_file(Kraken_output_file);
     }
