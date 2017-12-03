@@ -70,6 +70,7 @@ QuickFile UID_to_TaxID_map_file;
 
 uint32_t Minimum_hit_count = 1;
 unordered_map<uint32_t, uint32_t> Parent_map;
+unordered_map<uint32_t, vector<uint32_t> > Uid_dict;
 string Classified_output_file, Unclassified_output_file, Kraken_output_file, Report_output_file, TaxDB_file;
 ostream *Classified_output;
 ostream *Unclassified_output;
@@ -210,7 +211,7 @@ int main(int argc, char **argv) {
     Kraken_output = &cout;
   }
 
-  if (!Report_output_file.empty()) {
+  if (!Report_output_file.empty() && Report_output_file != "off") {
      Print_kraken_report = true;
       cerr << "Writing Kraken report output to " << Report_output_file << endl;
      Report_output = cout_or_file(Report_output_file);
@@ -255,7 +256,7 @@ int main(int argc, char **argv) {
     "taxID", 
     "rank", 
     "taxName"});
-  rep.printReport("kraken","blu");
+  rep.printReport("kraken");
   }
 
   for (size_t i = 0; i < Open_fstreams.size(); ++i) {
@@ -541,7 +542,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
       cerr << "Quick mode not available when mapping UIDs" << endl;
       exit(1);
     } else {
-      call = resolve_uids2(hit_counts, Parent_map, 
+      call = resolve_uids3(hit_counts, Parent_map, Uid_dict,
         UID_to_TaxID_map_file.ptr(), UID_to_TaxID_map_file.size());
     }
   } else {
