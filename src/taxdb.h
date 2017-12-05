@@ -946,10 +946,15 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID
     bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _readCounts(readCounts), _show_zeros(show_zeros) {
 
   for (auto it = _readCounts.begin(); it != _readCounts.end(); ++it) {
-    TaxonomyEntry<TAXID>* tax = &taxdb.entries.at(it->first);
-    while (tax != NULL) {
-      _readCountsIncludingChildren[tax->taxonomyID] += it->second;
-      tax = tax->parent;
+    auto tax_it = taxdb.entries.find(it->first);
+    if (tax_it == taxdb.entries.end()) {
+      cerr << "No entry for " << it->first << " in database!" << endl;
+    } else {
+      TaxonomyEntry<TAXID>* tax = &(tax_it->second);
+      while (tax != NULL) {
+        _readCountsIncludingChildren[tax->taxonomyID] += it->second;
+        tax = tax->parent;
+      }
     }
   }
 
