@@ -23,6 +23,7 @@
 use strict;
 use warnings;
 use File::Basename;
+use File::Path;
 use Getopt::Long;
 
 my $PROG = basename $0;
@@ -102,6 +103,13 @@ See --help for more details.\n";
   exit 1;
 }
 
+
+if (scalar(@db_prefix) == 0) {
+  print STDERR "Need to specify a database with --db!
+See --help for more details.\n";
+  exit 1;
+}
+
 eval { @db_prefix = map { krakenlib::find_db($_) } @db_prefix };
 if ($@) {
   die "$PROG: $@";
@@ -148,11 +156,16 @@ my $auto_detect = 1;
 if ($fasta_input || $fastq_input || $compressed) {
   $auto_detect = 0;
 }
-if (! -f $ARGV[0]) {
+if (!defined $ARGV[0] || ! -f $ARGV[0]) {
   $auto_detect = 0;
 }
 if ($auto_detect) {
   auto_detect_file_format();
+}
+
+
+if (! -d dirname($report_file)) {
+  make_path(dirname($report_file));
 }
 
 # set flags for classifier
@@ -268,7 +281,7 @@ Options:
                           Print unclassified sequences to filename
   --classified-out FILENAME
                           Print classified sequences to filename
-  --output FILENAME       Print output to filename (default: stdout); "-" will
+  --output FILENAME       Print output to filename (default: stdout); "off" will
                           suppress normal output
   --only-classified-output
                           Print no Kraken output for unclassified sequences

@@ -109,6 +109,7 @@ int main(int argc, char **argv) {
     auto it = seqid_map.find(seq_id);
     if (it == seqid_map.end()) {
       cerr << "ERROR: Couldn't find taxid for " << seq_id << endl;
+      continue;
       exit(1);
     } else {
       seq_taxid = it->second;

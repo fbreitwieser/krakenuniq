@@ -380,10 +380,10 @@ void process_file(string filename, uint32_t taxid) {
     set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
 }
 
-void process_sequence(DNASequence dna) {
+//void process_sequence(DNASequence dna) {
   // TODO: Refactor such that a list of files + taxid can be given.
   // Or maybe asembly_summary file?
-}
+//}
 
 void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_contaminant_taxid) {
   KmerScanner scanner(seq, start, finish);

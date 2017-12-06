@@ -89,7 +89,7 @@ struct TaxRank {
 
   static const unordered_map<string, RANK> string_to_rank;
 
-  static const RANK toRank(const string& rank) {
+  static RANK toRank(const string& rank) {
     const auto& it = string_to_rank.find(rank);
     if (it == string_to_rank.end()) {
       cerr << "ERROR: Could not find rank " << rank << endl;
@@ -293,7 +293,7 @@ class TaxReport {
 
   public:
     TaxReport(std::ostream& _reportOfb, TaxonomyDB<TAXID> & taxdb, std::unordered_map<TAXID, READCOUNTS>, bool _show_zeros);
-    void printReport(std::string format, std::string rank);
+    void printReport(std::string format);
     void printReport(TaxonomyEntry<TAXID>& tax, unsigned depth);
     void setReportCols(std::vector<std::string> names);
 
@@ -946,10 +946,15 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID
     bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _readCounts(readCounts), _show_zeros(show_zeros) {
 
   for (auto it = _readCounts.begin(); it != _readCounts.end(); ++it) {
-    TaxonomyEntry<TAXID>* tax = &taxdb.entries.at(it->first);
-    while (tax != NULL) {
-      _readCountsIncludingChildren[tax->taxonomyID] += it->second;
-      tax = tax->parent;
+    auto tax_it = taxdb.entries.find(it->first);
+    if (tax_it == taxdb.entries.end()) {
+      cerr << "No entry for " << it->first << " in database!" << endl;
+    } else {
+      TaxonomyEntry<TAXID>* tax = &(tax_it->second);
+      while (tax != NULL) {
+        _readCountsIncludingChildren[tax->taxonomyID] += it->second;
+        tax = tax->parent;
+      }
     }
   }
 
@@ -977,7 +982,7 @@ void TaxReport<TAXID,READCOUNTS>::setReportCols(std::vector<std::string> names) 
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxReport<TAXID,READCOUNTS>::printReport(std::string format, std::string rank) {
+void TaxReport<TAXID,READCOUNTS>::printReport(std::string format) {
   _total_n_reads = reads(_readCountsIncludingChildren[0]) + reads(_readCountsIncludingChildren[1]);
   if (_total_n_reads == 0) {
     std::cerr << "total number of reads is zero - not creating a report!" << endl;
