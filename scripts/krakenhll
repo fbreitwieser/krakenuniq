@@ -124,6 +124,18 @@ foreach my $file (@kdb_files,@idx_files) {
   die "$PROG: $file does not exist!\n" if (! -e $file);
 }
 
+if (scalar(@db_prefix) > 1) {
+  my $taxdb1_size = (stat $db_prefix[0]."/taxDB")[7];
+  for (my $i = 1; $i < scalar(@db_prefix); ++$i) {
+    my $taxdb2_size = (stat $db_prefix[$i]."/taxDB")[7];
+    if ($taxdb1_size !=  $taxdb2_size) {
+      print STDERR "You need identical taxonomies for hierachical mapping!\n";
+      print STDERR "$db_prefix[0]/taxDB differs from $db_prefix[$i]/taxDB.\n";
+      exit 1;
+    }
+  }
+}
+
 if ($min_hits > 1 && ! $quick) {
   die "$PROG: --min_hits requires --quick to be specified\n";
 }

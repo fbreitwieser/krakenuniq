@@ -128,11 +128,16 @@ namespace kraken {
         if (it2 != hit_counts.end()) {
           score += it2->second;
         }
-        if (node == parent_map.at(node)) {
+        auto node_it = parent_map.find(node);
+        if (node_it == parent_map.end()) {
+          cerr << "No parent for " << node << " recorded" << endl;
+          break;
+        } else if (node_it->second == node) {
           cerr << "Taxon " << node << " has itself as parent!" << endl;
           break;
+        } else {
+          node = node_it->second;
         }
-        node = parent_map.at(node);
 
       }
 

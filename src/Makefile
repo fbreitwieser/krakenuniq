@@ -1,6 +1,6 @@
 CXX = g++
 FOPENMP?=-fopenmp
-CXXFLAGS = -Wall  -Wextra -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAGS}
+CXXFLAGS = -Wall  -Wextra -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAGS} -g
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
 PROGS1 = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb 
 TEST_PROGS = grade_classification test_hll_on_db dump_db_kmers

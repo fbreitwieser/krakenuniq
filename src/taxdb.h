@@ -910,10 +910,10 @@ void TaxonomyDB<TAXID>::setGenomeSize(const TAXID taxid, const uint64_t genomeSi
 
 template<typename TAXID>
 void TaxonomyDB<TAXID>::readGenomeSizes(string file) {
-  for (auto entry_it = entries.begin(); entry_it != entries.end(); ++entry_it) {
-    entry_it->second.genomeSize = 0;
-    entry_it->second.genomeSizeOfChildren = 0;
-  }
+  //for (auto entry_it = entries.begin(); entry_it != entries.end(); ++entry_it) {
+  //  entry_it->second.genomeSize = 0;
+  //  entry_it->second.genomeSizeOfChildren = 0;
+  //}
   log_msg("Reading genome sizes from " + file);
   std::ifstream inFile(file);
   if (!inFile.is_open())
@@ -946,10 +946,15 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID
     bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _readCounts(readCounts), _show_zeros(show_zeros) {
 
   for (auto it = _readCounts.begin(); it != _readCounts.end(); ++it) {
-    TaxonomyEntry<TAXID>* tax = &taxdb.entries.at(it->first);
-    while (tax != NULL) {
-      _readCountsIncludingChildren[tax->taxonomyID] += it->second;
-      tax = tax->parent;
+    auto tax_it = taxdb.entries.find(it->first);
+    if (tax_it == taxdb.entries.end()) {
+      cerr << "No entry for " << it->first << " in database!" << endl;
+    } else {
+      TaxonomyEntry<TAXID>* tax = &(tax_it->second);
+      while (tax != NULL) {
+        _readCountsIncludingChildren[tax->taxonomyID] += it->second;
+        tax = tax->parent;
+      }
     }
   }
 
