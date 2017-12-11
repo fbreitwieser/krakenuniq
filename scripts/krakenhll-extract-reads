@@ -1,0 +1,210 @@
+#!/bin/env perl
+# (c) 2015-2017 Steven Salzberg and Florian Breitwieser
+# part of KrakenHLL
+# licensed under GPL-3
+
+use strict;
+use warnings;
+use Getopt::Std;
+use File::Basename;
+
+my %print_it;
+my $KRAKEN;
+
+my $usage = "
+".basename($0).": Extract all reads from FASTQ file that are matched to a specied taxon by KrakenHLL
+
+Usage: ".basename($0)." [OPTIONS] <taxon> <kraken> <fasta/fastq>
+
+<taxon>         taxonomy ID, possibly multiple separated by ','
+<kraken>        kraken result file
+<fasta/fastq>   fasta/fastq file, possibly gzipped
+
+Options:
+  -a  input is FASTA file (default: FASTQ)
+  -f  output in FASTA format
+  -i  invert: print all reads not matching taxon
+  -t TAXDB Include children of taxonomy IDs, using TAXDB to find them
+  -v  verbose
+  -p  paired-end reads: use a '%' in fasta/q file name as placeholder for 1 and 2
+
+Example:
+    ".basename($0)." -p 9606 result.kraken input_%.fq 
+    outputs all reads of input_1.fq and input_2.fq that have the taxonomy ID 9606 to STDOUT.
+";
+
+my %options=(
+    i=>0
+);
+getopts("fviapt:", \%options) || die $usage;
+my $is_paired = $options{p};
+my $is_inverted = $options{i};
+$is_inverted=0 unless defined $is_inverted;
+
+die "$usage" unless $#ARGV == 2;
+
+sub get_children {
+  my $h = shift;
+  my @children = ();
+  foreach my $parent (@_) {
+    push @children, @{$h->{$parent}} if defined $h->{$parent};
+    foreach my $child (@{$h->{$parent}}) {
+      push @children, get_children($h, $child);
+    }
+  }
+  return @children;
+}
+
+my %taxon_id = map {$_ => 0} split(/,/,$ARGV[0]);
+if (defined $options{t}) {
+  print STDERR "Reading $options{t} to get children ... ";
+  open(my $TAXDB, "<", $options{t});
+  my %child_map;
+  while (my ($tid, $parent_tid) = split(/\t/, <$TAXDB>)) {
+    push @{$child_map{$parent_tid}}, $tid unless $tid == $parent_tid;
+    #print STDERR join(";", @{$child_map{$parent_tid}})."\n" if $parent_tid == 562;
+  }
+  close($TAXDB);
+  my @all_children = get_children(\%child_map, (keys %taxon_id));
+  my $n_children = scalar @all_children;
+  foreach (@all_children) {
+    $taxon_id{$_} = 0;
+  }
+  print STDERR "found $n_children children in total. \n";
+}
+
+print STDERR "Getting all reads ".
+            ($is_inverted ? "not matched to" : "matched to")." the following taxon: ",join(", ",(keys %taxon_id)),"\n";
+
+open($KRAKEN,"<",$ARGV[1]) ||  die ("can't open file $ARGV[1].\n");
+
+## open fastq_files
+my ($FQ,$FQ_2);
+if ($ARGV[2] =~ /.gz$/) {
+    if ($is_paired) {
+        open $FQ, "gunzip -c ".get_p($ARGV[2],1)." |" or die $!;
+        open $FQ_2, "gunzip -c ".get_p($ARGV[2],2)." |" or die $!;
+    } else {
+        open $FQ, "gunzip -c $ARGV[2] |" or die $!;
+    }
+} else {
+    if ($is_paired) {
+        open $FQ, '<', get_p($ARGV[2],1) or die $!;
+        open $FQ_2, '<', get_p($ARGV[2],2) or die $!;
+    } else {
+        open $FQ, '<', $ARGV[2] or die $!;
+    }
+}
+
+while (<$KRAKEN>) {
+    # kraken file format is:
+    # C<tab>M02302:53:000000000-ACJM9:1:1101:14778:1726<tab>9606<tab>151<tab>9606:56 0:55 9606:2 0:8
+    my (undef, $readid, $taxid) = split("\t");
+    chomp $taxid;
+    #print STDERR '($tmp1, $readid, $taxid, $len, $kmer_hits) = '."($tmp1, $readid, $taxid, $len, $kmer_hits)\n";
+    if (defined $taxon_id{$taxid}) {
+        $print_it{$readid} = $taxid;  # mark it for printing
+        $taxon_id{$taxid} += 1;
+    } elsif (defined $taxon_id{-1}) {
+        $print_it{$readid} = -1;  # mark it for printing
+        $taxon_id{-1} += 1;
+    }
+}
+
+my $sum_reads = 0;
+for my $taxon (keys %taxon_id) {
+    printf STDERR "  Got %5s reads for %s\n",$taxon_id{$taxon},$taxon;
+    $sum_reads += $taxon_id{$taxon};
+}
+exit(0) if $sum_reads==0;
+
+$options{f} = 1 if (defined $options{a});
+
+my $cnt=0;
+$\ = undef ;
+print STDERR "Going through FA/FQ file to get reads";
+my $previous;
+
+my $start_symbol = defined $options{a}? '>' : '@';
+
+while(<$FQ>) {
+
+    next unless (/^$start_symbol/);   # if not at first line of fastq entry
+    my ($id, $other) = split(" ");
+
+    $id =~ s/^$start_symbol//; # get rid of ">" character
+    $id =~ s/ .*//;            # remove everything after the space
+    if ($is_paired) {
+        # remove pair-specific part of read IDs (if present)
+        $id =~ s#/[12]$##;  # || die "$id??";
+    }
+    $id =~ s#/[12]$##; ## paired read ends
+
+    my $print_this_read = defined $print_it{$id};
+    $print_this_read = !$print_this_read if $is_inverted;
+
+    if ($print_this_read) { # print all 4 lines
+        if (defined $options{f}) {
+            die if $is_paired;  ##NOT IMPLEMENTED YET
+            ## output in FASTA format
+            #print ">",$id," matches ",$print_it{$id},"\n";
+            print ">",$id,"\n";
+            my $next = <$FQ>;
+            print $next;
+ 
+            if (defined $options{a}) {
+              while ($next = <$FQ> && !$next =~ /^>/ ) {
+                print $next;
+              }
+              $_ = $next;
+              redo; # redo the with $_ set to $next
+            } else {
+              <$FQ>;
+              <$FQ>;
+            }
+        } else {
+            ## output in FASTQ format
+            print $_;
+            for (my $i = 0; $i<3; $i++) {
+                my $next = <$FQ>;
+                print $next;
+            }
+            if ($is_paired) {
+                for (my $i = 0; $i<4; $i++) {
+                    my $next = <$FQ_2>;
+                    print $next;
+                }
+            }
+        }
+
+        ++$cnt;
+        if ($cnt % 100 eq 0) {
+            printf STDERR "\rnumber of extracted reads: %10s",$cnt; 
+            $|++;
+        }
+        last if $cnt >= $sum_reads;
+    } else {
+        if (!defined $options{a}) {
+            # skip next 3 fastq lines
+            for (my $i = 0; $i<3; $i++) { <$FQ>; }
+            # skip next 4 fastq lines in mate-pair (when paired) - header was not read
+            if ($is_paired) { 
+                for (my $i = 0; $i<4; $i++) { <$FQ_2>; } 
+            }
+
+        }
+    }
+}
+printf STDERR "\rnumber of extracted reads: %10s",$cnt; 
+print STDERR "\n\n";
+
+close $KRAKEN;
+close $FQ;
+
+sub get_p {
+    my ($s,$p) = @_;
+    $s =~ s/%/$p/;
+    return $s;
+}
+
+

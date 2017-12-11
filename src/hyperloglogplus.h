@@ -36,6 +36,7 @@
 #include<math.h>    //log
 #include<algorithm> //vector.count
 #include<bitset>
+#include<unordered_set>
 
 #include "hyperloglogbias.h"
 #include "assert_helpers.h"
@@ -204,8 +205,19 @@ inline uint32_t extractHighBits(uint32_t bits, uint8_t hi) {
 }
 
 
+
+template<typename SET>
+inline 
+void insert_hash(SET& uset, const uint32_t val, const uint8_t pPrime) {
+  // this implementation currently does not check if there is a value for an index of length pPrime
+  uset.insert(val);
+}
+
+
+
 inline 
 void insert_hash(vector<uint32_t>& vec, const uint32_t val, const uint8_t pPrime) {
+  //if (sparseList_is_sorted) {
   auto it = std::lower_bound( vec.begin(), vec.end(), val); // find proper position in descending order
   if (it == vec.end()) { // position at the end
     vec.insert( it, val ); // insert before iterator it
@@ -231,6 +243,9 @@ void insert_hash(vector<uint32_t>& vec, const uint32_t val, const uint8_t pPrime
       vec.insert( it, val ); // insert before iterator it
     }
   }
+  //} else {
+  //  vec.push_back(val);
+  //}
 }
 
 /*
@@ -283,10 +298,24 @@ inline uint8_t clz(const uint64_t x) {
 //#else
 //#endif
 
+template<typename T>
+struct NoHash {
+  size_t operator() (const T &u) const {
+    return u;
+  }
+};
 
-// TODO: the sparse list may be encoded with variable length encoding
-//   see Heule et al., section 5.3.2
-typedef vector<uint32_t> SparseListType;
+
+// Heule et al. encode the sparse list with variable length encoding
+//   see section 5.3.2. This implementation just uses a sorted vector or unordered_set.
+typedef unordered_set<uint32_t> SparseListType;
+// Other possible SparseList types:
+// // typedef vector<uint32_t> SparseListType;
+// The sorted vector implementation is pretty inefficient currently, because the vector
+// is always kept sorted. 
+// //typedef unordered_set<uint32_t, NoHash<uint32_t> > SparseListType;
+// No real performance gain from using the hash value directly - and probably problems
+// with the bucket assignment, since unordered_set expects size_t hashes
 
 /**
  * HyperLogLogPlusMinus class
@@ -330,6 +359,7 @@ public:
 
     if (sparse) {
       this->sparseList = SparseListType(); // TODO: if SparseListType is changed, initialize with appropriate size
+      this->sparseList.reserve(m/4);
     } else {
       this->M = vector<uint8_t>(m);
     }
@@ -361,7 +391,7 @@ public:
 #endif
 
       // if the sparseList is too large, switch to normal (register) representation
-      if (this->sparseList.size() > this->m) { // TODO: is the size of m correct?
+      if (this->sparseList.size() > this->m/4) {
         switchToNormalRepresentation();
       }
     } else {
@@ -403,7 +433,7 @@ public:
 #endif
     this->sparse = false;
     this->M = vector<uint8_t>(this->m);
-    if (sparseList.size() > 0) { //TDOD: do I need to check this, here?
+    if (sparseList.size() > 0) {
       addToRegisters(this->sparseList);
       this->sparseList.clear();
     }

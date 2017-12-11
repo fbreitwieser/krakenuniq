@@ -3,7 +3,7 @@ FOPENMP?=-fopenmp
 CXXFLAGS = -Wall  -Wextra -std=c++0x $(FOPENMP) -I./gzstream -O2 -Wfatal-errors ${CPPFLAGS}
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
 PROGS1 = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb 
-TEST_PROGS = grade_classification test_hll_on_db
+TEST_PROGS = grade_classification test_hll_on_db dump_db_kmers
 #PROGS = $(PROGS1) $(TEST_PROGS)
 PROGS = $(PROGS1)
 #LIBFLAGS = -L. -lz -lgzstream ${LDFLAGS}
@@ -34,6 +34,8 @@ read_uid_mapping: quickfile.o
 count_unique: hyperloglogplus.h
 
 test_hll_on_db: krakendb.o hyperloglogplus.h quickfile.o
+
+dump_db_kmers: krakendb.o quickfile.o
 
 classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.h taxdb.h report-cols.h
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)

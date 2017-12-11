@@ -27,16 +27,12 @@
 using namespace std;
 using namespace kraken;
 
-//using std::map to have the keys sorted
-void count_n_random_kmers(size_t nr, char* ptr, size_t pair_sz, size_t key_ct, size_t key_len) {
-}
-
 int main(int argc, char **argv) {
-  if (argc != 5) {
+  if (argc != 4) {
     std::cerr << "USAGE:\n" 
-      << "count_unique DATABASE PRECISION SPARSE NR_KMERS\n"
+      << "test_hll_on_db DATABASE SPARSE NR_KMERS\n"
       << "\n"
-      << "Valid precision values: 10-18. SPARSE can be 0 or 1. \n";
+      << "Tests precision values 10-18. SPARSE can be 0 or 1. \n";
     return 1;
   }
 
@@ -47,9 +43,9 @@ int main(int argc, char **argv) {
   cerr << "Fully loaded\n";
   KrakenDB db(db_file.ptr());
 
-  size_t p = stoi(argv[2]);
-  bool sparse = bool(stoi(argv[3]));
-  size_t nr = stoi(argv[4]);
+  //size_t p = stoi(argv[2]);
+  bool sparse = bool(stoi(argv[2]));
+  size_t nr = stoi(argv[3]);
 
   HyperLogLogPlusMinus<uint64_t> hll10(10, sparse); // unique k-mer count per taxon
   HyperLogLogPlusMinus<uint64_t> hll11(11, sparse); // unique k-mer count per taxon
@@ -82,7 +78,7 @@ int main(int argc, char **argv) {
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
   std::uniform_real_distribution<> dis(0.0, 1.0);
 
-  cout << "precision\ttrue_count\testimate\n";
+  cout << "precision\ttrue_count\testimate\tertl_estimate\n";
   size_t ctr = 0;
   for (uint64_t i = 0; i < key_ct; i++) {
     if (dis(gen) < prob) {
@@ -100,16 +96,19 @@ int main(int argc, char **argv) {
       hll17.add(*kmer);
       hll18.add(*kmer);
       ++ctr;
-      if (ctr < 10 || floor(log10(ctr)) == log10(ctr)) {
-        cout << 10 << '\t' << ctr << '\t' << hll10.cardinality() << '\n';
-        cout << 11 << '\t' << ctr << '\t' << hll11.cardinality() << '\n';
-        cout << 12 << '\t' << ctr << '\t' << hll12.cardinality() << '\n';
-        cout << 13 << '\t' << ctr << '\t' << hll13.cardinality() << '\n';
-        cout << 14 << '\t' << ctr << '\t' << hll14.cardinality() << '\n';
-        cout << 15 << '\t' << ctr << '\t' << hll15.cardinality() << '\n';
-        cout << 16 << '\t' << ctr << '\t' << hll16.cardinality() << '\n';
-        cout << 17 << '\t' << ctr << '\t' << hll17.cardinality() << '\n';
-        cout << 18 << '\t' << ctr << '\t' << hll18.cardinality() << '\n';
+
+      uint64_t last_dec = pow(10,floor(log10(ctr)));
+      if (floor(log10(ctr)) == log10(ctr) || 
+        (ctr > 100 && (ctr*10) % last_dec == 0)) {
+        cout << 10 << '\t' << ctr << '\t' << hll10.cardinality() << '\t' << hll10.ertlCardinality() << '\n';
+        cout << 11 << '\t' << ctr << '\t' << hll11.cardinality() << '\t' << hll11.ertlCardinality() << '\n';
+        cout << 12 << '\t' << ctr << '\t' << hll12.cardinality() << '\t' << hll12.ertlCardinality() << '\n';
+        cout << 13 << '\t' << ctr << '\t' << hll13.cardinality() << '\t' << hll13.ertlCardinality() << '\n';
+        cout << 14 << '\t' << ctr << '\t' << hll14.cardinality() << '\t' << hll14.ertlCardinality() << '\n';
+        cout << 15 << '\t' << ctr << '\t' << hll15.cardinality() << '\t' << hll15.ertlCardinality() << '\n';
+        cout << 16 << '\t' << ctr << '\t' << hll16.cardinality() << '\t' << hll16.ertlCardinality() << '\n';
+        cout << 17 << '\t' << ctr << '\t' << hll17.cardinality() << '\t' << hll17.ertlCardinality() << '\n';
+        cout << 18 << '\t' << ctr << '\t' << hll18.cardinality() << '\t' << hll18.ertlCardinality() << '\n';
       }
     }
   }

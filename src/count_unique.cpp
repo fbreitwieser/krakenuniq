@@ -41,13 +41,14 @@ int usage(int exit_code) {
 "  -p PRECISION   Precision in range of 10 to 18 (required)\n"
 "  -r INT         Create INT random numbers, instead of counting from STDIN\n"
 "  -s             Use sparse representation for smaller cardinalities\n"
-"  -t             Test mode - print cardinalities after every item\n"
+"  -t             Test mode - print cardinalities regularily\n"
+"  -y             Show relative error along with cardinality estimates\n"
 "  -e             Use improved cardinality estimator by Otmar Ertl, too\n";
     return exit_code;
   }
 
 double rel_error(uint64_t est, uint64_t truth) {
-  if (est > truth) 
+  if (est >= truth) 
     return double(est - truth)/double(truth);
   else
   return -double(truth - est)/double(truth);
@@ -57,7 +58,7 @@ void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool ertl_too
   
     uint64_t esth = hll.cardinality();
     uint64_t este = hll.ertlCardinality();
-    cout << esth;
+    cout << ctr << '\t' << esth;
     if (ertl_too) 
       cout << '\t' << este;
   
@@ -82,7 +83,12 @@ void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr,
   hll.add(nr);
   ++ctr;
   if (test_mode) {
-     print_card(hll, ctr, ertl_too, show_rel_error);
+    // prints numbers at powers of 10 and 10 points in-between
+    uint64_t last_dec = pow(10,floor(log10(ctr)));
+    if (floor(log10(ctr)) == log10(ctr) || 
+        (ctr > 100 && (ctr*10) % last_dec == 0)) {
+      print_card(hll, ctr, ertl_too, show_rel_error);
+    }
   }
 }
 

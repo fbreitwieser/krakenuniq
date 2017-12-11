@@ -56,13 +56,21 @@ my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
 
 my $USAGE="\n".basename($0).
-" [<options>] <database> <database>*
+" [<options>] <pattern> <pattern>*
 
 ARGUMENT
- <database>    One of refseq, genbank, contaminants or taxonomy:
-                 - contaminants gets contaminant sequences from UniVec and EmVec,
-                 - taxonomy for taxonomy mappings.
-                 - use refseq or genbank for genomic sequences,
+ <pattern>  Possible patterns:
+              'contaminants'   downloads contaminant sequences from UniVec and EmVec
+              'taxonomy'       downloads the NCBI taxonomy mappings
+              'genbank'        downloads GenBank genomes (see parameters -a and -d)
+              'refseq'         downloads RefSeq genomes (see parameters -a and -d)
+              'refseq/DOMAIN'  downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria')
+              'refseq/DOMAIN/ASS_LEVEL'    specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
+              'refseq/DOMAIN/ASS_LEVEL/taxidTAXID'   specifify taxid (e.g. 'refseq/vertebrate_mammalian/taxid9606')
+
+              
+  By default, 'refseq' and 'genbank' download the domains and assembly levels specied
+  with other parameters, however
                    - refseq and genbank can be proceeded by '/DOMAIN' or '/DOMAIN/ASS_LEVEL', e.g.
                      - refseq/archaea, refseq/viral/Any, or genbank/bacteria
                      - if ASS_LEVEL is not given, the default is used
