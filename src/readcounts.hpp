@@ -24,7 +24,7 @@
 #include "hyperloglogplus.h"
 
 namespace kraken {
-  static size_t HLL_PRECISION = 12;
+  static size_t HLL_PRECISION = 14;
   struct ReadCounts {
     uint64_t n_reads;
     uint64_t n_kmers;

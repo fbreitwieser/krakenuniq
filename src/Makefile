@@ -31,13 +31,13 @@ grade_classification: taxdb.h report-cols.h
 
 read_uid_mapping: quickfile.o
 
-count_unique: hyperloglogplus.h
+count_unique: hyperloglogplus.o
 
-test_hll_on_db: krakendb.o hyperloglogplus.h quickfile.o
+test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
 dump_db_kmers: krakendb.o quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.h taxdb.h report-cols.h
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o taxdb.h report-cols.h
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
 build_taxdb: taxdb.h report-cols.h quickfile.o
@@ -63,3 +63,6 @@ quickfile.o: quickfile.cpp quickfile.hpp
 
 uid_mapping.o: krakenutil.hpp uid_mapping.hpp uid_mapping.cpp
 	$(CXX) $(CXXFLAGS) -c uid_mapping.cpp
+
+hyperloglogplus.o: hyperloglogplus.h hyperloglogplus.cpp
+	$(CXX) $(CXXFLAGS) -c hyperloglogplus.cpp

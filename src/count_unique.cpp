@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   bool ertl_too = false;
   bool show_rel_error = false;
   bool use_stdin = true;
-  size_t n_rand;
+  size_t n_rand = 1;
 
   int c;
 

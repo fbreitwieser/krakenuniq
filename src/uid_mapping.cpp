@@ -146,6 +146,8 @@ namespace kraken {
       const unordered_map<uint32_t, uint32_t> &parent_map,
       const char* fptr, const size_t fsize) {
 
+    (void)fsize; // parameter unused
+
     unordered_map<uint32_t, uint32_t> taxid_counts;
     unordered_map<uint32_t, double> frac_taxid_counts;
 
@@ -212,6 +214,8 @@ namespace kraken {
       const unordered_map<uint32_t, uint32_t> &parent_map,
       unordered_map<uint32_t, vector<uint32_t> > &uid_dict,
       const char* fptr, const size_t fsize) {
+
+    (void)fsize; // parameter unused
 
     unordered_map<uint32_t, uint32_t> taxid_counts;
     unordered_map<uint32_t, double> frac_taxid_counts;
