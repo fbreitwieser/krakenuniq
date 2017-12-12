@@ -134,17 +134,14 @@ uint8_t getRank(const uint64_t hash_value, const uint8_t p) {
 // Methods for spare representation, Heule et al., 2015
 
 uint8_t getEncodedRank(const uint32_t encoded_hash_value, const uint8_t pPrime, const uint8_t p) {
-    uint8_t rank_val;
     // check if the least significant bit is 1
     if ( (encoded_hash_value & 1) == 1) {
       // if yes: the hash was stored with higher precision, bits p to pPrime were 0
       uint8_t additional_rank = pPrime - p;
-      rank_val = additional_rank + extractBits(encoded_hash_value, 7, 1);
+      return additional_rank + extractBits(encoded_hash_value, 7, 1);
     } else {
-      rank_val = getRank(encoded_hash_value,p);
-      //assert_leq(rank_val,32);
+      return getRank(encoded_hash_value,p);
     }
-    return rank_val;
 }
 
 /**
@@ -165,7 +162,7 @@ uint8_t getEncodedRank(const uint32_t encoded_hash_value, const uint8_t pPrime, 
  * @return encoded hash value
  */
 inline
-uint32_t encodeHashIn32Bit(uint64_t hash_value, size_t p, uint8_t pPrime) {
+uint32_t encodeHashIn32Bit(uint64_t hash_value, uint8_t pPrime, uint8_t p) {
     // extract first pPrime bits as index
     uint32_t idx = (uint32_t)(extractHighBits(hash_value,pPrime) << (32-pPrime));
 
@@ -482,14 +479,13 @@ void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
 
     if (sparse) {
       // sparse mode: put the encoded hash into sparse list
-      uint32_t encoded_hash_value = encodeHashIn32Bit(hash_value, p, pPrime);
+      uint32_t encoded_hash_value = encodeHashIn32Bit(hash_value, pPrime, p);
       addHashToSparseList(sparseList, encoded_hash_value, pPrime);
 
 #ifdef HLL_DEBUG2
       cerr << "encoded hash:   " << bitset<32>(encoded_hash_value) << endl;
-      idx_n_rank ir(encoded_hash_value, pPrime, p);
-      assert_eq(ir.idx,getIndex(hash_value, p));
-      assert_eq(ir.rank, getRank(hash_value, p));
+      assert_eq(getIndex(encoded_hash_value,p),getIndex(hash_value, p));
+      assert_eq(getEncodedRank(encoded_hash_value,pPrime,p), getRank(hash_value, p));
 #endif
 
       // if the sparseList is too large, switch to normal (register) representation
@@ -528,16 +524,14 @@ void HyperLogLogPlusMinus<T>::reset() {
 // Convert from sparse representation (using sparseList) to normal (using register)
 template <typename T>
 void HyperLogLogPlusMinus<T>::switchToNormalRepresentation() {
+    D(cerr << "switching to normal representation" << endl;)
 #ifdef HLL_DEBUG
-    cerr << "switching to normal representation" << endl;
     cerr << " est before: " << cardinality() << endl;
 #endif
     this->sparse = false;
     this->M = vector<uint8_t>(this->m);
-    if (sparseList.size() > 0) {
-      addToRegisters(this->sparseList);
-      this->sparseList.clear();
-    }
+    addToRegisters(this->sparseList);
+    this->sparseList.clear();
 #ifdef HLL_DEBUG
     cerr << " est after: " << cardinality() << endl;
 #endif
@@ -551,7 +545,7 @@ void HyperLogLogPlusMinus<T>::addToRegisters(const SparseListType &sparseList) {
     }
     for (SparseListType::const_iterator encoded_hash_value_ptr = sparseList.begin(); encoded_hash_value_ptr != sparseList.end(); ++encoded_hash_value_ptr) {
 
-      uint8_t idx = getIndex(*encoded_hash_value_ptr, p);
+      size_t idx = getIndex(*encoded_hash_value_ptr, p);
       assert_lt(idx,M.size());
       uint8_t rank_val = getEncodedRank(*encoded_hash_value_ptr, pPrime, p);
       if (rank_val > this->M[idx]) {
@@ -610,20 +604,21 @@ template<>
 uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality() const {
     if (sparse) {
       // if we are 'sparse', then use linear counting with increased precision pPrime
-      D(cerr << "sparse representation - return linear counting estimate" << endl; )
-      return uint64_t(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
+      uint64_t lc_estimate = round(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
+      D(cerr << "sparse representation - return linear counting estimate("<<mPrime<<","<<(mPrime-uint32_t(sparseList.size()))<<") " << lc_estimate << endl; )
+      return lc_estimate;
     }
 
     // use linear counting (lc) estimate if there are zeros in the matrix
     //  AND the lc estimate is smaller than an empirically defined threshold
     uint32_t v = countZeros(M);
     if (v != 0) {
-      uint64_t lc_estimate = linearCounting(m, v);
-      D(cerr << "linear counting estimate: " << lc_estimate << endl;)
+      uint64_t lc_estimate = round(linearCounting(m, v));
+      D(cerr << "linear counting estimate ("<<m<<","<<v<<"): " << lc_estimate << endl;)
       // check if the lc estimate is below the threshold
       //assert(lc_estimate >= 0);
       if (lc_estimate <= double(threshold[p-4])) {
-        D(cerr << "below threshold - return it " << endl;)
+        //D(cerr << "below threshold - return it " << endl;)
         return lc_estimate;
       }
       D(cerr << "above threshold of " << threshold[p-4] << " - calculate raw estimate " << endl;)
@@ -644,13 +639,6 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality() const {
 }
 
 
-template<>
-uint64_t HyperLogLogPlusMinus<uint64_t>::cardinality() const {
-    return heuleCardinality();
-}
-
-
-
 /**
  * Improved cardinality estimator of Ertl, 2017 (arXiv, section 4)
  *  Based on the underlying distribution, the estimator employs correction 
@@ -669,7 +657,7 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::ertlCardinality() const {
     vector<int> C;
     if (sparse) {
       q = 64  - pPrime;
-      m = 1 << pPrime;
+      m = mPrime;
       C = sparseRegisterHistogram(sparseList, pPrime, p, q);
     } else {
       q = 64 - p;
@@ -695,6 +683,10 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::ertlCardinality() const {
     
 }
 
+template<>
+uint64_t HyperLogLogPlusMinus<uint64_t>::cardinality() const {
+    return heuleCardinality();
+}
 
 /////////////////////////////////////////////////////////////////////
 // Hash and other functions

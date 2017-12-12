@@ -248,6 +248,7 @@ int main(int argc, char **argv) {
     }
 
   TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
+  if (HLL_PRECISION > 0) {
   rep.setReportCols(vector<string> { 
     "%",
     "reads", 
@@ -258,6 +259,15 @@ int main(int argc, char **argv) {
     "taxID", 
     "rank", 
     "taxName"});
+  } else {
+  rep.setReportCols(vector<string> { 
+    "%",
+    "reads", 
+    "taxReads",
+    "taxID", 
+    "rank", 
+    "taxName"});
+  }
   rep.printReport("kraken");
   }
 
