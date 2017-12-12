@@ -102,10 +102,11 @@ int main(int argc, char **argv) {
   bool show_rel_error = false;
   bool use_stdin = true;
   size_t n_rand = 1;
+  size_t n_redo = 1;
 
   int c;
 
-  while ((c = getopt (argc, argv, "shtep:r:y")) != -1)
+  while ((c = getopt (argc, argv, "shtep:r:yx:")) != -1)
     switch (c) {
       case 's': sparse = true; break;
       case 't': test_mode = true; break;
@@ -115,6 +116,7 @@ int main(int argc, char **argv) {
       case 'r': use_stdin = false; 
                 n_rand = stoi(optarg); 
                 break;
+      case 'x': n_redo = stoi(optarg); break;
       case 'h': return usage(0); break;
       case '?':
         if (optopt == 'p' || optopt == 'r')
@@ -147,6 +149,8 @@ int main(int argc, char **argv) {
     while (cin >> nr) {
       add_to_hll(hll, nr, ctr, test_mode, ertl_too, show_rel_error);
     }
+    if (!test_mode) 
+      print_card(hll, ctr, ertl_too, show_rel_error);
   } else {
     // get random seed from random_device RNG
     std::random_device rd;
@@ -155,13 +159,15 @@ int main(int argc, char **argv) {
     
     // Define output distribution (default range for unsigned: 0 to MAX)
     std::uniform_int_distribution<uint64_t> distr;
+    for (size_t j = 0; j < n_redo; ++j) {
 
-    for(size_t i = 0; i < n_rand; i++) {
-      add_to_hll(hll, distr(rng), ctr, test_mode, ertl_too, show_rel_error);
+      for(size_t i = 0; i < n_rand; i++) {
+        add_to_hll(hll, distr(rng), ctr, test_mode, ertl_too, show_rel_error);
+      }
+      if (!test_mode) 
+        print_card(hll, ctr, ertl_too, show_rel_error);
+      hll.reset();
     }
-  }
-  if (!test_mode) {
-    print_card(hll, ctr, ertl_too, show_rel_error);
   }
   
 }

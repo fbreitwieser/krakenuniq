@@ -71,9 +71,10 @@ template<typename HASH>
 class HyperLogLogPlusMinus {
 
 private:
+  uint8_t p;      // precision, set in constructor
+  size_t m = 1 << p;  // number of registers
+
   vector<uint8_t> M;    // registers, size m
-  uint8_t p;            // precision
-  uint32_t m = 1 << p;  // number of registers
   bool sparse;          // sparse representation of the data?
   SparseListType sparseList;
   HASH (*bit_mixer) (uint64_t);
@@ -86,7 +87,7 @@ private:
 public:
 
   // Construct HLL with precision bits
-  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true, HASH  (*bit_mixer) (uint64_t) = murmurhash3_finalizer);
+  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true, HASH (*bit_mixer) (uint64_t) = murmurhash3_finalizer);
   ~HyperLogLogPlusMinus() {};
   void reset(); // Note: sets sparse=true
 
