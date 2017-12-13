@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
   bool flajolet_too = false;
   bool show_rel_error = false;
   bool use_stdin = true;
-  long n_rand = 1;
+  size_t n_rand = 1;
   size_t n_redo = 1;
 
   int c;
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
       case 'y': show_rel_error = true; break;
       case 'p': p = stoi(optarg); break;
       case 'r': use_stdin = false; 
-                n_rand = stol(optarg); 
+                n_rand = stoll(optarg); 
                 break;
       case 'x': n_redo = stoi(optarg); break;
       case 'h': return usage(0); break;
