@@ -28,24 +28,22 @@ namespace kraken {
 
   struct ReadCounts {
     uint64_t n_reads;
-    uint64_t n_kmers;
+    // uint64_t n_kmers; // now in kmers.nObserved()
     bool count_kmers = HLL_PRECISION == 0;
     HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
 
-    ReadCounts() : n_reads(0), n_kmers(0), count_kmers(HLL_PRECISION > 0) {
+    ReadCounts() : n_reads(0), count_kmers(HLL_PRECISION > 0) {
       if (count_kmers) 
         kmers = HyperLogLogPlusMinus<uint64_t>(HLL_PRECISION);
     }
 
     void add_kmer(uint64_t kmer) {
-      ++ n_kmers;
       if (count_kmers)
         kmers.add(kmer);
     }
     
     ReadCounts& operator+=(const ReadCounts& b) {
       n_reads += b.n_reads;
-      n_kmers += b.n_kmers;
       if (count_kmers)
         kmers += b.kmers;
       return *this;
@@ -55,7 +53,7 @@ namespace kraken {
       if (n_reads < rc.n_reads) {
         return true;
       }
-      if (n_reads == rc.n_reads && n_kmers < rc.n_kmers) {
+      if (n_reads == rc.n_reads && kmers.nObserved() < rc.kmers.nObserved()) {
         return true;
       }
       return false;

@@ -425,6 +425,7 @@ HyperLogLogPlusMinus<uint64_t>::HyperLogLogPlusMinus(uint8_t precision, bool spa
 
 template<>
 void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
+    ++ n_observed;
     // compute hash for item
     uint64_t hash_value = bit_mixer(item);
 
@@ -510,11 +511,28 @@ void HyperLogLogPlusMinus<T>::addToRegisters(const SparseListType &sparseList) {
     }
 }
 
+
+template<typename T>
+uint64_t HyperLogLogPlusMinus<T>::nObserved() const {
+    return n_observed;
+}
+
 // Merge other HyperLogLogPlusMinus into this one. May convert to normal representation
 template<typename T>
 void HyperLogLogPlusMinus<T>::add(const HyperLogLogPlusMinus<T>* other) {
     if (this->p != other->p) {
       throw std::invalid_argument("precisions must be equal");
+    }
+    if (other->n_observed == 0)
+      return;
+
+    if (this->n_observed == 0) {
+      // TODO: Make this more efficient when other is disowned
+      n_observed = other->n_observed;
+      sparse = other->sparse;
+      sparseList = other->sparseList;
+      M = other->M;
+      return;
     }
 
     if (this->sparse && other->sparse) {
@@ -542,6 +560,7 @@ void HyperLogLogPlusMinus<T>::add(const HyperLogLogPlusMinus<T>* other) {
         }
       }
     }
+    n_observed += other->n_observed;
 }
 
 template<typename T>

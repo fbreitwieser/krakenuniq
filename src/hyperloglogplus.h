@@ -74,8 +74,9 @@ class HyperLogLogPlusMinus {
 private:
   uint8_t p;      // precision, set in constructor
   size_t m = 1 << p;  // number of registers
-
   vector<uint8_t> M;    // registers, size m
+  uint64_t n_observed = 0;
+
   bool sparse;          // sparse representation of the data?
   SparseListType sparseList;
   HASH (*bit_mixer) (uint64_t);
@@ -107,6 +108,8 @@ public:
   uint64_t ertlCardinality() const;
   // Flayolet's cardinality estimator without bias correction
   uint64_t flajoletCardinality(bool use_sparse_precision = true) const;
+
+  uint64_t nObserved() const;
 
 private:
   void switchToNormalRepresentation();

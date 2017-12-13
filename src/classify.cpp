@@ -47,6 +47,7 @@ string hitlist_string(const vector<uint32_t> &taxa, const vector<char>& ambig_li
 
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
+double get_seconds(struct timeval time1, struct timeval time2);
 unordered_map<uint32_t, ReadCounts> taxon_counts; // stats per taxon
 
 int Num_threads = 1;
@@ -213,12 +214,6 @@ int main(int argc, char **argv) {
     Kraken_output = &cout;
   }
 
-  if (!Report_output_file.empty() && Report_output_file != "off") {
-     Print_kraken_report = true;
-      cerr << "Writing Kraken report output to " << Report_output_file << endl;
-     Report_output = cout_or_file(Report_output_file);
-  }
-
   //cerr << "Print_kraken: " << Print_kraken << "; Print_kraken_report: " << Print_kraken_report << "; k: " << uint32_t(KrakenDatabases[0]->get_k()) << endl;
 
   struct timeval tv1, tv2;
@@ -227,9 +222,11 @@ int main(int argc, char **argv) {
     process_file(argv[i]);
   gettimeofday(&tv2, NULL);
 
-  std::cerr << "Finishing up ..\n";
+  report_stats(tv1, tv2);
 
-  if (Print_kraken_report) {
+  if (!Report_output_file.empty() && Report_output_file != "off") {
+    gettimeofday(&tv1, NULL);
+    std::cerr << "Writing report file to " << Report_output_file <<"  ..\n";
     for (size_t i = 0; i < DB_filenames.size(); ++i) {
       const auto fname = DB_filenames[i] + ".counts";
       ifstream ifs(fname);
@@ -246,29 +243,32 @@ int main(int argc, char **argv) {
       }
       taxdb.readGenomeSizes(fname);
     }
-
-  TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
-  if (HLL_PRECISION > 0) {
-  rep.setReportCols(vector<string> { 
-    "%",
-    "reads", 
-    "taxReads",
-    "kmers",
-    "dup",
-    "cov", 
-    "taxID", 
-    "rank", 
-    "taxName"});
-  } else {
-  rep.setReportCols(vector<string> { 
-    "%",
-    "reads", 
-    "taxReads",
-    "taxID", 
-    "rank", 
-    "taxName"});
-  }
-  rep.printReport("kraken");
+     Report_output = cout_or_file(Report_output_file);
+  
+    TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
+    if (HLL_PRECISION > 0) {
+    rep.setReportCols(vector<string> { 
+      "%",
+      "reads", 
+      "taxReads",
+      "kmers",
+      "dup",
+      "cov", 
+      "taxID", 
+      "rank", 
+      "taxName"});
+    } else {
+    rep.setReportCols(vector<string> { 
+      "%",
+      "reads", 
+      "taxReads",
+      "taxID", 
+      "rank", 
+      "taxName"});
+    }
+    rep.printReport("kraken");
+    gettimeofday(&tv2, NULL);
+    fprintf(stderr, "Report finished in %.3f seconds.\n", get_seconds(tv1,tv2));
   }
 
   for (size_t i = 0; i < Open_fstreams.size(); ++i) {
@@ -281,13 +281,10 @@ int main(int argc, char **argv) {
     ogzs->close();
   }
 
-
-  report_stats(tv1, tv2);
-
   return 0;
 }
 
-void report_stats(struct timeval time1, struct timeval time2) {
+double get_seconds(struct timeval time1, struct timeval time2) {
   time2.tv_usec -= time1.tv_usec;
   time2.tv_sec -= time1.tv_sec;
   if (time2.tv_usec < 0) {
@@ -297,6 +294,11 @@ void report_stats(struct timeval time1, struct timeval time2) {
   double seconds = time2.tv_usec;
   seconds /= 1e6;
   seconds += time2.tv_sec;
+  return(seconds);
+}
+
+void report_stats(struct timeval time1, struct timeval time2) {
+  double seconds = get_seconds(time1, time2);
 
   cerr << "\r";
   fprintf(stderr, 
@@ -358,7 +360,11 @@ void process_file(char *filename) {
       {
         total_classified += my_total_classified;
         for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end(); ++it) {
-            taxon_counts[it->first] += it->second;
+          //auto res = taxon_counts.insert({it->first, it->second});
+          //if (!res.second) {
+          //  res.first->second += std::move(it->second);
+          //}
+          taxon_counts[it->first] += it->second;
         }
 
         if (Print_kraken)
