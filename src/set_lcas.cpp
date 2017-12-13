@@ -78,8 +78,14 @@ const size_t hll_prec = 10;
 TaxonomyDB<uint32_t> taxdb;
 
 const string prefix = "kraken:taxid|";
-unordered_set<uint32_t> host_taxids = {9606};
-uint32_t contaminant_taxids = {32630};
+
+// do not add sequence taxIDs for host sequences (currently only human)
+const uint32_t TID_HUMAN = 9606;
+
+// k-mers appearing in contaminant sequences will keep the contaminant
+//  sequence taxid, even if they also appear in a genome
+const uint32_t TID_CONTAMINANT1 = 32630; // 'synthetic construct'
+const uint32_t TID_CONTAMINANT2 = 81077; // 'artificial sequences'
 
 
 int main(int argc, char **argv) {
@@ -241,7 +247,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
         taxid = get_new_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
     }
 
-    if (Add_taxIds_for_Sequences && orig_taxid != 9606) {
+    if (Add_taxIds_for_Sequences && orig_taxid != TID_HUMAN) {
       taxid = get_new_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
     }
     if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
@@ -304,8 +310,8 @@ void process_single_file() {
       continue;
     }
     
-    bool is_contaminant_taxid = taxid == 32630 || taxid == 81077;
-    if (Add_taxIds_for_Sequences && taxid != 9606 && it_p->second != 9606) {
+    bool is_contaminant_taxid = taxid == TID_CONTAMINANT1 || taxid == TID_CONTAMINANT2;
+    if (Add_taxIds_for_Sequences && taxid != TID_HUMAN && it_p->second != TID_HUMAN) {
       // Update entry based on header line
       auto entryIt = taxdb.entries.find(taxid);
       if (entryIt == taxdb.entries.end()) {
@@ -414,7 +420,7 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_
       if (!force_contaminant_taxid) {
         *val_ptr = lca(Parent_map, taxid, *val_ptr);
       } else {
-        if (*val_ptr == 32630 || *val_ptr == 81077) {
+        if (*val_ptr == TID_CONTAMINANT1 || *val_ptr == TID_CONTAMINANT2) {
           // keep value
         } else if (is_contaminant_taxid) {
           // When force_contaminant_taxid is set, do not compute lca, but assign the taxid
