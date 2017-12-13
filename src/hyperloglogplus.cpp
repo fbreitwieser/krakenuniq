@@ -51,13 +51,13 @@ static int clz_manual(uint64_t x)
 #define __builtin_clzl(x) __lzcnt64(x)
 #endif
 
-inline uint8_t clz(const uint32_t x) {
-  if (x == 0) { return 32; }
+inline uint8_t clz(const uint32_t x, const uint8_t max = 32) {
+  if (x == 0) { return max; }
   return __builtin_clz(x);
 }
 
-inline uint8_t clz(const uint64_t x) {
-  if (x == 0) { return 64; }
+inline uint8_t clz(const uint64_t x, const uint8_t max = 64) {
+  if (x == 0) { return max; }
   return __builtin_clzl(x);
 }
 
@@ -113,19 +113,16 @@ T trailingOnes(const uint8_t p) {
 
 uint8_t getRank(const uint32_t hash_value, const uint8_t p) {
   // shift p values off, and count leading zeros of the remaining string {x31-p,...,x0}
-  uint32_t rank_bits (hash_value << p | trailingOnes<uint32_t>(p));
-
-  // __builtin_clz is undefined when val is zero, but that will not happen here - bit 32-p is set
-  uint8_t rank_val = clz(rank_bits) + 1;
+  uint32_t rank_bits (hash_value << p);
+  uint8_t rank_val = clz(rank_bits, 32-p) + 1;
   assert_leq(rank_val,32-p+1);
   return rank_val;
 }
 
 uint8_t getRank(const uint64_t hash_value, const uint8_t p) {
   // shift p values off, and count leading zeros of the remaining string {x63-p,...,x0}
-  uint64_t rank_bits (hash_value << p | trailingOnes<uint64_t>(p));
-
-  uint8_t rank_val = (clz(rank_bits)) + 1;
+  uint64_t rank_bits (hash_value << p);
+  uint8_t rank_val = clz(rank_bits, 64-p) + 1;
   assert_leq(rank_val,64-p+1);
   return rank_val;
 }
@@ -603,47 +600,9 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::flajoletCardinality(bool use_sparse_pre
     } /* else if (est > 1/30 * pow(2,64) {
       // No bias correction - should not run in the problem with 64-bit hashes
     } */
-    return round(est);
+
+    return (use_n_observed && n_observed < est)? n_observed : round(est);
 }
-
-template<>
-uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality(bool correct_bias) const {
-    if (sparse) {
-      // if we are 'sparse', then use linear counting with increased precision pPrime
-      uint64_t lc_estimate = round(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
-      D(cerr << "sparse representation - return linear counting estimate("<<mPrime<<","<<(mPrime-uint32_t(sparseList.size()))<<") " << lc_estimate << endl; )
-      return lc_estimate;
-    }
-
-    // use linear counting (lc) estimate if there are zeros in the matrix
-    //  AND the lc estimate is smaller than an empirically defined threshold
-    uint32_t v = countZeros(M);
-    if (v != 0) {
-      uint64_t lc_estimate = round(linearCounting(m, v));
-      D(cerr << "linear counting estimate ("<<m<<","<<v<<"): " << lc_estimate << endl;)
-      // check if the lc estimate is below the threshold
-      //assert(lc_estimate >= 0);
-      if (lc_estimate <= double(threshold[p-4])) {
-        //D(cerr << "below threshold - return it " << endl;)
-        return lc_estimate;
-      }
-      D(cerr << "above threshold of " << threshold[p-4] << " - calculate raw estimate " << endl;)
-    }
-
-    // calculate raw estimate on registers
-    //double est = alpha(m) * harmonicMean(M, m);
-    double est = calculateRawEstimate(M);
-    D(cerr << "raw estimate: " << est << endl;)
-    // correct for biases if estimate is smaller than 5m
-    if (correct_bias && est <= double(m)*5.0) {
-      D(cerr << "correct bias; subtract " << getEstimateBias(est, p) << endl;)
-      assert(est > getEstimateBias(est, p));
-      est -= getEstimateBias(est, p);
-    }
-
-    return std::round(est);
-}
-
 
 /**
  * Improved cardinality estimator of Ertl, 2017 (arXiv, section 4)
@@ -685,8 +644,52 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::ertlCardinality() const {
     est_denominator += m * sigma(double(C[0])/double(m));
     D(cerr << endl;)
     double m_sq_alpha_inf = (m / (2.0*std::log(2))) * m;
-    return std::round(m_sq_alpha_inf / est_denominator);
-    
+    double est = m_sq_alpha_inf / est_denominator;
+
+    return (use_n_observed && n_observed < est)? n_observed : round(est);
+}
+
+
+template<>
+uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality(bool correct_bias) const {
+    if (p > 18) {
+      cerr << "Heule HLL++ estimate only works with value of p up to 18 - returning Ertl estimate." << endl;
+      return(ertlCardinality());
+    }
+    if (sparse) {
+      // if we are 'sparse', then use linear counting with increased precision pPrime
+      uint64_t lc_estimate = round(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
+      D(cerr << "sparse representation - return linear counting estimate("<<mPrime<<","<<(mPrime-uint32_t(sparseList.size()))<<") " << lc_estimate << endl; )
+      return lc_estimate;
+    }
+
+    // use linear counting (lc) estimate if there are zeros in the matrix
+    //  AND the lc estimate is smaller than an empirically defined threshold
+    uint32_t v = countZeros(M);
+    if (v != 0) {
+      uint64_t lc_estimate = round(linearCounting(m, v));
+      D(cerr << "linear counting estimate ("<<m<<","<<v<<"): " << lc_estimate << endl;)
+      // check if the lc estimate is below the threshold
+      //assert(lc_estimate >= 0);
+      if (lc_estimate <= double(threshold[p-4])) {
+        //D(cerr << "below threshold - return it " << endl;)
+        return lc_estimate;
+      }
+      D(cerr << "above threshold of " << threshold[p-4] << " - calculate raw estimate " << endl;)
+    }
+
+    // calculate raw estimate on registers
+    //double est = alpha(m) * harmonicMean(M, m);
+    double est = calculateRawEstimate(M);
+    D(cerr << "raw estimate: " << est << endl;)
+    // correct for biases if estimate is smaller than 5m
+    if (correct_bias && est <= double(m)*5.0) {
+      D(cerr << "correct bias; subtract " << getEstimateBias(est, p) << endl;)
+      assert(est > getEstimateBias(est, p));
+      est -= getEstimateBias(est, p);
+    }
+
+    return (use_n_observed && n_observed < est)? n_observed : round(est);
 }
 
 template<>

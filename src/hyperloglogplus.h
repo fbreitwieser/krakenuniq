@@ -76,6 +76,7 @@ private:
   size_t m = 1 << p;  // number of registers
   vector<uint8_t> M;    // registers, size m
   uint64_t n_observed = 0;
+  bool use_n_observed = true; // return min(estimate, n_observed) instead of estimate
 
   bool sparse;          // sparse representation of the data?
   SparseListType sparseList;

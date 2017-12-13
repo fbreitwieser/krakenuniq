@@ -51,7 +51,7 @@ double rel_error(uint64_t est, uint64_t truth) {
   if (est >= truth) 
     return double(est - truth)/double(truth);
   else
-  return -double(truth - est)/double(truth);
+    return -double(truth - est)/double(truth);
 }
 
 void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) { 
@@ -72,15 +72,22 @@ void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool show_rel
     }
   
   if (show_rel_error) {
-    if (heule_too)
-      cout << '\t' << rel_error(esth, ctr);
-    if (flajolet_too)
+    double esth_err, este_err;
+    if (heule_too) {
+      esth_err = rel_error(esth, ctr);
+      cout << '\t' << esth_err;
+    }
+    if (flajolet_too) {
       cout << '\t' << rel_error(estf, ctr);
+    }
+    if (ertl_too) {
+      este_err = rel_error(este, ctr);
+      cout << '\t' << este_err;
+    }
     if (ertl_too && heule_too) {
-      cout << '\t' << rel_error(este, ctr);
-      if (abs(rel_error(este, ctr)) == abs(rel_error(esth, ctr))) {
+      if (abs(este_err) == abs(esth_err)) {
         cout << "\tequal";
-      } else if (abs(rel_error(este, ctr)) < abs(rel_error(esth, ctr))) {
+      } else if (abs(este_err) < abs(esth_err)) {
         cout << "\tErtl won!";
       } else {
         cout << "\tHeule won!";
@@ -115,7 +122,7 @@ int main(int argc, char **argv) {
   bool flajolet_too = false;
   bool show_rel_error = false;
   bool use_stdin = true;
-  size_t n_rand = 1;
+  long n_rand = 1;
   size_t n_redo = 1;
 
   int c;
@@ -129,7 +136,7 @@ int main(int argc, char **argv) {
       case 'y': show_rel_error = true; break;
       case 'p': p = stoi(optarg); break;
       case 'r': use_stdin = false; 
-                n_rand = stoi(optarg); 
+                n_rand = stol(optarg); 
                 break;
       case 'x': n_redo = stoi(optarg); break;
       case 'h': return usage(0); break;
