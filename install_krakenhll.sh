@@ -67,7 +67,7 @@ if [ "$INSTALL_JELLYFISH" == "1" ]; then
   cd $WD
 fi
 
-#make -C src clean
+make -C src clean
 make -C $DIR/src install
 for file in $DIR/scripts/*
 do
