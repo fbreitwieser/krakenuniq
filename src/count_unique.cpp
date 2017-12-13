@@ -54,17 +54,29 @@ double rel_error(uint64_t est, uint64_t truth) {
   return -double(truth - est)/double(truth);
 }
 
-void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool ertl_too, bool show_rel_error) { 
-  
-    uint64_t esth = hll.cardinality();
-    uint64_t este = hll.ertlCardinality();
-    cout << ctr << '\t' << esth;
-    if (ertl_too) 
+void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) { 
+ 
+    uint64_t esth, este, estf;
+
+    if (heule_too) {
+      esth = hll.heuleCardinality();
+      cout << ctr << '\t' << esth;
+    }
+    if (flajolet_too) {
+      estf = hll.flajoletCardinality(false);
+      cout << '\t' << estf;
+    }
+    if (ertl_too) {
+      este = hll.ertlCardinality();
       cout << '\t' << este;
+    }
   
   if (show_rel_error) {
-    cout << '\t' << rel_error(esth, ctr);
-    if (ertl_too) {
+    if (heule_too)
+      cout << '\t' << rel_error(esth, ctr);
+    if (flajolet_too)
+      cout << '\t' << rel_error(estf, ctr);
+    if (ertl_too && heule_too) {
       cout << '\t' << rel_error(este, ctr);
       if (abs(rel_error(este, ctr)) == abs(rel_error(esth, ctr))) {
         cout << "\tequal";
@@ -79,7 +91,7 @@ void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool ertl_too
 }
 
 
-void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr, bool test_mode, bool ertl_too, bool show_rel_error) {
+void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr, bool test_mode, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) {
   hll.add(nr);
   ++ctr;
   if (test_mode) {
@@ -87,7 +99,7 @@ void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr,
     uint64_t last_dec = pow(10,floor(log10(ctr)));
     if (floor(log10(ctr)) == log10(ctr) || 
         (ctr > 100 && (ctr*10) % last_dec == 0)) {
-      print_card(hll, ctr, ertl_too, show_rel_error);
+      print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
     }
   }
 }
@@ -98,7 +110,9 @@ int main(int argc, char **argv) {
   size_t p = 10;
   bool sparse = false;
   bool test_mode = false;
+  bool heule_too = true;
   bool ertl_too = false;
+  bool flajolet_too = false;
   bool show_rel_error = false;
   bool use_stdin = true;
   size_t n_rand = 1;
@@ -106,11 +120,12 @@ int main(int argc, char **argv) {
 
   int c;
 
-  while ((c = getopt (argc, argv, "shtep:r:yx:")) != -1)
+  while ((c = getopt (argc, argv, "shtep:r:yx:f")) != -1)
     switch (c) {
       case 's': sparse = true; break;
       case 't': test_mode = true; break;
       case 'e': ertl_too = true; break;
+      case 'f': flajolet_too = true; break;
       case 'y': show_rel_error = true; break;
       case 'p': p = stoi(optarg); break;
       case 'r': use_stdin = false; 
@@ -136,9 +151,22 @@ int main(int argc, char **argv) {
   //HyperLogLogPlusMinus<uint64_t> hll(p, sparse, wang_mixer); // unique k-mer count per taxon
 
   if (test_mode) {
-    cout << "observed\testimated";
-    if (ertl_too) {
-      cout << "\tertl_estimated";
+    cout << "observed\testimate_heule";
+    if (flajolet_too) {
+      cout << "\testimate_flajolet";
+    }
+    if (ertl_too)
+      cout << "\testimate_ertl";
+    if (show_rel_error) {
+      cout << "\trel_error_heule";
+      if (flajolet_too)
+        cout << "\trel_error_flajolet";
+
+      if (ertl_too)
+        cout << "\trel_error_ertl";
+
+      cout << "\twho_won";
+
     }
     cout << '\n';
   } 
@@ -147,10 +175,10 @@ int main(int argc, char **argv) {
   if (use_stdin) {
     uint64_t nr;
     while (cin >> nr) {
-      add_to_hll(hll, nr, ctr, test_mode, ertl_too, show_rel_error);
+      add_to_hll(hll, nr, ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
     }
     if (!test_mode) 
-      print_card(hll, ctr, ertl_too, show_rel_error);
+      print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
   } else {
     // get random seed from random_device RNG
     std::random_device rd;
@@ -162,11 +190,12 @@ int main(int argc, char **argv) {
     for (size_t j = 0; j < n_redo; ++j) {
 
       for(size_t i = 0; i < n_rand; i++) {
-        add_to_hll(hll, distr(rng), ctr, test_mode, ertl_too, show_rel_error);
+        add_to_hll(hll, distr(rng), ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
       }
       if (!test_mode) 
-        print_card(hll, ctr, ertl_too, show_rel_error);
+        print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
       hll.reset();
+      ctr = 0;
     }
   }
   

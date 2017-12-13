@@ -33,6 +33,7 @@
 #include<algorithm> //vector.count
 #include<bitset>
 #include<unordered_set>
+#include<numeric>   //accummulate
 
 #include "hyperloglogbias.h"
 #include "assert_helpers.h"
@@ -99,11 +100,13 @@ public:
   HyperLogLogPlusMinus<HASH>& operator+=(const HyperLogLogPlusMinus<HASH>& other);
 
   // Calculate cardinality estimates
-  uint64_t cardinality() const; // returns heuleCardinality()
+  uint64_t cardinality() const; // returns ertlCardinality()
   // HLL++ estimator of Heule et al., 2015. Uses empirical bias correction factors
-  uint64_t heuleCardinality() const; 
+  uint64_t heuleCardinality(bool correct_bias = true) const; 
   // Improved estimator of Ertl, 2017. Does not rely on empirical data
   uint64_t ertlCardinality() const;
+  // Flayolet's cardinality estimator without bias correction
+  uint64_t flajoletCardinality(bool use_sparse_precision = true) const;
 
 private:
   void switchToNormalRepresentation();

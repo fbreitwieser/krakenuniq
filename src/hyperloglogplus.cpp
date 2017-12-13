@@ -222,9 +222,8 @@ void addHashToSparseList(vector<uint32_t>& vec, const uint32_t val, const uint8_
 
 template<typename SET>
 inline 
-void addHashToSparseList(SET& uset, const uint32_t val, const uint8_t pPrime) {
+void addHashToSparseList(SET& uset, const uint32_t val, const uint8_t /*pPrime*/) {
   // this implementation currently does not check if there is a value for an index of length pPrime
-  (void)pPrime;
   uset.insert(val);
 }
 
@@ -280,49 +279,6 @@ uint32_t countZeros(vector<uint8_t> s) {
 }
 
 
-#define arr_len(a) (a + sizeof a / sizeof a[0])
-vector<double> rawEstimateData(size_t p) {
-    switch (p) {
-      case  4: return vector<double>(rawEstimateData_precision4,arr_len(rawEstimateData_precision4));
-      case  5: return vector<double>(rawEstimateData_precision5,arr_len(rawEstimateData_precision5));
-      case  6: return vector<double>(rawEstimateData_precision6,arr_len(rawEstimateData_precision6));
-      case  7: return vector<double>(rawEstimateData_precision7,arr_len(rawEstimateData_precision7));
-      case  8: return vector<double>(rawEstimateData_precision8,arr_len(rawEstimateData_precision8));
-      case  9: return vector<double>(rawEstimateData_precision9,arr_len(rawEstimateData_precision9));
-      case 10: return vector<double>(rawEstimateData_precision10,arr_len(rawEstimateData_precision10));
-      case 11: return vector<double>(rawEstimateData_precision11,arr_len(rawEstimateData_precision11));
-      case 12: return vector<double>(rawEstimateData_precision12,arr_len(rawEstimateData_precision12));
-      case 13: return vector<double>(rawEstimateData_precision13,arr_len(rawEstimateData_precision13));
-      case 14: return vector<double>(rawEstimateData_precision14,arr_len(rawEstimateData_precision14));
-      case 15: return vector<double>(rawEstimateData_precision15,arr_len(rawEstimateData_precision15));
-      case 16: return vector<double>(rawEstimateData_precision16,arr_len(rawEstimateData_precision16));
-      case 17: return vector<double>(rawEstimateData_precision17,arr_len(rawEstimateData_precision17));
-      case 18: return vector<double>(rawEstimateData_precision18,arr_len(rawEstimateData_precision18));
-    }
-    return vector<double>();
-}
-
-vector<double> biasData(size_t p) {
-    switch(p) {
-      case  4: return vector<double>(biasData_precision4,arr_len(biasData_precision4));
-      case  5: return vector<double>(biasData_precision5,arr_len(biasData_precision5));
-      case  6: return vector<double>(biasData_precision6,arr_len(biasData_precision6));
-      case  7: return vector<double>(biasData_precision7,arr_len(biasData_precision7));
-      case  8: return vector<double>(biasData_precision8,arr_len(biasData_precision8));
-      case  9: return vector<double>(biasData_precision9,arr_len(biasData_precision9));
-      case 10: return vector<double>(biasData_precision10,arr_len(biasData_precision10));
-      case 11: return vector<double>(biasData_precision11,arr_len(biasData_precision11));
-      case 12: return vector<double>(biasData_precision12,arr_len(biasData_precision12));
-      case 13: return vector<double>(biasData_precision13,arr_len(biasData_precision13));
-      case 14: return vector<double>(biasData_precision14,arr_len(biasData_precision14));
-      case 15: return vector<double>(biasData_precision15,arr_len(biasData_precision15));
-      case 16: return vector<double>(biasData_precision16,arr_len(biasData_precision16));
-      case 17: return vector<double>(biasData_precision17,arr_len(biasData_precision17));
-      case 18: return vector<double>(biasData_precision18,arr_len(biasData_precision18));
-    }
-    return vector<double>();
-}
-
 /**
   * Estimate the bias of raw estimate using empirically determined values.
   * Uses weighted average of the two cells between which the estimate falls.
@@ -331,8 +287,8 @@ vector<double> biasData(size_t p) {
   * @return correction value for
   */
 double getEstimateBias(double estimate, uint8_t p) {
-    vector<double> rawEstimateTable = rawEstimateData(p);
-    vector<double> biasTable = biasData(p);
+    const vector<double>& rawEstimateTable = rawEstimateData[p-4];
+    const vector<double>& biasTable = biasData[p-4];
   
     // check if estimate is lower than first entry, or larger than last
     if (rawEstimateTable.front() >= estimate) { return biasTable.front(); }
@@ -543,7 +499,7 @@ void HyperLogLogPlusMinus<T>::addToRegisters(const SparseListType &sparseList) {
     if (sparseList.size() == 0) {
       return;
     }
-    for (SparseListType::const_iterator encoded_hash_value_ptr = sparseList.begin(); encoded_hash_value_ptr != sparseList.end(); ++encoded_hash_value_ptr) {
+    for (auto encoded_hash_value_ptr = sparseList.begin(); encoded_hash_value_ptr != sparseList.end(); ++encoded_hash_value_ptr) {
 
       size_t idx = getIndex(*encoded_hash_value_ptr, p);
       assert_lt(idx,M.size());
@@ -600,8 +556,39 @@ HyperLogLogPlusMinus<T>& HyperLogLogPlusMinus<T>::operator+=(const HyperLogLogPl
     return *this;
 }
 
+
 template<>
-uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality() const {
+uint64_t HyperLogLogPlusMinus<uint64_t>::flajoletCardinality(bool use_sparse_precision) const {
+    vector<uint8_t> M = this->M;
+    if (sparse) {
+      if (use_sparse_precision) {
+        return round(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
+      } else{
+        // For testing purposes. Put sparse list into a standard register
+        M = vector<uint8_t>(m, 0);
+        for (const auto& val : sparseList) {
+          size_t idx = getIndex(val, p);
+          assert_lt(idx,M.size());
+          uint8_t rank_val = getEncodedRank(val, pPrime, p);
+          if (rank_val > M[idx]) {
+            M[idx] = rank_val;
+          }
+        }
+      }
+    }
+    double est = calculateRawEstimate(M);
+    if (est <= 2.5*m) {
+      uint32_t v = countZeros(M);
+      if (v > 0) 
+        est = linearCounting(m, v);
+    } /* else if (est > 1/30 * pow(2,64) {
+      // No bias correction - should not run in the problem with 64-bit hashes
+    } */
+    return round(est);
+}
+
+template<>
+uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality(bool correct_bias) const {
     if (sparse) {
       // if we are 'sparse', then use linear counting with increased precision pPrime
       uint64_t lc_estimate = round(linearCounting(mPrime, mPrime-uint32_t(sparseList.size())));
@@ -629,7 +616,7 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality() const {
     double est = calculateRawEstimate(M);
     D(cerr << "raw estimate: " << est << endl;)
     // correct for biases if estimate is smaller than 5m
-    if (est <= double(m)*5.0) {
+    if (correct_bias && est <= double(m)*5.0) {
       D(cerr << "correct bias; subtract " << getEstimateBias(est, p) << endl;)
       assert(est > getEstimateBias(est, p));
       est -= getEstimateBias(est, p);
@@ -685,7 +672,7 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::ertlCardinality() const {
 
 template<>
 uint64_t HyperLogLogPlusMinus<uint64_t>::cardinality() const {
-    return heuleCardinality();
+    return ertlCardinality();
 }
 
 /////////////////////////////////////////////////////////////////////
