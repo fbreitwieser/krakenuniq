@@ -386,15 +386,6 @@ void process_file(char *filename) {
   delete reader;
 }
 
-inline
-uint32_t get_taxon_for_kmer(KrakenDB& database, uint64_t* kmer_ptr, uint64_t& current_bin_key,
-    int64_t& current_min_pos, int64_t& current_max_pos) {
-  uint32_t* val_ptr = database.kmer_query(
-      database.canonical_representation(*kmer_ptr), &current_bin_key,
-      &current_min_pos, &current_max_pos);
-  return val_ptr ? *val_ptr : 0;
-}
-
 
 inline void print_sequence(ostringstream* oss_ptr, const DNASequence& dna) {
       if (Fastq_input) {
@@ -527,21 +518,21 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
         ambig_list.push_back(1);
       }
       else {
+        uint64_t cannonical_kmer = KrakenDatabases[0]->canonical_representation(*kmer_ptr);
         ambig_list.push_back(0);
         // go through multiple databases to map k-mer
         for (size_t i=0; i<KrakenDatabases.size(); ++i) {
-        taxon = get_taxon_for_kmer(*KrakenDatabases[i], kmer_ptr,
-        db_statuses[i].current_bin_key, db_statuses[i].current_min_pos, db_statuses[i].current_max_pos);
-
-        //uint32_t* val_ptr = KrakenDatabases[i]->kmer_query(
-        //  KrakenDatabases[i]->canonical_representation(*kmer_ptr), &db_statuses[i].current_bin_key,
-        //  &db_statuses[i].current_min_pos, &db_statuses[i].current_max_pos);
-        //taxon = val_ptr ? *val_ptr : 0;
-          if (taxon) break;
+          uint32_t* val_ptr = KrakenDatabases[i]->kmer_query(
+            cannonical_kmer, &db_statuses[i].current_bin_key,
+            &db_statuses[i].current_min_pos, &db_statuses[i].current_max_pos);
+          if (val_ptr) {
+            taxon = *val_ptr;
+            break;
+          }
         }
 
         // cerr << "taxon for " << *kmer_ptr << " is " << taxon << endl;
-        my_taxon_counts[taxon].add_kmer(*kmer_ptr);
+        my_taxon_counts[taxon].add_kmer(cannonical_kmer);
 
         if (taxon) {
           hit_counts[taxon]++;
