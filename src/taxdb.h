@@ -947,7 +947,7 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB
     const std::unordered_map<TAXID, READCOUNTS>& readCounts,
     bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _taxCounts(readCounts), _show_zeros(show_zeros) {
 
-  cerr << "Setting all the values in the TaxTree ...";
+  cerr << "Setting values in the taxonomy tree ...";
   for (auto it = _taxCounts.begin(); it != _taxCounts.end(); ++it) {
     auto tax_it = taxdb.entries.find(it->first);
     if (tax_it == taxdb.entries.end()) {
@@ -986,6 +986,9 @@ void TaxReport<TAXID,READCOUNTS>::setReportCols(const std::vector<std::string>& 
 
 template<typename TAXID, typename READCOUNTS>
 void TaxReport<TAXID,READCOUNTS>::printReport(const std::string& format) {
+
+  cerr << "Printing classification report ... " << endl;
+
   const auto it_unclassified = _cladeCounts.find(0);
   const auto it_classified = _cladeCounts.find(1);
   const auto it_other = _cladeCounts.find(-1);

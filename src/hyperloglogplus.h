@@ -97,8 +97,12 @@ public:
   // Add items or other HLL to this sketch
   void add(uint64_t item);
   void add(vector<uint64_t> items);
-  void add(const HyperLogLogPlusMinus<HASH>* other);
-  HyperLogLogPlusMinus<HASH>& operator+=(const HyperLogLogPlusMinus<HASH>* other);
+
+  // Merge another sketch into this one
+  // TODO: assumes equal bit_mixers! but does not check that
+  void merge(HyperLogLogPlusMinus<HASH>&& other);
+  void merge(const HyperLogLogPlusMinus<HASH>& other);
+  HyperLogLogPlusMinus<HASH>& operator+=(HyperLogLogPlusMinus<HASH>&& other);
   HyperLogLogPlusMinus<HASH>& operator+=(const HyperLogLogPlusMinus<HASH>& other);
 
   // Calculate cardinality estimates

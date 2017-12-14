@@ -364,7 +364,7 @@ void process_file(char *filename) {
           //if (!res.second) {
           //  res.first->second += std::move(it->second);
           //}
-          taxon_counts[it->first] += it->second;
+          taxon_counts[it->first] += std::move(it->second);
         }
 
         if (Print_kraken)

@@ -431,6 +431,9 @@ void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
     cerr << bitset<64>(hash_value) << endl;
 #endif
 
+    if (sparse && this->sparseList.size() + 1 > this->m/4) {
+       switchToNormalRepresentation();
+     }
     if (sparse) {
       // sparse mode: put the encoded hash into sparse list
       uint32_t encoded_hash_value = encodeHashIn32Bit(hash_value, pPrime, p);
@@ -443,9 +446,6 @@ void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
 #endif
 
       // if the sparseList is too large, switch to normal (register) representation
-      if (this->sparseList.size() > this->m/4) {
-        switchToNormalRepresentation();
-      }
     } else {
       // normal mode
       // take first p bits as index  {x63,...,x64-p}
@@ -514,64 +514,99 @@ uint64_t HyperLogLogPlusMinus<T>::nObserved() const {
     return n_observed;
 }
 
-// Merge other HyperLogLogPlusMinus into this one. May convert to normal representation
+
 template<typename T>
-void HyperLogLogPlusMinus<T>::add(const HyperLogLogPlusMinus<T>* other) {
-    if (this->p != other->p) {
+void HyperLogLogPlusMinus<T>::merge(HyperLogLogPlusMinus<T>&& other) {
+    if (this->p != other.p) {
       throw std::invalid_argument("precisions must be equal");
     }
-    if (other->n_observed == 0)
+    if (other.n_observed == 0)
+      return;
+
+    if (this->n_observed == 0) {
+      n_observed = other.n_observed;
+      sparse = other.sparse;
+      sparseList = std::move(other.sparseList);
+      M = std::move(other.M);
+    } else {
+      n_observed += other.n_observed;
+      if (this->sparse && other.sparse) {
+        // this->merge(static_cast<const HyperLogLogPlusMinus<T>&>(other));
+        // consider using addHashToSparseList(this->sparseList, val, pPrime) and checking for sizes
+        this->sparseList.insert(other.sparseList.begin(), other.sparseList.end());
+      } else if (other.sparse) {
+        // other is sparse, but this is not
+        addToRegisters(other.sparseList);
+      } else {
+        if (this->sparse) {
+          this->sparse = false;
+          M = std::move(other.M);
+          addToRegisters(this->sparseList);
+          this->sparseList.clear();
+        } else {
+          // merge registers
+          for (size_t i = 0; i < other.M.size(); ++i) {
+            if (other.M[i] > this->M[i]) {
+              this->M[i] = other.M[i];
+           }
+          }
+        }
+      }
+    }
+}
+
+// Merge other HyperLogLogPlusMinus into this one. May convert to normal representation
+template<typename T>
+void HyperLogLogPlusMinus<T>::merge(const HyperLogLogPlusMinus<T>& other) {
+    if (this->p != other.p) {
+      throw std::invalid_argument("precisions must be equal");
+    }
+    if (other.n_observed == 0)
       return;
 
     if (this->n_observed == 0) {
       // TODO: Make this more efficient when other is disowned
-      n_observed = other->n_observed;
-      sparse = other->sparse;
-      sparseList = other->sparseList;
-      M = other->M;
-      return;
-    }
-
-    if (this->sparse && other->sparse) {
-      if (this->sparseList.size()+other->sparseList.size() > this->m) {
-        // TODO: this switches to normal representation too soon if there is duplication
-        switchToNormalRepresentation();
-        addToRegisters(other->sparseList);
-      } else {
-        
-        for (const auto val : other->sparseList) {
-          addHashToSparseList(this->sparseList, val, pPrime);
-        }
-      }
-    } else if (other->sparse) {
-      // other is sparse, but this is not
-      addToRegisters(other->sparseList);
+      n_observed = other.n_observed;
+      sparse = other.sparse;
+      sparseList = other.sparseList;
+      M = other.M;
     } else {
-      if (this->sparse) {
-        switchToNormalRepresentation();
-      }
-      // merge registers
-      for (size_t i = 0; i < other->M.size(); ++i) {
-        if (other->M[i] > this->M[i]) {
-          this->M[i] = other->M[i];
+      n_observed += other.n_observed;
+      if (this->sparse && other.sparse) {
+        // consider using addHashToSparseList(this->sparseList, val, pPrime) and checking for sizes
+        this->sparseList.insert(other.sparseList.begin(), other.sparseList.end());
+      } else if (other.sparse) {
+        // other is sparse, but this is not
+        addToRegisters(other.sparseList);
+      } else {
+        if (this->sparse) {
+          this->sparse = false;
+          M = other.M;
+          addToRegisters(this->sparseList);
+          this->sparseList.clear();
+        } else {
+          // merge registers
+          for (size_t i = 0; i < other.M.size(); ++i) {
+            if (other.M[i] > this->M[i]) {
+              this->M[i] = other.M[i];
+            }
+          }
         }
       }
     }
-    n_observed += other->n_observed;
 }
 
 template<typename T>
-HyperLogLogPlusMinus<T>& HyperLogLogPlusMinus<T>::operator+=(const HyperLogLogPlusMinus<T>* other) {
-    add(other);
+HyperLogLogPlusMinus<T>& HyperLogLogPlusMinus<T>::operator+=(HyperLogLogPlusMinus<T>&& other) {
+    merge(std::move(other));
     return *this;
 }
 
 template<typename T>
 HyperLogLogPlusMinus<T>& HyperLogLogPlusMinus<T>::operator+=(const HyperLogLogPlusMinus<T>& other) {
-    add(&other);
+    merge(other);
     return *this;
 }
-
 
 template<>
 uint64_t HyperLogLogPlusMinus<uint64_t>::flajoletCardinality(bool use_sparse_precision) const {
