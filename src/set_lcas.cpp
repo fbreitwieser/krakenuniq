@@ -74,7 +74,6 @@ map< TaxidSet, uint32_t> Taxids_to_UID_map;
 unordered_map<string, uint32_t> ID_to_taxon_map;
 unordered_map<uint32_t, bool> SeqId_added;
 KrakenDB Database;
-const size_t hll_prec = 10;
 TaxonomyDB<uint32_t> taxdb;
 
 const string prefix = "kraken:taxid|";

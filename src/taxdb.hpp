@@ -319,8 +319,7 @@ uint64_t string_to_T(string str) {
 }
 
 template <typename T>
-inline
-uint64_t reads(const T read_count) {
+uint64_t reads(const T) {
   cerr << "No reads function for type!! " << endl;
   throw ;
   return(0);

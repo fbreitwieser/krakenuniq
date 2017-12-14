@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
       exit(1);
     } else {
       seq_taxid = it->second;
-      if (!taxdb.hppasTaxon(seq_taxid)) {
+      if (!taxdb.hasTaxon(seq_taxid)) {
         if (ignored_taxa.count(seq_taxid) == 0) {
           cerr << "Ignoring taxon " << seq_taxid << " - not in database" << endl;
           ignored_taxa.insert(seq_taxid);
