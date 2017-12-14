@@ -28,7 +28,7 @@ db_sort: krakendb.o quickfile.o
 
 set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
 
-grade_classification: taxdb.hpp report-cols.hpp
+grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
