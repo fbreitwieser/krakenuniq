@@ -18,7 +18,19 @@
  */
 
 
-#include "hyperloglogplus.h"
+#include "hyperloglogplus.hpp"
+
+#include<vector>
+#include<stdexcept>
+#include<iostream>
+#include<fstream>
+#include<math.h>    //log
+#include<algorithm> //vector.count
+#include<bitset>
+#include<numeric>   //accummulate
+
+#include "hyperloglogplus-bias.hpp"
+#include "assert_helpers.h"
 
 /////////////////////////////////////////////////////////////////////
 // Helper methods for bit operations

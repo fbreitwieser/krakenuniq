@@ -26,18 +26,7 @@
 #define HYPERLOGLOGPLUS_H_
 
 #include<vector>
-#include<stdexcept>
-#include<iostream>
-#include<fstream>
-#include<math.h>    //log
-#include<algorithm> //vector.count
-#include<bitset>
 #include<unordered_set>
-#include<numeric>   //accummulate
-
-#include "hyperloglogbias.h"
-#include "assert_helpers.h"
-
 using namespace std;
 
 //#define HLL_DEBUG

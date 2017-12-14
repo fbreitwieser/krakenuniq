@@ -17,7 +17,7 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "hyperloglogplus.h"
+#include "hyperloglogplus.hpp"
 #include <iostream>
 #include <fstream>
 #include <random>

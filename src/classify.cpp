@@ -24,7 +24,7 @@
 #include "quickfile.hpp"
 #include "seqreader.hpp"
 #include "readcounts.hpp"
-#include "taxdb.h"
+#include "taxdb.hpp"
 #include "gzstream.h"
 #include "uid_mapping.hpp"
 #include <sstream>

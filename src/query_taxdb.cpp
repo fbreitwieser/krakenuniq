@@ -17,7 +17,7 @@
  * along with KrakenHLL.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "taxdb.h"
+#include "taxdb.hpp"
 #include <iostream>
 #include <fstream>
 #include <unordered_map>

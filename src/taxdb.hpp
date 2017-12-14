@@ -33,7 +33,7 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
-#include "report-cols.h"
+#include "report-cols.hpp"
 //#include "readcounts.hpp"
 
 

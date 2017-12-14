@@ -17,7 +17,7 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "taxdb.h"
+#include "taxdb.hpp"
 #include "quickfile.hpp"
 #include <iostream>
 #include <fstream>

@@ -23,7 +23,7 @@
 #include "krakendb.hpp"
 #include "krakenutil.hpp"
 #include "seqreader.hpp"
-#include "taxdb.h"
+#include "taxdb.hpp"
 #include "readcounts.hpp"
 #include "uid_mapping.hpp"
 #include <unordered_map>

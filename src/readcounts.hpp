@@ -21,7 +21,7 @@
 #define READCOUNTS_HPP
 
 #include "kraken_headers.hpp"
-#include "hyperloglogplus.h"
+#include "hyperloglogplus.hpp"
 
 namespace kraken {
   static size_t HLL_PRECISION = 14;

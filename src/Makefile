@@ -28,7 +28,7 @@ db_sort: krakendb.o quickfile.o
 
 set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
 
-grade_classification: taxdb.h report-cols.h
+grade_classification: taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
@@ -38,16 +38,16 @@ test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
 dump_db_kmers: krakendb.o quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o taxdb.h report-cols.h readcounts.hpp
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o taxdb.hpp report-cols.hpp readcounts.hpp
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
-build_taxdb: taxdb.h report-cols.h quickfile.o
+build_taxdb: taxdb.hpp report-cols.hpp quickfile.o
 
 make_seqid_to_taxid_map: quickfile.o
 
 read_uid_mapping: quickfile.o krakenutil.o uid_mapping.o
 
-krakenutil.o: krakenutil.cpp krakenutil.hpp taxdb.h report-cols.h
+krakenutil.o: krakenutil.cpp krakenutil.hpp taxdb.hpp report-cols.hpp
 	$(CXX) $(CXXFLAGS) -c krakenutil.cpp
 
 krakendb.o: krakendb.cpp krakendb.hpp quickfile.hpp
@@ -65,5 +65,5 @@ quickfile.o: quickfile.cpp quickfile.hpp
 uid_mapping.o: krakenutil.hpp uid_mapping.hpp uid_mapping.cpp
 	$(CXX) $(CXXFLAGS) -c uid_mapping.cpp
 
-hyperloglogplus.o: hyperloglogplus.h hyperloglogplus.cpp
+hyperloglogplus.o: hyperloglogplus.hpp hyperloglogplus.cpp
 	$(CXX) $(CXXFLAGS) -c hyperloglogplus.cpp
