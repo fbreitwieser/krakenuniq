@@ -169,7 +169,7 @@ std::vector<char> slurp_file(std::string filename, size_t lSize) {
   fclose (pFile);
 
   std::cerr << " Done" << std::endl;
-  return(std::move(buffer));
+  return(buffer);
 }
 
 

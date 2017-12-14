@@ -259,7 +259,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
     cerr << "Error: No ID mappings present!!" << endl;
   }
   cerr << " got " << ID_to_taxon_map.size() << " mappings." << endl;
-  return std::move(ID_to_taxon_map);
+  return ID_to_taxon_map;
 }
 
 void process_single_file() {
