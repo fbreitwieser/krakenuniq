@@ -284,18 +284,18 @@ template<typename TAXID, typename READCOUNTS>
 class TaxReport {
   private:
     std::ostream& _reportOfb;
-    TaxonomyDB<TAXID> & _taxdb;
-    std::unordered_map<TAXID, READCOUNTS> _readCounts;
-    std::unordered_map<TAXID, READCOUNTS> _readCountsIncludingChildren; // consider accessing by TaxEntry*
-    uint64_t _total_n_reads;
+    const TaxonomyDB<TAXID> & _taxdb;
+    const std::unordered_map<TAXID, READCOUNTS>& _taxCounts; // set in constructor, from classification
+    std::unordered_map<TAXID, READCOUNTS> _cladeCounts; // consider accessing by TaxEntry*
+    uint64_t _total_n_reads = 0;
     bool _show_zeros;
-    void printLine(TaxonomyEntry<TAXID>& tax, unsigned depth);
+    void printLine(const TaxonomyEntry<TAXID>& tax, const READCOUNTS& rc, unsigned depth);
 
   public:
-    TaxReport(std::ostream& _reportOfb, TaxonomyDB<TAXID> & taxdb, std::unordered_map<TAXID, READCOUNTS>, bool _show_zeros);
-    void printReport(std::string format);
-    void printReport(TaxonomyEntry<TAXID>& tax, unsigned depth);
-    void setReportCols(std::vector<std::string> names);
+    TaxReport(std::ostream& _reportOfb, const TaxonomyDB<TAXID> & taxdb, const std::unordered_map<TAXID, READCOUNTS>&, bool _show_zeros);
+    void printReport(const std::string & format);
+    void printReport(const TaxonomyEntry<TAXID>& tax, unsigned depth);
+    void setReportCols(const std::vector<std::string>& names);
 
     std::vector<std::string> _report_col_names;
     std::vector<REPORTCOLS> _report_cols;
@@ -943,19 +943,19 @@ void TaxonomyDB<TAXID>::readGenomeSizes(string file) {
 
 
 template<typename TAXID, typename READCOUNTS>
-TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID>& taxdb, 
-    std::unordered_map<TAXID, READCOUNTS> readCounts,
-    bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _readCounts(readCounts), _show_zeros(show_zeros) {
+TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB<TAXID>& taxdb, 
+    const std::unordered_map<TAXID, READCOUNTS>& readCounts,
+    bool show_zeros) : _reportOfb(reportOfb), _taxdb(taxdb), _taxCounts(readCounts), _show_zeros(show_zeros) {
 
   cerr << "Setting all the values in the TaxTree ...";
-  for (auto it = _readCounts.begin(); it != _readCounts.end(); ++it) {
+  for (auto it = _taxCounts.begin(); it != _taxCounts.end(); ++it) {
     auto tax_it = taxdb.entries.find(it->first);
     if (tax_it == taxdb.entries.end()) {
       cerr << "No entry for " << it->first << " in database!" << endl;
     } else {
-      TaxonomyEntry<TAXID>* tax = &(tax_it->second);
+      const TaxonomyEntry<TAXID>* tax = &(tax_it->second);
       while (tax != NULL) {
-        _readCountsIncludingChildren[tax->taxonomyID] += it->second;
+        _cladeCounts[tax->taxonomyID] += it->second;
         tax = tax->parent;
       }
     }
@@ -971,7 +971,7 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, TaxonomyDB<TAXID
 
 
 template<typename TAXID, typename READCOUNTS>
-void TaxReport<TAXID,READCOUNTS>::setReportCols(std::vector<std::string> names) {
+void TaxReport<TAXID,READCOUNTS>::setReportCols(const std::vector<std::string>& names) {
   _report_cols.clear();
   for (size_t i = 0; i< names.size(); ++i) {
     auto& s = names[i];
@@ -982,39 +982,39 @@ void TaxReport<TAXID,READCOUNTS>::setReportCols(std::vector<std::string> names) 
     _report_cols.push_back(it->second);
   }
   _report_col_names = names;
-
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxReport<TAXID,READCOUNTS>::printReport(std::string format) {
-  _total_n_reads = reads(_readCountsIncludingChildren.at(0)) + reads(_readCountsIncludingChildren.at(1));
+void TaxReport<TAXID,READCOUNTS>::printReport(const std::string& format) {
+  const auto it_unclassified = _cladeCounts.find(0);
+  const auto it_classified = _cladeCounts.find(1);
+  const auto it_other = _cladeCounts.find(-1);
+
+  if (it_unclassified != _cladeCounts.end()) _total_n_reads += reads(it_unclassified->second);
+  if (it_classified != _cladeCounts.end()) _total_n_reads += reads(it_classified->second);
+  if (it_other != _cladeCounts.end()) _total_n_reads += reads(it_other->second);
+
   if (_total_n_reads == 0) {
     std::cerr << "total number of reads is zero - not creating a report!" << endl;
     return;
   }
   if (_report_cols.size() == _report_col_names.size()) {
     // print header
-    bool first_one = true;
-    for (size_t i=0; i < _report_col_names.size(); ++i) {
-      const std::string& s = _report_col_names[i];
-      if (first_one) {
-	first_one = false;
-      } else {
-	_reportOfb << '\t';
-      }
-      _reportOfb << s;
+    _reportOfb << _report_col_names[0];
+    for (size_t i=1; i < _report_col_names.size(); ++i) {
+      _reportOfb << '\t' << _report_col_names[i];
     }
-    _reportOfb << endl;
+    _reportOfb << '\n';
   }
 
   if (format == "kraken") {
     // A: print number of unidentified reads
-    // B: print normal results
+    // B: print classified results
     // C: Print Unclassified stuff
     for (int i : { 0, 1, -1 } ) {
       auto it = _taxdb.entries.find(i);
       if (it != _taxdb.entries.end()) {
-	printReport(it->second,0u);
+        printReport(it->second,0u);
       }
     }
   } else {
@@ -1026,34 +1026,37 @@ void TaxReport<TAXID,READCOUNTS>::printReport(std::string format) {
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxReport<TAXID,READCOUNTS>::printReport(TaxonomyEntry<TAXID>& tax, unsigned depth) {
-  if (_show_zeros || reads(_readCountsIncludingChildren.at(tax.taxonomyID)) > 0) {
-    printLine(tax, depth);
+void TaxReport<TAXID,READCOUNTS>::printReport(const TaxonomyEntry<TAXID>& tax, unsigned depth) {
+
+    const auto taxit = _cladeCounts.find(tax.taxonomyID);
+    
+    if (taxit == _cladeCounts.end() || (!_show_zeros && reads(taxit->second) == 0))
+      return;
+
+    printLine(tax, taxit->second, depth);
 
     // Sort children
     vector<size_t> pos;
-    vector<READCOUNTS*> rc;
+    unordered_map<size_t, READCOUNTS*> rc;
     for (size_t i =0; i < tax.children.size(); ++i) {
-      auto it = _readCountsIncludingChildren.find(tax.children[i]->taxonomyID);
-      if (it != _readCountsIncludingChildren.end()) {
-	pos.push_back(i++);
-	rc.push_back(&(it->second));
+      auto it = _cladeCounts.find(tax.children[i]->taxonomyID);
+      if (it != _cladeCounts.end()) {
+	pos.push_back(i);
+	rc[i] = &(it->second);
       }
     }
-    std::sort(pos.begin(), pos.end(), [&](size_t a, size_t b) { return rc[b] < rc[a] ;} );
+    std::sort(pos.begin(), pos.end(), [&](size_t a, size_t b) { return *(rc.at(b)) < *(rc.at(a)) ;} );
 
     for (size_t i=0; i < rc.size(); ++i) {
       auto child_it = tax.children[ pos[i] ];
       printReport(*child_it, depth+1);
     }
-  }
 }
 
 template<typename TAXID, typename READCOUNTS>
-void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID>& tax, unsigned depth) {
-  const READCOUNTS& rc = _readCountsIncludingChildren.at(tax.taxonomyID);
-  const auto r_it = _readCounts.find(tax.taxonomyID);
-  const bool has_tax_reads = r_it != _readCounts.end();
+void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, const READCOUNTS& rc, unsigned depth) {
+  const auto r_it = _taxCounts.find(tax.taxonomyID);
+  const bool has_tax_data = r_it != _taxCounts.end();
 
   long long unique_kmers_for_clade = rc.kmers.cardinality();
   double genome_size = double(tax.genomeSize+tax.genomeSizeOfChildren);
@@ -1068,11 +1071,11 @@ void TaxReport<TAXID,READCOUNTS>::printLine(TaxonomyEntry<TAXID>& tax, unsigned 
       case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*reads(rc)/_total_n_reads; break;
 					 //case REPORTCOLS::ABUNDANCE:      _reportOfb << 100*counts.abundance[0]; break;
 					 //case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
-      case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_reads? reads(r_it->second) : 0); break;
+      case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_data? reads(r_it->second) : 0); break;
       case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << reads(rc); break;
-      case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_reads? r_it->second.kmers.cardinality() : 0); break;
+      case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_data? r_it->second.kmers.cardinality() : 0); break;
       case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << unique_kmers_for_clade; break;
-      case REPORTCOLS::NUM_KMERS:        _reportOfb << (has_tax_reads? r_it->second.kmers.nObserved() : 0); break;
+      case REPORTCOLS::NUM_KMERS:        _reportOfb << (has_tax_data? r_it->second.kmers.nObserved() : 0); break;
       case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << rc.kmers.nObserved(); break;
       case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
       case REPORTCOLS::CLADE_KMER_COVERAGE: 
