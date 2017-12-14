@@ -38,10 +38,10 @@ test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
 dump_db_kmers: krakendb.o quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o taxdb.hpp report-cols.hpp readcounts.hpp
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o #taxdb.hpp report-cols.hpp readcounts.hpp
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
-build_taxdb: taxdb.hpp report-cols.hpp quickfile.o
+build_taxdb: quickfile.o #taxdb.hpp report-cols.hpp
 
 make_seqid_to_taxid_map: quickfile.o
 
