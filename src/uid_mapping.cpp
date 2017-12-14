@@ -27,8 +27,8 @@ using namespace std;
 
 namespace kraken {
 
-  static size_t INT_SIZE=sizeof(uint32_t);
-  static size_t UID_BLOCK_SIZE=2*INT_SIZE;
+  //static size_t INT_SIZE=sizeof(uint32_t);
+  //static size_t UID_BLOCK_SIZE=2*INT_SIZE;
   static uint32_t max_uid = -1;
 
   uint32_t uid_mapping(

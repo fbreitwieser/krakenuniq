@@ -65,8 +65,7 @@ KrakenDB::KrakenDB(char *ptr, size_t filesize) {
     errx(EX_DATAERR, "pointer is NULL");
   }
   if (strncmp(ptr, DATABASE_FILE_TYPE, strlen(DATABASE_FILE_TYPE))) {
-    string msg = "database in improper format - found " + string(ptr, strlen(DATABASE_FILE_TYPE));
-    errx(EX_DATAERR, msg.c_str());
+    errx(EX_DATAERR,"database in improper format - found %s", string(ptr, strlen(DATABASE_FILE_TYPE)).c_str());
   }
   memcpy(&key_bits, ptr + 8, 8);
   memcpy(&val_len, ptr + 16, 8);
