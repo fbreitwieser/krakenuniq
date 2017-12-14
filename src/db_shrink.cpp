@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
   input_file.read(buffer, 8);
   memcpy(&key_bits, buffer, 8);
   size_t header_size = 72 + 2 * (4 + 8 * key_bits);
-  delete buffer;
+  delete[] buffer;
 
   // Read in header and get remaining metadata
   buffer = new char[header_size];
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
   ofstream output_file(Output_DB_filename.c_str(), std::ofstream::binary);
   output_file.write(buffer, header_size);
 
-  delete buffer;
+  delete[] buffer;
 
   // Prep buffer for scan/select loop
   // We select one pair (the last) per "block"
