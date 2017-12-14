@@ -24,7 +24,7 @@
 #include<stdexcept>
 #include<iostream>
 #include<fstream>
-#include<math.h>    //log
+#include<cmath>    //log and sqrt
 #include<algorithm> //vector.count
 #include<bitset>
 #include<numeric>   //accummulate
