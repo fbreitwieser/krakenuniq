@@ -80,6 +80,10 @@ public:
 
   // Construct HLL with precision bits
   HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true, HASH (*bit_mixer) (uint64_t) = murmurhash3_finalizer);
+  HyperLogLogPlusMinus(const HyperLogLogPlusMinus<HASH>& other);
+  HyperLogLogPlusMinus(HyperLogLogPlusMinus<HASH>&& other);
+  HyperLogLogPlusMinus<HASH>& operator= (HyperLogLogPlusMinus<HASH>&& other);
+  HyperLogLogPlusMinus<HASH>& operator= (const HyperLogLogPlusMinus<HASH>& other);
   ~HyperLogLogPlusMinus() {};
   void reset(); // Note: sets sparse=true
 

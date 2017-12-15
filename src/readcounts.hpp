@@ -32,9 +32,24 @@ namespace kraken {
     bool count_kmers = HLL_PRECISION == 0; // TODO: redo
     HyperLogLogPlusMinus<uint64_t> kmers; // unique k-mer count per taxon
 
-    ReadCounts() : n_reads(0), count_kmers(HLL_PRECISION > 0) {
-      if (count_kmers) 
-        kmers = HyperLogLogPlusMinus<uint64_t>(HLL_PRECISION);
+    ReadCounts() : n_reads(0), count_kmers(HLL_PRECISION > 0), kmers(HyperLogLogPlusMinus<uint64_t>(HLL_PRECISION)) {
+    }
+
+    ReadCounts(const ReadCounts& other) : n_reads(other.n_reads), count_kmers(other.count_kmers), kmers(other.kmers) {
+    }
+
+    ReadCounts& operator=(const ReadCounts& other) {
+      n_reads = other.n_reads;
+      count_kmers =other.count_kmers;
+      kmers = other.kmers;
+      return *this;
+    }
+
+    ReadCounts& operator=(ReadCounts&& other) {
+      n_reads = other.n_reads;
+      count_kmers =other.count_kmers;
+      kmers = std::move(other.kmers);
+      return *this;
     }
 
     void add_kmer(uint64_t kmer) {
@@ -66,6 +81,46 @@ namespace kraken {
       return false;
     }
   };
+
+  /* Implementation of more efficient merge of ReadCounts - however requires access to private members of HLL
+  ReadCounts mergeReadCounts(vector<const ReadCounts*> read_counts) {
+    if (read_counts.size() == 0) {
+      cerr << "no read_counts?" << endl;
+      exit(1);
+    } 
+    ReadCounts res = *(read_counts.front());
+    if (read_counts.size() == 1) {
+      return res;
+    }
+
+    bool not_sparse = !res.kmers.sparse;
+    for (size_t i = 1; i<read_counts.size(); ++i) {
+      res += *(read_counts[i]);
+      if (res.kmers.sparse) {
+        if (read_counts[i]->kmers.sparse) {
+          res.kmers.sparseList.insert(read_counts[i]->kmers.sparseList.begin(), read_counts[i]->kmers.sparseList.end());
+        } else {
+          not_sparse = true;
+        }
+      }
+    }
+
+    if (not_sparse) {
+      res.kmers.switchToNormalRepresentation();
+      for (size_t i = 0; i < res.kmers.M.size(); ++i) {
+        uint8_t max_elem = res.kmers.M[i];
+        for (size_t j = 1; j<read_counts.size(); ++j) {
+          if (!read_counts[j]->kmers.sparse) {
+            if (read_counts[j]->kmers.M[i] > max_elem)
+              max_elem = read_counts[j]->kmers.M[i];
+          }
+        }
+        res.kmers.M[i] = max_elem;  
+      }
+    }
+    return res;
+  }
+  */
   
   uint64_t reads(const ReadCounts& read_count) {
     return(read_count.n_reads);

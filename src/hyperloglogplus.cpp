@@ -432,6 +432,49 @@ HyperLogLogPlusMinus<uint64_t>::HyperLogLogPlusMinus(uint8_t precision, bool spa
     }
 }
 
+template<typename HASH>
+HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (HyperLogLogPlusMinus<HASH>&& other) {
+  p = other.p;
+  m = other.m;
+  M = std::move(other.M);
+  n_observed = other.n_observed;
+  sparse = other.sparse;
+  sparseList = std::move(other.sparseList);
+  bit_mixer = other.bit_mixer;
+  return *this;
+}
+
+template<typename HASH>
+HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (const HyperLogLogPlusMinus<HASH>& other) {
+  p = other.p;
+  m = other.m;
+  M = other.M;
+  n_observed = other.n_observed;
+  sparse = other.sparse;
+  sparseList = other.sparseList;
+  bit_mixer = other.bit_mixer;
+  return *this;
+}
+
+template<typename HASH>
+HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(const HyperLogLogPlusMinus<HASH>& other):
+      p(other.p), m(other.m), 
+      M(other.M), n_observed(other.n_observed), sparse(other.sparse), 
+      sparseList(other.sparseList), 
+      bit_mixer(other.bit_mixer) {
+}
+
+
+template<typename HASH>
+HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(HyperLogLogPlusMinus<HASH>&& other):
+      p(other.p), m(other.m), 
+      M(std::move(other.M)), 
+      n_observed(other.n_observed), sparse(other.sparse), 
+      sparseList(std::move(other.sparseList)), 
+      bit_mixer(other.bit_mixer) {
+}
+
+
 template<>
 void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
     ++ n_observed;
@@ -490,6 +533,8 @@ void HyperLogLogPlusMinus<T>::reset() {
 // Convert from sparse representation (using sparseList) to normal (using register)
 template <typename T>
 void HyperLogLogPlusMinus<T>::switchToNormalRepresentation() {
+    if (!sparse) 
+      return;
     D(cerr << "switching to normal representation" << endl;)
 #ifdef HLL_DEBUG
     cerr << " est before: " << cardinality() << endl;
@@ -506,6 +551,10 @@ void HyperLogLogPlusMinus<T>::switchToNormalRepresentation() {
 // add sparseList to the registers of M
 template<typename T>
 void HyperLogLogPlusMinus<T>::addToRegisters(const SparseListType &sparseList) {
+    if (sparse) {
+      cerr << "Cannot add to registers of a sparse HLL" << endl;
+      return;
+    }
     if (sparseList.size() == 0) {
       return;
     }
