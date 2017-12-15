@@ -24,7 +24,6 @@
 #include "krakenutil.hpp"
 #include "seqreader.hpp"
 #include "taxdb.hpp"
-#include "readcounts.hpp"
 #include "uid_mapping.hpp"
 #include <unordered_map>
 #include <map>
