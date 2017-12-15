@@ -270,6 +270,7 @@ int main(int argc, char **argv) {
     gettimeofday(&tv2, NULL);
     fprintf(stderr, "Report finished in %.3f seconds.\n", get_seconds(tv1,tv2));
   }
+  cerr << "Finishing up ...";
 
   for (size_t i = 0; i < Open_fstreams.size(); ++i) {
     ofstream* ofs = Open_fstreams[i];
@@ -360,10 +361,6 @@ void process_file(char *filename) {
       {
         total_classified += my_total_classified;
         for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end(); ++it) {
-          //auto res = taxon_counts.insert({it->first, it->second});
-          //if (!res.second) {
-          //  res.first->second += std::move(it->second);
-          //}
           taxon_counts[it->first] += std::move(it->second);
         }
 
