@@ -999,12 +999,12 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB
   //cerr << " Nr children: " << _children.size() << endl;
 
   #pragma omp parallel for schedule(dynamic, 50)
-  for (int i = 0; i < _children.size(); ++i) {
+  for (size_t i = 0; i < _children.size(); ++i) {
 
     auto cit = _children.begin();
     advance(cit, i);
     READCOUNTS rc = *(cit->second.front());
-    for (int j = 1; j < cit->second.size(); ++j)
+    for (size_t j = 1; j < cit->second.size(); ++j)
        rc += *(cit->second[j]);
     //READCOUNTS rc = mergeReadCounts(cit->second);
     #pragma omp critical(update_clade_counts)
