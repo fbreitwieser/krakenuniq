@@ -76,7 +76,7 @@ GetOptions(
   "unclassified-out=s" => \$unclassified_out,
   "classified-out=s" => \$classified_out,
   "print-sequence=s" => \$print_sequence,
-  "output=s" => \$outfile,
+  "o|output=s" => \$outfile,
   "report-file=s" => \$report_file,
   "preload" => \$preload,
   "paired" => \$paired,
@@ -164,7 +164,7 @@ if ($auto_detect) {
 }
 
 
-if (! -d dirname($report_file)) {
+if (defined $report_file && !-d dirname($report_file)) {
   make_path(dirname($report_file));
 }
 
