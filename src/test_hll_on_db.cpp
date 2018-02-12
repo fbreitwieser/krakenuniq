@@ -14,7 +14,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
+ * along with KrakenHLL.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "hyperloglogplus.hpp"
@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+
   char *db_name = argv[1];
   QuickFile db_file;
   db_file.open_file(db_name);
@@ -57,6 +58,16 @@ int main(int argc, char **argv) {
   HyperLogLogPlusMinus<uint64_t> hll16(16, sparse); // unique k-mer count per taxon
   HyperLogLogPlusMinus<uint64_t> hll17(17, sparse); // unique k-mer count per taxon
   HyperLogLogPlusMinus<uint64_t> hll18(18, sparse); // unique k-mer count per taxon
+
+  hll10.use_n_observed = false;
+  hll11.use_n_observed = false;
+  hll12.use_n_observed = false;
+  hll13.use_n_observed = false;
+  hll14.use_n_observed = false;
+  hll15.use_n_observed = false;
+  hll16.use_n_observed = false;
+  hll17.use_n_observed = false;
+  hll18.use_n_observed = false;
 
   char* ptr = db.get_ptr();
   //char* pair_ptr = db.get_pair_ptr();
@@ -79,6 +90,8 @@ int main(int argc, char **argv) {
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
   std::uniform_real_distribution<> dis(0.0, 1.0);
 
+  //double lg_range = log10(nr)-2.;
+
   cout << "precision\ttrue_count\testimate\tertl_estimate\n";
   size_t ctr = 0;
   for (uint64_t i = 0; i < key_ct; i++) {
@@ -98,9 +111,12 @@ int main(int argc, char **argv) {
       hll18.add(*kmer);
       ++ctr;
 
+	  double log_ctr = log10(ctr);
+
       uint64_t last_dec = pow(10,floor(log10(ctr)));
-      if (floor(log10(ctr)) == log10(ctr) || 
-        (ctr > 100 && (ctr*10) % last_dec == 0)) {
+	  bool do_print = floor(log10(ctr)) == log10(ctr) || (ctr > 100 && (ctr*10) % last_dec == 0);
+	  //bool do_print = dis(gen)
+      if (do_print) {
         cout << 10 << '\t' << ctr << '\t' << hll10.cardinality() << '\t' << hll10.ertlCardinality() << '\n';
         cout << 11 << '\t' << ctr << '\t' << hll11.cardinality() << '\t' << hll11.ertlCardinality() << '\n';
         cout << 12 << '\t' << ctr << '\t' << hll12.cardinality() << '\t' << hll12.ertlCardinality() << '\n';
