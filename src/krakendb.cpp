@@ -92,6 +92,9 @@ std::map<uint32_t,uint64_t> KrakenDB::count_taxons() {
     exit(1);
   }
   for (uint64_t i = 0; i < key_ct; i++) {
+    if (i % 10000000 == 1) {
+      fprintf(stderr, "\r %.2f %%", 100*(double)i/(double)key_ct );
+    }
     uint32_t* taxon = (uint32_t *) (ptr + pair_sz * i + key_len);
     if (taxon == NULL) {
         std::cerr << "taxon is NULL (i is " << i << " and key_ct is " << key_ct << ")" << std::endl;
@@ -100,6 +103,7 @@ std::map<uint32_t,uint64_t> KrakenDB::count_taxons() {
         ++taxon_counts[taxon_i];
     }
   }
+  fprintf(stderr, "\r");
   return taxon_counts;
 }
 

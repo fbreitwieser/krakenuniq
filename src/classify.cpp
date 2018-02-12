@@ -230,9 +230,16 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < DB_filenames.size(); ++i) {
       const auto fname = DB_filenames[i] + ".counts";
       ifstream ifs(fname);
+      bool counts_file_gd = false;
       if (ifs.good()) {
-        ifs.close();
-      } else {
+        if (ifs.peek() == std::ifstream::traits_type::eof()) {
+          cerr << "Kmer counts file is empty - trying to regenerate ..." << endl;
+        } else {
+          ifs.close();
+          counts_file_gd = true;
+        }
+      }
+      if (!counts_file_gd) {
         ofstream ofs(fname);
         cerr << "Writing kmer counts to " << fname << "... [only once for this database, may take a while] " << endl;
         auto counts = KrakenDatabases[i]->count_taxons();
