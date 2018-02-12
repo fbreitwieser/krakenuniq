@@ -63,6 +63,7 @@ bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
+bool full_report = false;
 
 bool Map_UIDs = false;
 string UID_to_TaxID_map_filename;
@@ -254,24 +255,40 @@ int main(int argc, char **argv) {
   
     TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
     if (HLL_PRECISION > 0) {
-    rep.setReportCols(vector<string> { 
-      "%",
-      "reads", 
-      "taxReads",
-      "kmers",
-      "dup",
-      "cov", 
-      "taxID", 
-      "rank", 
-      "taxName"});
+      if (full_report) {
+        rep.setReportCols(vector<string> {
+          "%",
+          "reads",
+          "taxReads",
+          "kmers",
+          "taxKmers",
+          "kmersDB",
+          "taxKmersDB",
+          "dup",
+          "cov",
+          "taxID",
+          "rank",
+          "taxName"});
+      } else {
+        rep.setReportCols(vector<string> {
+          "%",
+          "reads",
+          "taxReads",
+          "kmers",
+          "dup",
+          "cov",
+          "taxID",
+          "rank",
+          "taxName"});
+      }
     } else {
-    rep.setReportCols(vector<string> { 
-      "%",
-      "reads", 
-      "taxReads",
-      "taxID", 
-      "rank", 
-      "taxName"});
+      rep.setReportCols(vector<string> {
+        "%",
+        "reads",
+        "taxReads",
+        "taxID",
+        "rank",
+        "taxName"});
     }
     rep.printReport("kraken");
     gettimeofday(&tv2, NULL);
