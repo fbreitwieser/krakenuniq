@@ -27,7 +27,7 @@ set -o pipefail  # Stop on failures in non-final pipeline commands
 
 JELLYFISH1_BIN=""
 for JF in $JELLYFISH_BIN $(dirname $0)/jellyfish/bin/jellyfish  /usr/local/opt/jellyfish-1.1/bin/jellyfish jellyfish1 jellyfish; do
-  if test -f $JF || command -v $JF 2>/dev/null; then
+  if test -f $JF || command -v $JF >/dev/null 2>&1; then
     JELLYFISH1_BIN=$JF;
     break
   fi
