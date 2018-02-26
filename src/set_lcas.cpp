@@ -77,8 +77,9 @@ TaxonomyDB<uint32_t> taxdb;
 
 const string prefix = "kraken:taxid|";
 
-// do not add sequence taxIDs for host sequences (currently only human)
+// do not add sequence taxIDs for host sequences (currently only human and mouse)
 const uint32_t TID_HUMAN = 9606;
+const uint32_t TID_MOUSE = 10090;
 
 // k-mers appearing in contaminant sequences will keep the contaminant
 //  sequence taxid, even if they also appear in a genome
@@ -245,7 +246,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
         taxid = get_new_taxid(name_to_taxid_map, Parent_map, name, taxid, "assembly");
     }
 
-    if (Add_taxIds_for_Sequences && orig_taxid != TID_HUMAN) {
+    if (Add_taxIds_for_Sequences && orig_taxid != TID_HUMAN && orig_taxid != TID_MOUSE) {
       taxid = get_new_taxid(name_to_taxid_map, Parent_map, seq_id, taxid, "sequence");
     }
     if (Add_taxIds_for_Assembly || Add_taxIds_for_Sequences) {
@@ -309,7 +310,7 @@ void process_single_file() {
     }
     
     bool is_contaminant_taxid = taxid == TID_CONTAMINANT1 || taxid == TID_CONTAMINANT2;
-    if (Add_taxIds_for_Sequences && taxid != TID_HUMAN && it_p->second != TID_HUMAN) {
+    if (Add_taxIds_for_Sequences && taxid != TID_HUMAN && it_p->second != TID_HUMAN && taxid != TID_MOUSE && it_p->second != TID_MOUSE) {
       // Update entry based on header line
       auto entryIt = taxdb.entries.find(taxid);
       if (entryIt == taxdb.entries.end()) {

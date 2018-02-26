@@ -630,7 +630,7 @@ sub download_domain(@) {
   my ($DATABASE, $domain_dir, $domain, $_assembly_level, $_taxid) = @_;
   $_assembly_level =~ s/ /_/g;
   print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level";
-  print STDERR (defined $_taxid? " and taxid $_taxid.\n" : ".\n");
+  print STDERR (defined $_taxid? " with taxid $_taxid.\n" : ".\n");
   die unless defined $domain_dir && defined $domain;
   if (-d $domain_dir) {
     print STDERR "WARNING: $domain_dir already exists - potentially overwriting files.\n";
