@@ -67,8 +67,12 @@ ARGUMENT
               'genbank'        downloads GenBank genomes (see parameters -a and -d)
               'refseq'         downloads RefSeq genomes (see parameters -a and -d)
               'refseq/DOMAIN'  downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria')
-              'refseq/DOMAIN/ASS_LEVEL'    specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
-              'refseq/DOMAIN/ASS_LEVEL/taxidTAXID'   specifify taxid (e.g. 'refseq/vertebrate_mammalian/taxid9606')
+              'refseq/DOMAIN/ASS_LEVEL'
+			                   specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
+              'refseq/DOMAIN/ASS_LEVEL/column1=value1(/column2=value2)*' 
+			                   require specific column values in assembly_summary.txt.
+							    e.g. 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download human assemblies
+							      or 'genbank/bacteria/Any/species_taxid=9606' <- downloads Genbank assemblies not in RefSeq
 
               
   By default, 'refseq' and 'genbank' download the domains and assembly levels specied
@@ -160,24 +164,15 @@ foreach my $DATABASE (@ARGV) {
   } elsif ( $DATABASE eq "contaminants" ) { 
     download_contaminats(get_dir($BASE_DIR,"library/contaminants"));
   } elsif ( $DATABASE =~ /^refseq/ || $DATABASE =~ /^genbank/ ) {
-    my ($db, $domain, @levels) = split(/\//, $DATABASE);
-    if (!defined $domain) {
-      foreach my $domain (split(/,/,$DOMAINS)) {
-        my $lib_dir = $add_dir? "$BASE_DIR/library/$domain" : "$BASE_DIR/$domain";
-        download_domain($db, $lib_dir, $domain, $ASSEMBLY_LEVEL);
-      }
-    } else {
+    my ($db, $domains, $assembly_levels, @additional_filters) = split(/\//, $DATABASE);
+    $domains = $DOMAINS unless defined $domains;
+	$assembly_levels = $ASSEMBLY_LEVEL unless defined $assembly_levels;
+
+    foreach my $domain (split(/,/, $domains)) {
       my $lib_dir = $add_dir? "$BASE_DIR/library/$domain" : "$BASE_DIR/$domain";
-      my $level = $ASSEMBLY_LEVEL;
-      my $taxid = $TAXID;
-      foreach (@levels) {
-        if (/taxid(.*)/) {
-          $taxid = $1;
-        } else {
-          $level = $_;
-        }
-      }
-      download_domain($db, $lib_dir, $domain, $level, $taxid);
+	  foreach my $assembly_level (split(/,/, $assembly_levels)) {
+      	download_domain($db, $lib_dir, $domain, $assembly_level, @additional_filters);
+	  }
     }
   } else {
     print STDERR "Unknown database $DATABASE. \n";
@@ -541,7 +536,6 @@ sub print_header_lines(@) {
   return unless -f $file;
   print STDERR "Making map file for $file\n" if ($VERBOSE);
   $taxid = "$taxid\t$name" if defined $name;
-  print STDERR "\n grep '^>' $file | sed -e 's/.//' -e 's/\\( .*\\|\$\\)/\t$taxid/' > $file.map\n";
   #`grep '^>' "$file" | sed -e 's/.//' -e 's/\\( .*\\|\$\\)/\t$taxid/' > "$file.map"`;
   open (my $F, ">", "$file.map");
   open (my $G, "<", $file);
@@ -627,10 +621,10 @@ sub download_taxonomy(@) {
 }
 
 sub download_domain(@) {
-  my ($DATABASE, $domain_dir, $domain, $_assembly_level, $_taxid) = @_;
+  my ($DATABASE, $domain_dir, $domain, $_assembly_level, @additional_filters) = @_;
   $_assembly_level =~ s/ /_/g;
   print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level";
-  print STDERR (defined $_taxid? " with taxid $_taxid.\n" : ".\n");
+  print STDERR (defined @additional_filters? " and additional filters @additional_filters.\n" : ".\n");
   die unless defined $domain_dir && defined $domain;
   if (-d $domain_dir) {
     print STDERR "WARNING: $domain_dir already exists - potentially overwriting files.\n";
@@ -644,24 +638,61 @@ sub download_domain(@) {
 
   my $is_viral_refseq =1 if $domain eq "viral" && $DATABASE eq "refseq";
 
+  my %cols = (
+	assembly_accession=>0,
+	bioproject=>1,
+	biosample=>2,
+	wgs_master=>3,
+	refseq_category=>4,
+    taxid=>5,
+	species_taxid=>6,
+	organism_name=>7,
+	infraspecific_name=>8,
+	isolate=>9,
+	version_status=>10,
+    assembly_level=>11,
+	release_type=>12,
+	genome_rep=>13,
+	seq_rel_date=>14,
+	asm_name=>15,
+	submitter=>16,
+    gbrs_paired_asm=>17,
+	paired_asm_comp=>18,
+	ftp_path=>19,
+	excluded_from_refseq=>20,
+	relation_to_type_material=>21
+  );
+
+  my %seen_acs;
   my @genomes_to_dl;
   open(my $A1, "<", $ass_file);
   open(my $A2, ">", $ass_file_filtered);
   while (<$A1>) {
     next if /^#/;
-    my ($assembly_accession, $bioproject, $biosample, $wgs_master, $refseq_category, 
-      $taxid, $species_taxid, $organism_name, $infraspecific_name, $isolate, $version_status, 
-      $assembly_level, $release_type, $genome_rep, $seq_rel_date, $asm_name, $submitter, 
-      $gbrs_paired_asm, $paired_asm_comp, $ftp_path, $excluded_from_refseq, $relation_to_type_material) = split /\t/;
+	my @fields = split /\t/;
 
-	$assembly_level =~ s/ /_/g;
-    next unless $version_status eq "latest";
-    next if ($_assembly_level ne "Any" && $assembly_level ne $_assembly_level);
-    next if (defined $REFSEQ_CATEGORY && $refseq_category ne $REFSEQ_CATEGORY);
-    next if (defined $_taxid && $taxid ne $_taxid);
+	$fields[$cols{"assembly_level"}] =~ s/ /_/g;
+    next unless $fields[$cols{"version_status"}] eq "latest";
+    next if ($_assembly_level ne "Any" && $fields[$cols{"assembly_level"}] ne $_assembly_level);
+    next if (defined $REFSEQ_CATEGORY && $fields[$cols{"refseq_category"}] ne $REFSEQ_CATEGORY);
+
+	## Kick out duplicates
+	next if (defined $seen_acs{$fields[$cols{"assembly_accession"}]});
+	$seen_acs{$fields[$cols{"assembly_accession"}]} = 1;
+	
+	my $keep_it = 1;
+	foreach (@additional_filters) {
+		my ($k, $v) = split(/=/);
+		die "$k is not an available column filter. Available: ".(join(", ", sort keys %cols)) if (!defined $cols{$k});
+		$keep_it = 0 if $fields[$cols{$k}] ne $v; 
+	}
+	next unless $keep_it;
+
     print $A2 $_;
     ++ $n_genomes;
-    push @genomes_to_dl, [$ftp_path, $taxid, $organism_name, $infraspecific_name, $assembly_accession, $assembly_level];
+    push @genomes_to_dl, [
+			$fields[$cols{"ftp_path"}], $fields[$cols{"taxid"}], $fields[$cols{"organism_name"}], 
+			$fields[$cols{"infraspecific_name"}], $fields[$cols{"assembly_accession"}], $fields[$cols{"assembly_level"}]];
   }
   close $A2;
   close $A1;
