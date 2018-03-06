@@ -34,6 +34,9 @@ my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
 my @ALL_ASSEMBLY_LEVELS=qw/Complete\ Genome Chromosome Scaffold Contig/;
 my @SMALL_GENOMES=qw/mitochondrion plaasmid plastid/;
 
+my %taxonomy;
+my %taxonomy_map;
+
 ## Option parsing
 my $DATABASE="refseq";
 my $ASSEMBLY_LEVEL="Complete Genome";
@@ -51,8 +54,17 @@ my $OVERWRITE_FILES=0;
 my $INCLUDE_VIRAL_NEIGHBORS=0;
 my $DOMAINS;
 my $DL_MOD_RSYNC;
+
+my $SEQID_MAP_FILE;
+my $TAXDB_FILE;
+my $ADD_TAXID_FOR_GENOMES=0;
+my $ADD_TAXID_FOR_SEQUENCES=0;
+my $START_TAXID=1000000000;
+my $NO_SEQ_TAXID;
+
 my $n_children = 0;
 my @pids;
+my %taxid_name_map;
 
 my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
@@ -110,6 +122,14 @@ GetOptions(
   "category|c=s" => \$REFSEQ_CATEGORY,
   "taxonomy-id|t=s" => \$TAXID,
   "fna=s" => \$FNA_FILES,
+
+  "taxonomy-file=s" => \$TAXDB_FILE,
+  "seqid-map=s" => \$SEQID_MAP_FILE,
+  "taxids-for-genomes" => \$ADD_TAXID_FOR_GENOMES,
+  "taxids-for-sequences" => \$ADD_TAXID_FOR_SEQUENCES,
+  "start-taxid=i" => \$START_TAXID,
+  "no-sequence-taxids=s" => \$NO_SEQ_TAXID,
+
   "rsync|R" => \$DL_MOD_RSYNC,
   "include-viral-neighbors" => \$INCLUDE_VIRAL_NEIGHBORS,
   "filter-unplaced|u" => \$FILTER_UNPLACED,
@@ -126,6 +146,30 @@ if (!defined $ARGV[0] || !$ARGV[0] =~ /refseq|genbank|taxonomy|contaminants/) {
 if (defined $BASE_DIR && defined $DB_DIR) {
   print "Define either --db or -o, not both!";
   exit 1;
+}
+
+if (defined $ADD_TAXID_FOR_GENOMES || defined $ADD_TAXID_FOR_SEQUENCES) {
+  die "Specify a seqid map file with --seqid-map when adding taxonomy IDs!" unless defined $SEQID_MAP_FILE;
+  die "Specify a taxonomy file with --taxonomy-file when adding taxonomy IDs!" unless defined $TAXDB_FILE;
+}
+
+my $SEQID_MAP;
+if (defined $SEQID_MAP_FILE) {
+  die "$SEQID_MAP_FILE already exists - please delete before continuing" if -s $SEQID_MAP_FILE;
+  open($SEQID_MAP, ">", $SEQID_MAP_FILE) or die $!;
+}
+
+my $TAXDB;
+if (defined $TAXDB_FILE) {
+  die "$TAXDB_FILE already exists - please delete before continuing" if -s $TAXDB_FILE;
+  open($TAXDB, ">", $TAXDB_FILE) or die $!;
+}
+
+my %skip_seq_taxids;
+if (defined $NO_SEQ_TAXID) {
+  foreach (split(/,/, $NO_SEQ_TAXID)) {
+    $skip_seq_taxids{$_} = 1;
+  }
 }
 
 my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
@@ -186,14 +230,19 @@ foreach my $DATABASE (@ARGV) {
   }
 }
 
-my %taxid_name_map;
-
 if ($INCLUDE_VIRAL_NEIGHBORS) {
   my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
   download_viral_neighbors_url($nbr_lib_dir);
 }
 
 
+if (defined $SEQID_MAP_FILE) {
+  close($SEQID_MAP);
+}
+
+if (defined $TAXDB_FILE) {
+  close($TAXDB);
+}
 
 #########################################################
 ## Functions
@@ -224,7 +273,7 @@ sub download(@) {
     print STDERR "Fetching $url to $file ..." if $VERBOSE;
 
     my $ff = File::Fetch->new(uri=>"$url");
-    my $where = $ff->fetch(to=> dirname($file)) or die $ff->error;
+    my $where = $ff->fetch(to=> dirname($file)) or die "$ff->error URL: $url";
     move($where, $file);
 
     if (defined $gunzipped_filename) {
@@ -241,7 +290,7 @@ sub download(@) {
 
 sub start_fork() {
   my $pid;
-  return if $N_PROC <= 1;
+  return 0 if $N_PROC <= 1;
   if ($n_children == $N_PROC) {
     $pid = wait();
     --$n_children;
@@ -521,13 +570,10 @@ sub download_viral_neighbors(@) {
       system("mv -v $nbr_dir/$nbr_ac.fna $nbr_dir/$name1-tax$taxid/$nbr_ac.fna");
     }
     my $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&rettype=fasta&retmode=text&id=$nbr_ac";
-    if (! -s $file || ! -s "$file.map") {
-      start_fork() and next;
-      if (download($url,$file)) {
-       print_header_lines($file, $taxid, "$nname neighbors");
-      }
-      end_fork();
-    }
+    start_fork() && next;
+    download($url,$file);
+    end_fork();
+    print_header_lines($file, $taxid, "$nname neighbors");
   }
   print STDERR "\n";
   wait_children();
@@ -535,37 +581,45 @@ sub download_viral_neighbors(@) {
 #  $pm->wait_all_children();
 }
 
-sub print_header_lines(@) {
-  my ($file, $taxid, $name) = @_;
-  return if -s "$file.map";
-  return unless -f $file;
-  print STDERR "Making map file for $file\n" if ($VERBOSE);
-  $taxid = "$taxid\t$name" if defined $name;
-  print STDERR "\n grep '^>' $file | sed -e 's/.//' -e 's/\\( .*\\|\$\\)/\t$taxid/' > $file.map\n";
-  #`grep '^>' "$file" | sed -e 's/.//' -e 's/\\( .*\\|\$\\)/\t$taxid/' > "$file.map"`;
-  open (my $F, ">", "$file.map");
-  open (my $G, "<", $file);
-  while (<$G>) {
-   next unless /^>([^ ]*)/;
-    my $ac = $1;
-    print $F "$ac\t$taxid\n";
+sub add_taxid {
+  my ($taxid, $genome_name, $sequence_name) = @_;
+  my $skip_seq = defined $skip_seq_taxids{$taxid}; 
+
+  if ($ADD_TAXID_FOR_GENOMES) {
+    my $new_taxid = $START_TAXID++;
+    print $TAXDB $new_taxid,"\t",$taxid,"\tgenome\t",$genome_name,"\n";
+    $taxid = $new_taxid;
   }
-  close($G);
-  close($F);
+
+  if ($ADD_TAXID_FOR_SEQUENCES && !$skip_seq) {
+    my $new_taxid = $START_TAXID++;
+    print $TAXDB $new_taxid,"\t",$taxid,"\tsequence\t",$sequence_name,"\n";
+  }
+  return $taxid;
 }
 
+sub print_header_lines(@) {
+  my ($file, $taxid, $name) = @_;
+  return unless -f $file;
+  next unless $SEQID_MAP_FILE;
+  print STDERR "Making map file for $file\n" if ($VERBOSE);
+
+  open (my $G, "<", $file);
+  while (<$G>) {
+    next unless /^>(([^ ]*).*)/;
+    #$taxid = "$taxid\t$name" if defined $name;
+    $taxid = add_taxid($taxid, $name, $1);
+    print $SEQID_MAP "$2\t$taxid\n";
+  }
+  close($G);
+}
 
 sub print_header_line_ac(@) {
-  my ($file, $ac, $taxid, $name) = @_;
-  return if -s "$file.map";
-  print STDERR "Making map file for $file\n" if ($VERBOSE);
-  open (my $F, ">", "$file.map");
-  if (defined $name) {
-    print $F "$ac\t$taxid\t$name\n";
-  } else {
-    print $F "$ac\t$taxid\n";
-  }
-  close($F);
+  my ($ac, $taxid, $name) = @_;
+  next unless $SEQID_MAP_FILE;
+  $taxid = add_taxid($taxid, $name, $1);
+  #$taxid = "$taxid\t$name" if defined $name;
+  print $SEQID_MAP "$ac\t$taxid\n";
 }
 
 
@@ -704,7 +758,7 @@ sub download_domain(@) {
         ++$existing_files;
       } else {
         ++$downloaded_files;
-        start_fork() and next;
+        start_fork() && next;
         download($full_ftp_path, "$download_dir/$fname.gz", "$download_dir/$fname");
         end_fork();
       }
@@ -717,7 +771,7 @@ sub download_domain(@) {
       }
 
       if ($DO_DUST || !-s $fullfname1) {
-        start_fork() and next;
+        start_fork() && next;
         ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
         system("dustmasker -infmt fasta -in '$download_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$fullfname1'");
         unlink("$download_dir/$fname");
