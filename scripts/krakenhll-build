@@ -268,10 +268,10 @@ Options:
   --no-lca-database          Do not build a LCA database
   --work-on-disk             Perform most operations on disk rather than in
                              RAM (will slow down build in most cases)
-  --taxids-for-genomes       Add taxonomy IDs (starting with 1bio) for genomes.
+  --taxids-for-genomes       Add taxonomy IDs (starting with 1 billion) for genomes.
                              Only works with 3-column seqid2taxid map with third 
                              column being the name
-  --taxids-for-sequences     Add taxonomy IDs for sequences, starting with 1bio.
+  --taxids-for-sequences     Add taxonomy IDs for sequences, starting with 1 billion.
                              Can be useful to resolve classifications with multiple genomes
                              for one taxonomy ID.
   --library-dir DIR          Use DIR for reference sequences instead of DBDIR/library.

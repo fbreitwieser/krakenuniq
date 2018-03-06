@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
           ifs.close();
           counts_file_gd = true;
         }
-      }
+      } 
       if (!counts_file_gd) {
         ofstream ofs(fname);
         cerr << "Writing kmer counts to " << fname << "... [only once for this database, may take a while] " << endl;
@@ -256,38 +256,38 @@ int main(int argc, char **argv) {
     TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
     if (HLL_PRECISION > 0) {
       if (full_report) {
-        rep.setReportCols(vector<string> {
+        rep.setReportCols(vector<string> { 
           "%",
-          "reads",
+          "reads", 
           "taxReads",
           "kmers",
           "taxKmers",
           "kmersDB",
           "taxKmersDB",
           "dup",
-          "cov",
-          "taxID",
-          "rank",
+          "cov", 
+          "taxID", 
+          "rank", 
           "taxName"});
       } else {
-        rep.setReportCols(vector<string> {
+        rep.setReportCols(vector<string> { 
           "%",
-          "reads",
+          "reads", 
           "taxReads",
           "kmers",
           "dup",
-          "cov",
-          "taxID",
-          "rank",
+          "cov", 
+          "taxID", 
+          "rank", 
           "taxName"});
       }
     } else {
-      rep.setReportCols(vector<string> {
+      rep.setReportCols(vector<string> { 
         "%",
-        "reads",
+        "reads", 
         "taxReads",
-        "taxID",
-        "rank",
+        "taxID", 
+        "rank", 
         "taxName"});
     }
     rep.printReport("kraken");
