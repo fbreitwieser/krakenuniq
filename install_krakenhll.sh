@@ -38,7 +38,7 @@ On MacOS, if you experience the error \"clang: fatal error: unsupported option '
 
 while getopts "Chjc:" OPTION; do
     case $OPTION in
-    c) MAKE_ARGS="CXX=$OPTARG" ;;
+    c) MAKE_ARGS="CXX=\"$OPTARG\"" ;;
     C) MAKE_CLEAN="" ;;
     j) INSTALL_JELLYFISH=1 ;;
     h) echo "$USAGE"; exit 0 ;;
