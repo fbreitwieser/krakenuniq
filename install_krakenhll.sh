@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu>
+# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu>
 # Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
 #
 # Kraken is free software: you can redistribute it and/or modify
@@ -20,21 +20,38 @@ set -e
 
 DIR=$(dirname $0)
 VERSION=`cat $(dirname $0)/VERSION`
+INSTALL_JELLYFISH=0
+MAKE_ARGS=
+MAKE_CLEAN="clean"
 
-if [ "$1" == "--install-jellyfish" ]; then
- INSTALL_JELLYFISH=1;
- shift;
-fi
+USAGE="Usage: $(basename $0) [OPTIONS] INSTALL_DIR
 
-if [ -z "$1" ] || [ -n "$2" ]
+OPTIONS:
+    -j          Install jellyfish v1.1 in INSTALL_DIR, too.
+    -l BIN_DIR  Link KrakenHLL executables to BIN_DIR, e.g /usr/local/bin or ~/bin.
+    -c BIN      Use compiler BIN instead of g++.
+    -h          This help message
+
+On MacOS, if you experience the error \"clang: fatal error: unsupported option '-fopenmp'\" on OSX, try installing g++ with brew, and using the option \"-c g++-7\".
+"
+
+
+while getopts "Chjc:" OPTION; do
+    case $OPTION in
+    c) MAKE_ARGS="CXX=$OPTARG" ;;
+    C) MAKE_CLEAN="" ;;
+    j) INSTALL_JELLYFISH=1 ;;
+    h) echo "$USAGE"; exit 0 ;;
+    *) echo "Incorrect options provided. $USAGE"
+       exit 1 ;;
+    esac
+done
+shift $((OPTIND -1))
+
+if [ -z "$1" ]
 then
-  echo "Usage: $(basename $0) [--install-jellyfish] KRAKEN_DIR
-
-If --install-jellyfish is specified, the source code for version 1.1
-is downloaded from http://www.cbcb.umd.edu/software/jellyfish and installed 
-in KRAKEN_DIR. Note that this may overwrite other jellyfish installation in 
-the same path."
-  exit 64
+  echo "$USAGE"
+  exit 0
 fi
 
 if [ "$1" = "KRAKEN_DIR" ]
@@ -55,20 +72,20 @@ if [ "$INSTALL_JELLYFISH" == "1" ]; then
   cd $KRAKEN_DIR
   if [[ ! -d jellyfish ]]; then
     wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
-    tar xvvf jellyfish-1.1.11.tar.gz
+    tar xf jellyfish-1.1.11.tar.gz
     mv jellyfish-1.1.11 jellyfish
   fi
   cd jellyfish
   [[ -f Makefile ]] || ./configure
   make
   #make install ## doest not work for me on OSX
-  #cp $KRAKEN_DIR/jellyfish-install/bin/jellyfish $KRAKEN_DIR
+  cp $KRAKEN_DIR/jellyfish-install/bin/jellyfish $KRAKEN_DIR
   #rm -r jellyfish-1.1.11.tar.gz jellyfish-1.1.11
   cd $WD
 fi
 
-#make -C $DIR/src clean
-make -C $DIR/src install
+echo make -C $DIR/src $MAKE_CLEAN install $MAKE_ARGS
+make -C $DIR/src $MAKE_CLEAN  install $MAKE_ARGS || { echo "Error building KrakenHLL. See $(basename $0) -h for options." >&2; exit 1; }
 for file in $DIR/scripts/*
 do
   perl -pl -e 'BEGIN { while (@ARGV) { $_ = shift; ($k,$v) = split /=/, $_, 2; $H{$k} = $v } }'\
