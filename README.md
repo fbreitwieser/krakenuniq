@@ -41,3 +41,12 @@ For usage, see `krakenhll --help`. Note that you can use the same database as Kr
 ### Differences to `kraken-build`
  - Use `krakenhll-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
  - `seqid2taxid.map` mapping sequence IDs to taxonomy IDs does NOT parse or require `>gi|`, but rather the sequence ID is the header up to just before the first space
+ 
+ ## FAQ
+ 
+ ### Installing KrakenHLL on MacOS
+OSX by default links `g++` to `clang` without OpenMP support. You can install `g++` with HomeBrew and use the `-c` option of `krakenhll_install.sh` to specify the HomeBrew `g++`: 
+``` 
+brew install g++
+./install_krakenhll -c g++-7
+```
