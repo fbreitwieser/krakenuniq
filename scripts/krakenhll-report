@@ -39,23 +39,39 @@ require "$KRAKEN_DIR/krakenlib.pm";
 my $show_zeros = 0;
 my $db_prefix;
 my $is_cnts_table = 0;
+my $is_taxon_list = 0;
 
 GetOptions(
   "help" => \&display_help,
   "version" => \&display_version,
   "show-zeros" => \$show_zeros,
-  "cnts-table" => \$is_cnts_table,
+  "taxon-counts" => \$is_cnts_table,
+  "taxon-list" => \$is_taxon_list,
   "db=s" => \$db_prefix,
 );
 
 eval { $db_prefix = krakenlib::find_db($db_prefix); };
 if ($@) {
-  die "$PROG: $@";
+  print STDERR "$PROG: $@\n";
+  usage(1);
+}
+
+if ($is_cnts_table && $is_taxon_list) {
+  die "Specify either --taxon-counts or --taxon-list, not both! See -h for help.\n";
 }
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
-  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] [--show-zeros] <kraken output file(s)>\n";
+  print STDERR "Usage: $PROG --db KRAKEN_DB_NAME [OPTIONS] <kraken output file(s)>
+
+OPTIONS:
+  --show-zeros    Show full taxonomy table.
+  --taxon-counts  Input files are in the format '<taxon ID><tab><count>' instead of Kraken output.
+  --taxon-list    Input files is list of taxon IDs instead of Kraken output.
+  -h              This message.
+  
+  For most use-cases, krakenhll --report-file is better than krakenhll-report, 
+  as it contains additional information on unique k-mer count and coverage. \n";
   my $default_db;
   eval { $default_db = krakenlib::find_db(); };
   if (defined $default_db) {
@@ -70,7 +86,7 @@ sub display_help {
 
 sub display_version {
   print "KrakenHLL version #####=VERSION=#####\n";
-  print "Copyright 2017, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
+  print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }
@@ -83,16 +99,31 @@ my $seq_count = 0;
 $taxo_counts{0} = 0;
 if ($is_cnts_table) {
   while (<>) {
-    my ($taxid,$count) = split;
-    $taxo_counts{$taxid} = $count;
+    chomp;
+    my ($taxid, $count) = split;
+    $count = 1 unless defined $count;
+    $taxo_counts{$taxid} += $count;
     $seq_count += $count;
+  }
+} elsif ($is_taxon_list) {
+  while (<>) {
+    chomp;
+    foreach my $taxid (split) {
+      ++$taxo_counts{$taxid};
+      ++$seq_count;
+
+    }
   }
 } else {
   while (<>) {
-    my (undef,$taxid) = split;
+    my (undef, undef, $taxid) = split /\t/;
     $taxo_counts{$taxid}++;
     $seq_count++;
   }
+}
+
+while (my ($k, $v) = each %taxo_counts) {
+  print STDERR "Taxon $k is not in taxonomy tables - ignoring it.\n" unless defined $name_map{$k};
 }
 my $classified_count = $seq_count - $taxo_counts{0};
 
@@ -160,6 +191,7 @@ sub dfs_summation {
 
 sub load_taxonomy {
   my $prefix = shift;
+  print STDERR "Loading taxonomy ... ";
 
   open NAMES, "<", "$prefix/taxonomy/names.dmp"
     or die "$PROG: can't open names file: $!\n";
@@ -188,4 +220,5 @@ sub load_taxonomy {
     $rank_map{$node_id} = $rank;
   }
   close NODES;
+  print STDERR "Done.\n";
 }
