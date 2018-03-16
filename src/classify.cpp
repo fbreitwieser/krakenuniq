@@ -108,10 +108,12 @@ ostream* cout_or_file(string file) {
 
     if (ends_with(file, ".gz")) {
       ogzstream* ogzs = new ogzstream(file.c_str());
+      ogzs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_gzstreams.push_back(ogzs);
       return ogzs;
     } else {
       ofstream* ofs = new ofstream(file.c_str());
+      ofs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_fstreams.push_back(ofs);
       return ofs;
     }
