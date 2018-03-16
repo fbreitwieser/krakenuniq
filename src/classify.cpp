@@ -108,10 +108,12 @@ ostream* cout_or_file(string file) {
 
     if (ends_with(file, ".gz")) {
       ogzstream* ogzs = new ogzstream(file.c_str());
+      ogzs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_gzstreams.push_back(ogzs);
       return ogzs;
     } else {
       ofstream* ofs = new ofstream(file.c_str());
+      ofs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_fstreams.push_back(ofs);
       return ofs;
     }
@@ -179,14 +181,21 @@ int main(int argc, char **argv) {
   }
 
   // TODO: Check all databases have the same k
-  KmerScanner::set_k(KrakenDatabases[0]->get_k());
+  uint8_t kmer_size = KrakenDatabases[0]->get_k();
+  for (size_t i = 1; i < KrakenDatabases.size(); ++i) {
+    uint8_t kmer_size_i = KrakenDatabases[i]->get_k();
+    if (kmer_size_i != kmer_size) {
+      fprintf(stderr, "Different k-mer sizes in databases 1 and %lu: %i vs %i!\n", i+1, (int)kmer_size, (int)kmer_size_i);
+      exit(1);
+    }
+  };
+  KmerScanner::set_k(kmer_size);
 
   if (Populate_memory)
     cerr << "\ncomplete." << endl;
 
 
   if (!TaxDB_file.empty()) {
-    // TODO: Define if the taxDB has read counts or not!!
       taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
       Parent_map = taxdb.getParentMap();
   } else {

@@ -22,8 +22,10 @@
 
 use strict;
 use warnings;
-use File::Basename;
 use Getopt::Long;
+use File::Basename;
+use File::Copy;
+use File::Path qw/make_path/;
 
 my $PROG = basename $0;
 my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
@@ -309,7 +311,11 @@ sub download_library {
 
 sub add_to_library {
   my $arg = shift;
-  exec "krakenhll-add_to_library.sh", $arg;
+  if (! -d "$db/library/added") {
+    make_path("$db/library/added") or die "Couldn't create directory $db/library/added";
+  }
+  copy($arg, "$db/library/added");
+  print STDERR "Added $arg to database.\n";
 }
 
 sub shrink_db {

@@ -67,7 +67,7 @@ sub display_help {
 
 sub display_version {
   print "KrakenHLL version #####=VERSION=#####\n";
-  print "Copyright 2017, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
+  print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }
