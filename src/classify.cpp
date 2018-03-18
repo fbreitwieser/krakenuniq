@@ -63,6 +63,7 @@ bool Populate_memory = false;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
+bool full_report = false;
 
 bool Map_UIDs = false;
 string UID_to_TaxID_map_filename;
@@ -107,10 +108,12 @@ ostream* cout_or_file(string file) {
 
     if (ends_with(file, ".gz")) {
       ogzstream* ogzs = new ogzstream(file.c_str());
+      ogzs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_gzstreams.push_back(ogzs);
       return ogzs;
     } else {
       ofstream* ofs = new ofstream(file.c_str());
+      ofs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_fstreams.push_back(ofs);
       return ofs;
     }
@@ -178,14 +181,21 @@ int main(int argc, char **argv) {
   }
 
   // TODO: Check all databases have the same k
-  KmerScanner::set_k(KrakenDatabases[0]->get_k());
+  uint8_t kmer_size = KrakenDatabases[0]->get_k();
+  for (size_t i = 1; i < KrakenDatabases.size(); ++i) {
+    uint8_t kmer_size_i = KrakenDatabases[i]->get_k();
+    if (kmer_size_i != kmer_size) {
+      fprintf(stderr, "Different k-mer sizes in databases 1 and %lu: %i vs %i!\n", i+1, (int)kmer_size, (int)kmer_size_i);
+      exit(1);
+    }
+  };
+  KmerScanner::set_k(kmer_size);
 
   if (Populate_memory)
     cerr << "\ncomplete." << endl;
 
 
   if (!TaxDB_file.empty()) {
-    // TODO: Define if the taxDB has read counts or not!!
       taxdb = TaxonomyDB<uint32_t>(TaxDB_file, false);
       Parent_map = taxdb.getParentMap();
   } else {
@@ -230,9 +240,16 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < DB_filenames.size(); ++i) {
       const auto fname = DB_filenames[i] + ".counts";
       ifstream ifs(fname);
+      bool counts_file_gd = false;
       if (ifs.good()) {
-        ifs.close();
-      } else {
+        if (ifs.peek() == std::ifstream::traits_type::eof()) {
+          cerr << "Kmer counts file is empty - trying to regenerate ..." << endl;
+        } else {
+          ifs.close();
+          counts_file_gd = true;
+        }
+      } 
+      if (!counts_file_gd) {
         ofstream ofs(fname);
         cerr << "Writing kmer counts to " << fname << "... [only once for this database, may take a while] " << endl;
         auto counts = KrakenDatabases[i]->count_taxons();
@@ -247,24 +264,40 @@ int main(int argc, char **argv) {
   
     TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
     if (HLL_PRECISION > 0) {
-    rep.setReportCols(vector<string> { 
-      "%",
-      "reads", 
-      "taxReads",
-      "kmers",
-      "dup",
-      "cov", 
-      "taxID", 
-      "rank", 
-      "taxName"});
+      if (full_report) {
+        rep.setReportCols(vector<string> { 
+          "%",
+          "reads", 
+          "taxReads",
+          "kmers",
+          "taxKmers",
+          "kmersDB",
+          "taxKmersDB",
+          "dup",
+          "cov", 
+          "taxID", 
+          "rank", 
+          "taxName"});
+      } else {
+        rep.setReportCols(vector<string> { 
+          "%",
+          "reads", 
+          "taxReads",
+          "kmers",
+          "dup",
+          "cov", 
+          "taxID", 
+          "rank", 
+          "taxName"});
+      }
     } else {
-    rep.setReportCols(vector<string> { 
-      "%",
-      "reads", 
-      "taxReads",
-      "taxID", 
-      "rank", 
-      "taxName"});
+      rep.setReportCols(vector<string> { 
+        "%",
+        "reads", 
+        "taxReads",
+        "taxID", 
+        "rank", 
+        "taxName"});
     }
     rep.printReport("kraken");
     gettimeofday(&tv2, NULL);

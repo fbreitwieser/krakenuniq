@@ -52,6 +52,8 @@ static const std::map<std::string, REPORTCOLS> report_col_name_map = {
 		{"numUniqueKmersClade", REPORTCOLS::NUM_UNIQUE_KMERS_CLADE},
 		{"numKmersInDatabaseTaxon", REPORTCOLS::NUM_KMERS_IN_DATABASE},
 		{"numKmersInDatabaseClade", REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE},
+		{"taxKmersDB", REPORTCOLS::NUM_KMERS_IN_DATABASE},
+		{"kmersDB", REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE},
 		{"totalHitLen", REPORTCOLS::TOTAL_HIT_LENGTH},
 		{"totalScore", REPORTCOLS::TOTAL_SCORE},
 		{"abundance", REPORTCOLS::ABUNDANCE},

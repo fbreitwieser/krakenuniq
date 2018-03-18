@@ -65,7 +65,6 @@ private:
   size_t m = 1 << p;  // number of registers
   vector<uint8_t> M;    // registers, size m
   uint64_t n_observed = 0;
-  bool use_n_observed = true; // return min(estimate, n_observed) instead of estimate
 
   bool sparse;          // sparse representation of the data?
   SparseListType sparseList;
@@ -77,6 +76,7 @@ private:
   static const uint32_t mPrime = 1 << pPrime; // 2^pPrime
 
 public:
+  bool use_n_observed = true; // return min(estimate, n_observed) instead of estimate
 
   // Construct HLL with precision bits
   HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true, HASH (*bit_mixer) (uint64_t) = murmurhash3_finalizer);
