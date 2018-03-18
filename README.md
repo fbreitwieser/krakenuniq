@@ -3,9 +3,7 @@ KrakenHLL taxonomic sequence classification system with unique k-mer counting
 
 [Kraken](https://github.com/DerrickWood/kraken) is a fast taxonomic classifier for metagenomics data. This project, kraken-hll, adds some additional functionality - most notably a unique k-mer count using the HyperLogLog algorithm. Spurious identifications due to sequence contamination in the dataset or database often leads to many reads, however they usually cover only a small portion of the genome. 
 
-KrakenHLL adds two additional columns to the Kraken report - total number of k-mers observed for taxon, and the total number of unique k-mers observed for taxon (columns 3 and 4, resp.). 
-
-Here's a small example of a classification against a viral database with k=25. There are three species identified by just one read - Enterobacteria phage BP-4795, Salmonella phage SEN22, Sulfolobus monocaudavirus SMV1. Out of those, the identification of Salmonella phage SEN22 is the strongest, as there read was matched with 116 k-mers that are unique to the sequence, while the match to Sulfolobus monocaudavirus SMV1 is only based on a single 25-mer.
+KrakenHLL computes the number of unique k-mers observed for each taxon, which allows to filter more false positives.  Here's a small example of a classification against a viral database with k=25. There are three species identified by just one read - Enterobacteria phage BP-4795, Salmonella phage SEN22, Sulfolobus monocaudavirus SMV1. Out of those, the identification of Salmonella phage SEN22 is the strongest, as there read was matched with 116 k-mers that are unique to the sequence, while the match to Sulfolobus monocaudavirus SMV1 is only based on a single 25-mer.
 
 ```
 99.0958 2192    2192    255510  272869  no rank 0   unclassified

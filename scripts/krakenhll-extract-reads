@@ -34,7 +34,9 @@ Example:
 ";
 
 my %options=(
-    i=>0
+    i=>0,
+	a=>0,
+	f=>0
 );
 getopts("fviapt:", \%options) || die $usage;
 my $is_paired = $options{p};
@@ -118,15 +120,16 @@ for my $taxon (keys %taxon_id) {
 }
 exit(0) if $sum_reads==0;
 
-$options{f} = 1 if (defined $options{a});
+$options{f} = 1 if ($options{a});
 
 my $cnt=0;
 $\ = undef ;
 print STDERR "Going through FA/FQ file to get reads";
 my $previous;
 
-my $start_symbol = defined $options{a}? '>' : '@';
+my $start_symbol = $options{a}? '>' : '@';
 
+my $line;
 while(<$FQ>) {
 
     next unless (/^$start_symbol/);   # if not at first line of fastq entry
@@ -136,43 +139,55 @@ while(<$FQ>) {
     $id =~ s/ .*//;            # remove everything after the space
     if ($is_paired) {
         # remove pair-specific part of read IDs (if present)
-        $id =~ s#/[12]$##;  # || die "$id??";
+		#$id =~ s#[/\.][12]$##;  # || die "$id??";
     }
-    $id =~ s#/[12]$##; ## paired read ends
+    $id =~ s#[/\.][12]$##;  # always remove [12] ends
+	#$id =~ s#/[12]$##; ## paired read ends
 
     my $print_this_read = defined $print_it{$id};
     $print_this_read = !$print_this_read if $is_inverted;
 
     if ($print_this_read) { # print all 4 lines
-        if (defined $options{f}) {
-            die if $is_paired;  ##NOT IMPLEMENTED YET
+        if ($options{f}) {
             ## output in FASTA format
             #print ">",$id," matches ",$print_it{$id},"\n";
             print ">",$id,"\n";
-            my $next = <$FQ>;
-            print $next;
+            print <$FQ>;
  
-            if (defined $options{a}) {
+            if ($options{a}) {
+			  if ($is_paired) {
+					  die "options a,f and p cannot be used at the same time";
+			  }
+			  my $next;
               while ($next = <$FQ> && !$next =~ /^>/ ) {
                 print $next;
               }
               $_ = $next;
               redo; # redo the with $_ set to $next
             } else {
+			  # FASTQ file - skip qualities and mapping info
               <$FQ>;
               <$FQ>;
+			  if ($is_paired) {
+				<$FQ_2>;
+            	print ">",$id,"\n";
+				$line = <$FQ_2>;
+				print $line;
+				<$FQ_2>;
+				<$FQ_2>;
+			  }
             }
         } else {
             ## output in FASTQ format
             print $_;
             for (my $i = 0; $i<3; $i++) {
-                my $next = <$FQ>;
-                print $next;
+				$line = <$FQ>; 
+				print $line;
             }
             if ($is_paired) {
                 for (my $i = 0; $i<4; $i++) {
-                    my $next = <$FQ_2>;
-                    print $next;
+					$line = <$FQ_2>;
+					print $line;
                 }
             }
         }
@@ -184,7 +199,7 @@ while(<$FQ>) {
         }
         last if $cnt >= $sum_reads;
     } else {
-        if (!defined $options{a}) {
+        if (!$options{a}) {
             # skip next 3 fastq lines
             for (my $i = 0; $i<3; $i++) { <$FQ>; }
             # skip next 4 fastq lines in mate-pair (when paired) - header was not read
