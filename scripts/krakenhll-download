@@ -26,8 +26,8 @@ sub print_header_lines(@);
 sub print_header_line_ac(@);
 sub download_domain(@);
 sub download_viral_neighbors(@);
-sub download_viral_neighbors_url(@);
-sub download_viral_neighbors2(@);
+sub download_ncbi_search(@);
+sub get_sorted_maps(@);
 
 my $FTP="ftp://ftp.ncbi.nih.gov";
 my @ALL_GENOMES=qw/bacteria viral archaea fungi protozoa invertebrate plant vertebrate_mammalian vertebrate_other/;
@@ -44,38 +44,45 @@ my $TAXID;
 my $BASE_DIR;
 my $DB_DIR;
 my $N_PROC=5;
+my $MAP_DIV="nucl_gb";
 my $CHANGE_HEADER=0;
 my $DO_DUST=0;
 my $FILTER_UNPLACED=0;
+my $SEARCH_TERM;
 my $VERBOSE=0;
 my $OVERWRITE_FILES=0;
 my $DOMAINS;
 my $DL_MOD_RSYNC;
 my $n_children = 0;
 my $INCLUDE_VIRAL_NEIGHBORS = 0;
+my %taxid_name_map;
 my @pids;
 
 my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
 
 my $USAGE="\n".basename($0).
-" [<options>] <pattern> <pattern>*
+" [<options>] <database> <database>*
 
 ARGUMENT
- <pattern>  Possible patterns:
+ <database>  Possible databases
               'contaminants'    downloads contaminant sequences from UniVec and EmVec
               'taxonomy'        downloads the NCBI taxonomy mappings
               'genbank'         downloads GenBank genomes (see parameters -a and -d)
               'refseq'          downloads RefSeq genomes (see parameters -a and -d)
-              'refseq/DOMAIN'   downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria')
+			  'nucleotide'      specify --term to download nucleotide sequences retrieved from a NCBI search.
+              'viral-neighbors' downloads sequences listed as neighbors to RefSeq genomes in the NCBI viral genome resource.
+                                https://www.ncbi.nlm.nih.gov/genome/viruses/
+
+    for refseq and genbank, the assemblies can be filtered:
+              'refseq/DOMAIN'   downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria'). 
+			                    possible values: @ALL_GENOMES.
               'refseq/DOMAIN/ASS_LEVEL'
                                 specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
               'refseq/DOMAIN/ASS_LEVEL/column1=value1(/column2=value2)*' 
                                 require specific column values in assembly_summary.txt.
                                  e.g. 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download human assemblies
                                    or 'genbank/bacteria/Any/species_taxid=9606' <- downloads Genbank assemblies not in RefSeq
-              'viral-neighbors' downloads sequences listed as neighbors to RefSeq genomes in the NCBI viral genome resource.
-                                https://www.ncbi.nlm.nih.gov/genome/viruses/
 
               
   By default, 'refseq' and 'genbank' download the domains and assembly levels specied
@@ -90,18 +97,20 @@ COMMON OPTIONS
  --threads <# of threads>  Number of processes when downloading (uses xargs). Default: '$N_PROC'
  --rsync, -R        Download using rsync.
  --overwrite        Redownload and overwrite files with the same name.
- -v                 Verbose.
+ --verbose          Be verbose.
 
-WHEN USING database refseq OR genbank:
- -d <domain>        What domain to download. One or more of @ALL_GENOMES (comma separated).
- -a <assembly level>  Only download genomes with the specified assembly level. Default: '$ASSEMBLY_LEVEL'. Use 'Any' for any assembly level.
- -c <refseq category>   Only download genomes in the specified refseq category. Default: any.
- -t <taxids>        Only download the specified taxonomy IDs, comma separated. Default: any.
+WHEN USING DATABASE nucleotide:
+ --term search_term    Download all sequences returned from a NCBI nucleotide search.
+ --mappings divisions  Try mapping accession IDs using the mapping files for the specified divisions (comma-separated).
+                       Default: $MAP_DIV. Possible values: nucl_est, nucl_gb, nucl_gss, nucl_wgs.
+					   Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
+
+WHEN USING DATABASE refseq OR genbank:
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
                     See the assembly project FTP site for available sequences
  -u                 Filter unplaced sequences.
- --dust, -D         Mask low-complexity regions using dustmasker.
  -l                 Modify sequence header to include taxonomy ID for Kraken (i.e. add '>kraken:taxid|TAXID' to each sequence).
+ --dust, -D         Mask low-complexity regions using dustmasker.
  --include-viral-neighbors  Include viral neighbors. Deprecated. Add 'viral-neighbors' to the arguments, instead.
 ";
 
@@ -119,6 +128,8 @@ GetOptions(
   "rsync|R" => \$DL_MOD_RSYNC,
   "include-viral-neighbors" => \$INCLUDE_VIRAL_NEIGHBORS,
   "filter-unplaced|u" => \$FILTER_UNPLACED,
+  "term=s" => \$SEARCH_TERM,
+  "mappings=s" => \$MAP_DIV,
   "dust|D" => \$DO_DUST,
   "change-header|l" => \$CHANGE_HEADER,
   "force" => \$OVERWRITE_FILES,
@@ -178,7 +189,15 @@ foreach my $DATABASE (@ARGV) {
     }
   } elsif ($DATABASE eq'viral-neighbors') {
     my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
-    download_viral_neighbors_url($nbr_lib_dir);
+    download_viral_neighbors($nbr_lib_dir);
+  } elsif ($DATABASE eq 'nucleotide') {
+    if (!defined $SEARCH_TERM) {
+	  print STDERR "Please define a search term with --term when using database nucleotide. \n".
+	               " E.g. --term 'srcdb_refseq[prop] plasmid[title] complete sequence[title] txid2[organism]'\n.";
+	  exit 1;
+	}
+    my $nbr_dir = $add_dir? "$BASE_DIR/library/nucleotide/" : "$BASE_DIR/nucleotide/";
+    download_ncbi_search($nbr_dir, $SEARCH_TERM, get_sorted_maps(split /,/, $MAP_DIV));
   } else {
     print STDERR "Unknown database $DATABASE. \n";
     print STDERR $USAGE;
@@ -186,7 +205,6 @@ foreach my $DATABASE (@ARGV) {
   }
 }
 
-my %taxid_name_map;
 
 
 
@@ -293,37 +311,12 @@ sub end_fork() {
   exit() unless $N_PROC <= 1;
 }
 
-sub download_viral_neighbors_url(@) {
-  my ($nbr_dir) = @_;
-  print STDERR "Downloading viral neighbors into $nbr_dir.\n";
-
-  print STDERR "Reading names file ...\n";
-  my $dir = get_dir($BASE_DIR,"taxonomy");
-  my $names_file = "$dir/names.dmp";
-  if (!-f $names_file) {
-    download_taxonomy($dir);
-  }
-  open (my $N, "<", $names_file);
-  while (<$N>) {
-    next unless /scientific name/;
-    my ($taxid, $name) = split /\t\|\t/;
-    $taxid_name_map{$taxid} = $name;
-  }
-  close($N);
-
-  my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz";
-  download($url, "$dir/nucl_gb.accession2taxid.gz", { verbose => 1 });
-
-  my $sorted_map_f = "$dir/nucl_gb.accession2taxid.sorted";
-  if (!-s $sorted_map_f) {
-    print STDERR "Sorting mapping file ...\n";
-    my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-    system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
-  }
-
-  print STDERR "Downloading viral neighbors into $nbr_dir ...\n";
-  my $term="viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and (complete[title]) not unverified[title])";
+sub download_ncbi_search(@) {
+  my ($nbr_dir, $term, @sorted_map_files) = @_;
   $term =~ s/ /+/g;
+
+  initialize_name_map();
+
   my $esearch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
   my $complete_url="$esearch_url?db=nuccore&usehistory=y&retmax=1&retmode=json&term=$term";
   my $esearch_file = "$nbr_dir/esearch_neighbor_res.json";
@@ -331,7 +324,7 @@ sub download_viral_neighbors_url(@) {
 
   my $n_res=`grep -m1 '"count":' $esearch_file | sed -e 's/.*: "//' -e 's/",.*//'`;
   chomp $n_res;
-  print STDERR "found $n_res verified viral neighbors with complete genomes, starting download ...";
+  print STDERR "Downloading $n_res sequences into $nbr_dir.\n";
   return if (!defined $n_res || $n_res eq 0);
 
   # Step 2: Download FASTAs, 10k at a time
@@ -344,10 +337,10 @@ sub download_viral_neighbors_url(@) {
   while ($retstart < $n_res) {
 
     my $curr_retmax = min($n_res, $retstart+$retmax);
-    print STDERR "\r  Downloading viral neighbor sequence ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
+    print STDERR "\r  Downloading sequences ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
 
     #start_fork() and next;
-	my $part_file = "$nbr_dir/viral-neighbors_".($retstart+1)."-to-$curr_retmax.fna.tmp";
+	my $part_file = "$nbr_dir/dl_part_".($retstart+1)."-to-$curr_retmax.fna.tmp";
     download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$curr_retmax", $part_file);
 
     my $FA_HANDLE;
@@ -360,8 +353,12 @@ sub download_viral_neighbors_url(@) {
         $nbr_ac =~ s/ .*//;
         chomp $nbr_ac;
    
-        my $taxid = `look $nbr_ac $sorted_map_f | cut -f 2`;
-        chomp $taxid;
+		my $taxid;
+		foreach (@sorted_map_files) {
+          $taxid = `look $nbr_ac $_ | cut -f 2`;
+		  chomp $taxid;
+		  last if defined $taxid;
+        }
 
         if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
           my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
@@ -394,13 +391,30 @@ sub download_viral_neighbors_url(@) {
   }
   print STDERR "\n";
   wait_children();
-
 #  $pm->wait_all_children();
 }
 
-sub download_viral_neighbors(@) {
-  my ($nbr_dir) = @_;
+sub get_sorted_maps(@) {
+  my (@parts) = @_;
+  my @res;
+  my $dir = get_dir($BASE_DIR,"taxonomy");
+  foreach (@parts) {
+    my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
+    download($url, "$dir/$_.accession2taxid.gz", { verbose => 1 });
 
+    my $sorted_map_f = "$dir/$_.accession2taxid.sorted";
+    if (!-s $sorted_map_f) {
+      print STDERR "Sorting mapping file ...\n";
+      my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
+      system("gunzip -c $dir/$_.accession2taxid.gz | cut -f 2,3 | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
+    }
+	push @res, $sorted_map_f;
+  }
+  return @res;
+}
+
+sub initialize_name_map() {
+  return if %taxid_name_map;
   print STDERR "Reading names file ...\n";
   my $dir = get_dir($BASE_DIR,"taxonomy");
   my $names_file = "$dir/names.dmp";
@@ -414,68 +428,13 @@ sub download_viral_neighbors(@) {
     $taxid_name_map{$taxid} = $name;
   }
   close($N);
+}
 
-  print STDERR "Downloading nucl_gb.accession2taxid ...\n";
-  my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz";
-  download($url, "$dir/nucl_gb.accession2taxid.gz");
-
-  my $sorted_map_f = "$dir/nucl_gb.accession2taxid.sorted";
-  print STDERR "Sorting mapping file ...\n";
-  my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd > $sorted_map_f") unless -s $sorted_map_f;
-
-  print STDERR "Downloading viral neighbors into $nbr_dir ...\n";
-  my $url1 = "https://www.ncbi.nlm.nih.gov/genomes/GenomesGroup.cgi?taxid=10239&cmd=download2";
-  my $nbr_file = "$nbr_dir/viral_neighbors-taxid10239.nbr";
-  download($url1, $nbr_file);
-  open(my $F, "<", $nbr_file);
-  my @file = <$F>;
-  close($F);
-
-  my $i = 0;
-  my $n_genomes = scalar @file;
-
-  foreach (@file) {
-    next if /^#/;
-    ++$i;
-    print STDERR "\r  Downloading viral neighbor sequence $i/$n_genomes ..." unless $VERBOSE;
-#    my $pid = $pm->start and next;
-    chomp;
-    my ($rep_acs, $nbr_ac, undef, undef, $nname, $sname) = split /\t/;
-    my $taxid = `look $nbr_ac $sorted_map_f | cut -f 2`;
-    chomp $taxid;
-
-    if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
-      my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
-      chomp $res;
-      ($taxid) = split /\t/, $res;
-    }
-
-    my $name = $taxid_name_map{$taxid};
-    if (!defined $taxid || !defined $name) {
-       print STDERR "\nNo mapping for viral neighbor $nbr_ac [rep: $rep_acs, $nname, $taxid]!\n";
-       next;
-    }
-    (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
-    $name1 =~ s/__/_/g;
-    my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.fna";
-    system("mkdir -p $nbr_dir/$name1-tax$taxid");
-    if (-s "$nbr_dir/$nbr_ac.fna") {
-      system("mv -v $nbr_dir/$nbr_ac.fna $nbr_dir/$name1-tax$taxid/$nbr_ac.fna");
-    }
-    my $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&rettype=fasta&retmode=text&id=$nbr_ac";
-    if (! -s $file || ! -s "$file.map") {
-      start_fork() and next;
-      if (download($url,$file)) {
-       print_header_lines($file, $taxid, "$nname neighbors");
-      }
-      end_fork();
-    }
-  }
-  print STDERR "\n";
-  wait_children();
-
-#  $pm->wait_all_children();
+sub download_viral_neighbors(@) {
+  my ($nbr_dir) = @_;
+  print STDERR "Downloading viral neighbors.\n";
+  my $term="viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and (complete[title]) not unverified[title])";
+  download_ncbi_search($nbr_dir, $term, get_sorted_maps("nucl_gb"));
 }
 
 sub print_header_lines(@) {
