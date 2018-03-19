@@ -2,7 +2,7 @@
 #vim: et:ts=2:sw=2
 
 # krakenhll-download.pl - based on centrifuge-download
-# (c) Florian Breitwieser, 2017
+# (c) Florian Breitwieser, 2017-2018
 # licensed under GPL-3
 
 use strict;
@@ -16,6 +16,7 @@ use autodie;
 use Term::ANSIColor;
 use Getopt::Long;
 use LWP::UserAgent;
+use List::Util qw/min/;
 
 
 sub download_taxonomy(@);
@@ -32,7 +33,7 @@ my $FTP="ftp://ftp.ncbi.nih.gov";
 my @ALL_GENOMES=qw/bacteria viral archaea fungi protozoa invertebrate plant vertebrate_mammalian vertebrate_other/;
 my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
 my @ALL_ASSEMBLY_LEVELS=qw/Complete\ Genome Chromosome Scaffold Contig/;
-my @SMALL_GENOMES=qw/mitochondrion plaasmid plastid/;
+my @SMALL_GENOMES=qw/mitochondrion plasmid plastid/;
 
 ## Option parsing
 my $DATABASE="refseq";
@@ -48,10 +49,10 @@ my $DO_DUST=0;
 my $FILTER_UNPLACED=0;
 my $VERBOSE=0;
 my $OVERWRITE_FILES=0;
-my $INCLUDE_VIRAL_NEIGHBORS=0;
 my $DOMAINS;
 my $DL_MOD_RSYNC;
 my $n_children = 0;
+my $INCLUDE_VIRAL_NEIGHBORS = 0;
 my @pids;
 
 my $downloaded_viral_refseq=0;
@@ -62,17 +63,19 @@ my $USAGE="\n".basename($0).
 
 ARGUMENT
  <pattern>  Possible patterns:
-              'contaminants'   downloads contaminant sequences from UniVec and EmVec
-              'taxonomy'       downloads the NCBI taxonomy mappings
-              'genbank'        downloads GenBank genomes (see parameters -a and -d)
-              'refseq'         downloads RefSeq genomes (see parameters -a and -d)
-              'refseq/DOMAIN'  downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria')
+              'contaminants'    downloads contaminant sequences from UniVec and EmVec
+              'taxonomy'        downloads the NCBI taxonomy mappings
+              'genbank'         downloads GenBank genomes (see parameters -a and -d)
+              'refseq'          downloads RefSeq genomes (see parameters -a and -d)
+              'refseq/DOMAIN'   downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria')
               'refseq/DOMAIN/ASS_LEVEL'
-			                   specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
+                                specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
               'refseq/DOMAIN/ASS_LEVEL/column1=value1(/column2=value2)*' 
-			                   require specific column values in assembly_summary.txt.
-							    e.g. 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download human assemblies
-							      or 'genbank/bacteria/Any/species_taxid=9606' <- downloads Genbank assemblies not in RefSeq
+                                require specific column values in assembly_summary.txt.
+                                 e.g. 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download human assemblies
+                                   or 'genbank/bacteria/Any/species_taxid=9606' <- downloads Genbank assemblies not in RefSeq
+              'viral-neighbors' downloads sequences listed as neighbors to RefSeq genomes in the NCBI viral genome resource.
+                                https://www.ncbi.nlm.nih.gov/genome/viruses/
 
               
   By default, 'refseq' and 'genbank' download the domains and assembly levels specied
@@ -99,8 +102,7 @@ WHEN USING database refseq OR genbank:
  -u                 Filter unplaced sequences.
  --dust, -D         Mask low-complexity regions using dustmasker.
  -l                 Modify sequence header to include taxonomy ID for Kraken (i.e. add '>kraken:taxid|TAXID' to each sequence).
- --include-viral-neighbors  Include neighbors for viral genomes as defined at https://www.ncbi.nlm.nih.gov/genome/viruses/.
-                            Only works if refseq viral is downloaded in the same session!
+ --include-viral-neighbors  Include viral neighbors. Deprecated. Add 'viral-neighbors' to the arguments, instead.
 ";
 
 # arguments: $OPTFIND (current index), $OPTARG (argument for option), $OPTERR (bash-specific)
@@ -121,11 +123,6 @@ GetOptions(
   "change-header|l" => \$CHANGE_HEADER,
   "force" => \$OVERWRITE_FILES,
   "verbose|v" => \$VERBOSE) or die "Error in command line arguments";
-
-if (!defined $ARGV[0] || !$ARGV[0] =~ /refseq|genbank|taxonomy|contaminants/) {
-  print STDERR $USAGE;
-  exit 1;
-}
 
 if (defined $BASE_DIR && defined $DB_DIR) {
   print "Define either --db or -o, not both!";
@@ -153,9 +150,14 @@ if (defined $TAXID) {
   %select_taxonomy_ids = map { $_ => 1 } split(/,/, $TAXID);
 }
 
-if (!defined $ARGV[0]) {
+if (!defined $ARGV[0] && !$INCLUDE_VIRAL_NEIGHBORS) {
   print STDERR $USAGE;
   exit 1;
+}
+
+if ($INCLUDE_VIRAL_NEIGHBORS) {
+  my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
+  download_viral_neighbors_url($nbr_lib_dir);
 }
 
 foreach my $DATABASE (@ARGV) {
@@ -166,14 +168,17 @@ foreach my $DATABASE (@ARGV) {
   } elsif ( $DATABASE =~ /^refseq/ || $DATABASE =~ /^genbank/ ) {
     my ($db, $domains, $assembly_levels, @additional_filters) = split(/\//, $DATABASE);
     $domains = $DOMAINS unless defined $domains;
-	$assembly_levels = $ASSEMBLY_LEVEL unless defined $assembly_levels;
+    $assembly_levels = $ASSEMBLY_LEVEL unless defined $assembly_levels;
 
     foreach my $domain (split(/,/, $domains)) {
       my $lib_dir = $add_dir? "$BASE_DIR/library/$domain" : "$BASE_DIR/$domain";
-	  foreach my $assembly_level (split(/,/, $assembly_levels)) {
-      	download_domain($db, $lib_dir, $domain, $assembly_level, @additional_filters);
-	  }
+      foreach my $assembly_level (split(/,/, $assembly_levels)) {
+          download_domain($db, $lib_dir, $domain, $assembly_level, @additional_filters);
+      }
     }
+  } elsif ($DATABASE eq'viral-neighbors') {
+    my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
+    download_viral_neighbors_url($nbr_lib_dir);
   } else {
     print STDERR "Unknown database $DATABASE. \n";
     print STDERR $USAGE;
@@ -183,10 +188,6 @@ foreach my $DATABASE (@ARGV) {
 
 my %taxid_name_map;
 
-if ($INCLUDE_VIRAL_NEIGHBORS) {
-  my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
-  download_viral_neighbors_url($nbr_lib_dir);
-}
 
 
 
@@ -194,10 +195,26 @@ if ($INCLUDE_VIRAL_NEIGHBORS) {
 ## Functions
 
 sub download(@) {
-  my ($url, $file, $gunzipped_filename) = @_;
+  my ($url, $file, $opts) = @_;
+  my $gunzipped_filename;
+
+  if (defined $opts && defined $opts->{'gunzip'}) {
+    ($gunzipped_filename = $file) =~ s/.gz$//; 
+  }
+
+  if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
+    print STDERR "$file ";
+  }
+
   if (!$OVERWRITE_FILES && (( defined $gunzipped_filename && -s $gunzipped_filename) || (!defined $gunzipped_filename && -s $file))) {
     print STDERR "Not fetching $url - file $file exists.\n" if $VERBOSE;
+  	if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
+      print colored("check\n", "green");
+	}
     return 1;
+  }
+  if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
+    print STDERR ": downloading ...";
   }
 
   if ($url =~ /^http/) {
@@ -207,8 +224,8 @@ sub download(@) {
     }
     my $response = $ua->get($url, ':content_file' => $file);
     if (!$response->is_success) {
-      print STDERR "\nFAIL: Error downloading $url!\n";
-      print STDERR $response->status_line."\n";
+      print STDERR "\nFAIL: Error downloading $url ($response->status_line) - tying curl\n";
+	  system("curl '$url' -o $file") == 0 or die "Error curling $url.\n";
     } else {
       print STDERR "SUCCESS\n" if $VERBOSE;
     }
@@ -221,15 +238,26 @@ sub download(@) {
     my $ff = File::Fetch->new(uri=>"$url");
     my $where = $ff->fetch(to=> dirname($file)) or die $ff->error;
     move($where, $file);
-
-    if (defined $gunzipped_filename) {
-      print STDERR " GUNZIPPING" if $VERBOSE;
-      gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
-      unlink $file;
-      $file = $gunzipped_filename;
-    }
-    print STDERR " SUCCESS\n" if $VERBOSE;
   }
+
+  if (defined $gunzipped_filename && $gunzipped_filename ne $file) {
+    if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
+	  print STDERR " gunzipping ...";
+	}
+    print STDERR " GUNZIPPING" if $VERBOSE;
+    gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
+    unlink $file;
+    $file = $gunzipped_filename;
+  }
+  if (-s $file || (defined $gunzipped_filename && -s $gunzipped_filename)) {
+    print STDERR " SUCCESS\n" if $VERBOSE;
+    if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
+      print STDERR " done.\n";
+	}
+  } else {
+    print STDERR "failed.\n";
+  }
+
   #my $where = $ff->fetch(to=> dirname($file)) or die "\n$ff->error for $url!";
   return -s $file;
 }
@@ -265,93 +293,9 @@ sub end_fork() {
   exit() unless $N_PROC <= 1;
 }
 
-sub download_viral_neighbors2(@) {
-  my ($nbr_dir) = @_;
-  my $dir = get_dir($BASE_DIR,"taxonomy");
-  print STDERR "reading names file ...\n";
-  my $names_file = "$dir/names.dmp";
-  open (my $n, "<", $names_file);
-  while (<$n>) {
-    my ($taxid, undef, $name, undef, $type) = split /\t|\t/;
-    next unless $type eq "scientific name";
-    $taxid_name_map{$taxid} = $name;
-  }
-  close($n);
-
-  print STDERR "downloading nucl_gb.accession2taxid ...\n";
-  my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz";
-  download($url, "$dir/nucl_gb.accession2taxid.gz");
-
-  print STDERR "sorting mapping file ...\n";
-  my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-  print STDERR "sort cmd: $sort_cmd\n";
-  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd > $dir/nucl_gb.accession2taxid.sorted") unless -s "$dir/nucl_gb.accession2taxid.sorted";
-
-  if (!-f "$nbr_dir/all-nbrs.fa") {
-  my $fmt="fasta";
-  #my $term="viruses[organism]+not+cellular+organisms[orgn]+not+wgs[prop]+not+ac_000001:ac_999999[pacc]+not+gbdiv+syn[prop]+and+nuccore+genome+samespecies[filter]";
-  #my $term="viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (srcdb_refseq[prop] or (nuccore genome samespecies[filter] and (complete[title]) not unverified[title]))"; #include refseq
-  my $term="viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and (complete[title]) not unverified[title])";
-  $term =~ s/ /+/g;
-  my $esearch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-  my $complete_url="$esearch_url?db=nuccore&usehistory=y&retmax=1&retmode=json&term=$term";
-  ## todo: go through it 10,000 entries at a time
-  download($complete_url, "esearch_neighbor_res.json");
-
-  my $n_res=`grep -m1 '"count":' esearch_neighbor_res.json | sed -e 's/.*: "//' -e 's/",.*//;`;
-  chomp $n_res;
-  print STDERR "found $n_res verified viral neighbors with complete genomes. \n";
-  my $url_params=`cat esearch_neighbor_res.json | grep -e 'querykey' -e 'webenv' | sed -e 's/^ *"querykey": "/query_key=/' -e 's/^ *"webenv": "/webenv=/' -e 's/",//' | paste -sd\\&`;
-  chomp $url_params;
-  die "error getting viral neighbors with url $complete_url" if (!defined $url_params || $url_params == "");
-  my $retstart = 0;
-  my $retmax = 10000;
-  #my @all_fas = ();
-  while ($retstart < $n_res) {
-	  print STDERR "downloading sequences ".($retstart+1)." to ".min($n_res, $retstart+$retmax)." ...";
-	  download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$retmax", "$nbr_dir/all-nbrs-$retstart.fa");
-	  #push @all_fas, "$nbr_dir/all-nbrs-$retstart.fa";
-	  $retstart += $retmax;
-  }
-  }
-}
-
-
-sub download_viral_neighbors_for_taxid(@) {
-  my ($taxID, $result_file) = @_;
-
-  return if -s $result_file;
-
-  # Step 1: Initiate esearch to get JSON with WebEnv and QueryKey parameters
-  my $esearch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-  my $term="txid$taxID [Organism] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and complete[title] not unverified[title])";
-  $term =~ s/ /+/g;
-  my $complete_url="$esearch_url?db=nuccore&usehistory=y&retmax=1&retmode=json&term=$term";
-  download($complete_url, "esearch_neighbor_res.txid$taxID.json");
-
-  my $n_res=`grep -m1 '"count":' esearch_neighbor_res.json | sed -e 's/.*: "//' -e 's/",.*//;`;
-  chomp $n_res;
-  print STDERR "found $n_res verified viral neighbors for taxonomy $taxID with complete genomes. \n";
-  return if (!defined $n_res || $n_res == 0);
-
-  # Step 2: Download FASTAs, 10k at a time
-  my $url_params=`cat esearch_neighbor_res.json | grep -e 'querykey' -e 'webenv' | sed -e 's/^ *"querykey": "/query_key=/' -e 's/^ *"webenv": "/webenv=/' -e 's/",//' | paste -sd\\&`;
-  chomp $url_params;
-  die "error getting viral neighbors with url $complete_url" if (!defined $url_params || $url_params == "");
-  my $retstart = 0;
-  my $retmax = 10000;
-  my @all_fas = ();
-  while ($retstart < $n_res) {
-	  print STDERR "downloading sequences ".($retstart+1)." to ".min($n_res, $retstart+$retmax)." ...";
-	  download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$retmax", "$result_file-retstart_$retstart");
-	  push @all_fas, "$result_file-retstart_$retstart";
-	  $retstart += $retmax;
-  }
-  `mv -v @all_fas $result_file`;
-}
-
 sub download_viral_neighbors_url(@) {
   my ($nbr_dir) = @_;
+  print STDERR "Downloading viral neighbors into $nbr_dir.\n";
 
   print STDERR "Reading names file ...\n";
   my $dir = get_dir($BASE_DIR,"taxonomy");
@@ -367,14 +311,15 @@ sub download_viral_neighbors_url(@) {
   }
   close($N);
 
-  print STDERR "Downloading nucl_gb.accession2taxid ...\n";
   my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz";
-  download($url, "$dir/nucl_gb.accession2taxid.gz");
+  download($url, "$dir/nucl_gb.accession2taxid.gz", { verbose => 1 });
 
   my $sorted_map_f = "$dir/nucl_gb.accession2taxid.sorted";
-  print STDERR "Sorting mapping file ...\n";
-  my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-  system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd > $sorted_map_f") unless -s $sorted_map_f;
+  if (!-s $sorted_map_f) {
+    print STDERR "Sorting mapping file ...\n";
+    my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
+    system("gunzip -c $dir/nucl_gb.accession2taxid.gz | cut -f 2,3 | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
+  }
 
   print STDERR "Downloading viral neighbors into $nbr_dir ...\n";
   my $term="viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and (complete[title]) not unverified[title])";
@@ -397,14 +342,17 @@ sub download_viral_neighbors_url(@) {
   my $retmax = 10000;
   my @all_fas = ();
   while ($retstart < $n_res) {
-    print STDERR "\r  Downloading $retmax viral neighbor sequence starting with ".($retstart+1)."/$n_res ..." unless $VERBOSE;
+
+    my $curr_retmax = min($n_res, $retstart+$retmax);
+    print STDERR "\r  Downloading viral neighbor sequence ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
 
     #start_fork() and next;
-    download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$retmax", "$nbr_dir/retstart_$retstart.fa");
+	my $part_file = "$nbr_dir/viral-neighbors_".($retstart+1)."-to-$curr_retmax.fna.tmp";
+    download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$curr_retmax", $part_file);
 
     my $FA_HANDLE;
     my $fa_handle_open = 0;
-    open (my $F, "<", "$nbr_dir/retstart_$retstart.fa") or die "Couln't open downloaded file";
+    open (my $F, "<", $part_file) or die "Couln't open downloaded file";
     while (my $line = <$F>) {
       next if $line eq "\n";
       if ($line =~ /^>/) {
@@ -442,7 +390,7 @@ sub download_viral_neighbors_url(@) {
       #end_fork();
     }
     close($F);
-    $retstart += $retmax;
+    $retstart += $curr_retmax;
   }
   print STDERR "\n";
   wait_children();
@@ -534,7 +482,7 @@ sub print_header_lines(@) {
   my ($file, $taxid, $name) = @_;
   return if -s "$file.map";
   if (! -f $file) {
-	print STDERR "ERROR: $file does not exist - should not happen!?\n";
+    print STDERR "ERROR: $file does not exist - should not happen!?\n";
   }
   print STDERR "Writing mapping file for $file [$taxid, $name]\n" if $VERBOSE;
   $taxid = "$taxid\t$name" if defined $name;
@@ -573,7 +521,7 @@ sub download_contaminats(@) {
 
   # download UniVec and EmVec database
   download("ftp://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec","$CONTAMINANT_DIR/UniVec.fna");
-  download("ftp://ftp.ebi.ac.uk/pub/databases/emvec/emvec.dat.gz","$CONTAMINANT_DIR/emvec.dat.gz", "$CONTAMINANT_DIR/emvec.dat");
+  download("ftp://ftp.ebi.ac.uk/pub/databases/emvec/emvec.dat.gz","$CONTAMINANT_DIR/emvec.dat.gz", { gunzip => 1 });
 
   open(my $E1, "<", "$CONTAMINANT_DIR/emvec.dat");
   open(my $E2, ">", "$CONTAMINANT_DIR/EmVec.fna");
@@ -641,28 +589,28 @@ sub download_domain(@) {
   my $is_viral_refseq =1 if $domain eq "viral" && $DATABASE eq "refseq";
 
   my %cols = (
-	assembly_accession=>0,
-	bioproject=>1,
-	biosample=>2,
-	wgs_master=>3,
-	refseq_category=>4,
+    assembly_accession=>0,
+    bioproject=>1,
+    biosample=>2,
+    wgs_master=>3,
+    refseq_category=>4,
     taxid=>5,
-	species_taxid=>6,
-	organism_name=>7,
-	infraspecific_name=>8,
-	isolate=>9,
-	version_status=>10,
+    species_taxid=>6,
+    organism_name=>7,
+    infraspecific_name=>8,
+    isolate=>9,
+    version_status=>10,
     assembly_level=>11,
-	release_type=>12,
-	genome_rep=>13,
-	seq_rel_date=>14,
-	asm_name=>15,
-	submitter=>16,
+    release_type=>12,
+    genome_rep=>13,
+    seq_rel_date=>14,
+    asm_name=>15,
+    submitter=>16,
     gbrs_paired_asm=>17,
-	paired_asm_comp=>18,
-	ftp_path=>19,
-	excluded_from_refseq=>20,
-	relation_to_type_material=>21
+    paired_asm_comp=>18,
+    ftp_path=>19,
+    excluded_from_refseq=>20,
+    relation_to_type_material=>21
   );
 
   my %seen_acs;
@@ -671,30 +619,30 @@ sub download_domain(@) {
   open(my $A2, ">", $ass_file_filtered);
   while (<$A1>) {
     next if /^#/;
-	my @fields = split /\t/;
+    my @fields = split /\t/;
 
-	$fields[$cols{"assembly_level"}] =~ s/ /_/g;
+    $fields[$cols{"assembly_level"}] =~ s/ /_/g;
     next unless $fields[$cols{"version_status"}] eq "latest";
     next if ($_assembly_level ne "Any" && $fields[$cols{"assembly_level"}] ne $_assembly_level);
     next if (defined $REFSEQ_CATEGORY && $fields[$cols{"refseq_category"}] ne $REFSEQ_CATEGORY);
 
-	## Kick out duplicates
-	next if (defined $seen_acs{$fields[$cols{"assembly_accession"}]});
-	$seen_acs{$fields[$cols{"assembly_accession"}]} = 1;
-	
-	my $keep_it = 1;
-	foreach (@additional_filters) {
-		my ($k, $v) = split(/=/);
-		die "$k is not an available column filter. Available: ".(join(", ", sort keys %cols)) if (!defined $cols{$k});
-		$keep_it = 0 if $fields[$cols{$k}] ne $v; 
-	}
-	next unless $keep_it;
+    ## Kick out duplicates
+    next if (defined $seen_acs{$fields[$cols{"assembly_accession"}]});
+    $seen_acs{$fields[$cols{"assembly_accession"}]} = 1;
+    
+    my $keep_it = 1;
+    foreach (@additional_filters) {
+        my ($k, $v) = split(/=/);
+        die "$k is not an available column filter. Available: ".(join(", ", sort keys %cols)) if (!defined $cols{$k});
+        $keep_it = 0 if $fields[$cols{$k}] ne $v; 
+    }
+    next unless $keep_it;
 
     print $A2 $_;
     ++ $n_genomes;
     push @genomes_to_dl, [
-			$fields[$cols{"ftp_path"}], $fields[$cols{"taxid"}], $fields[$cols{"organism_name"}], 
-			$fields[$cols{"infraspecific_name"}], $fields[$cols{"assembly_accession"}], $fields[$cols{"assembly_level"}]];
+            $fields[$cols{"ftp_path"}], $fields[$cols{"taxid"}], $fields[$cols{"organism_name"}], 
+            $fields[$cols{"infraspecific_name"}], $fields[$cols{"assembly_accession"}], $fields[$cols{"assembly_level"}]];
   }
   close $A2;
   close $A1;
@@ -738,7 +686,7 @@ sub download_domain(@) {
       } else {
         ++$downloaded_files;
         start_fork() and next;
-        download($full_ftp_path, "$download_dir/$fname.gz", "$download_dir/$fname");
+        download($full_ftp_path, "$download_dir/$fname.gz", { gunzip => 1 });
         end_fork();
       }
 
