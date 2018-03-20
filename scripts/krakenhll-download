@@ -242,7 +242,8 @@ sub download(@) {
     }
     my $response = $ua->get($url, ':content_file' => $file);
     if (!$response->is_success) {
-      print STDERR "\nFAIL: Error downloading $url ($response->status_line) - tying curl\n";
+	  my $status_line = $response->status_line;
+      print STDERR "\nFAIL: Error using LWP for downloading $url ($status_line) - tying curl.\n";
 	  system("curl '$url' -o $file") == 0 or die "Error curling $url.\n";
     } else {
       print STDERR "SUCCESS\n" if $VERBOSE;
