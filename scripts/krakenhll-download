@@ -17,7 +17,7 @@ use Term::ANSIColor;
 use Getopt::Long;
 use LWP::UserAgent;
 use List::Util qw/min/;
-
+use File::SortedSeek qw/alphabetic/;
 
 sub download_taxonomy(@);
 sub download_contaminats(@);
@@ -315,6 +315,12 @@ sub download_ncbi_search(@) {
   my ($nbr_dir, $term, @sorted_map_files) = @_;
   $term =~ s/ /+/g;
 
+  my @sorted_map_file_handles;
+  foreach (@sorted_map_files) {
+    open(my $FH, "<", $_) or die $!;
+	push @sorted_map_file_handles, $FH;
+  }
+
   initialize_name_map();
 
   my $esearch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
@@ -354,10 +360,12 @@ sub download_ncbi_search(@) {
         chomp $nbr_ac;
    
 		my $taxid;
-		foreach (@sorted_map_files) {
-          $taxid = `look $nbr_ac $_ | cut -f 2`;
+		foreach (@sorted_map_file_handles) {
+		  my $tell = alphabetic(*$_, $nbr_ac);
+		  next unless defined $tell;
+          $taxid = <$_>;
+		  $taxid =~ s/.*\t//;
 		  chomp $taxid;
-		  last if defined $taxid;
         }
 
         if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
@@ -368,7 +376,9 @@ sub download_ncbi_search(@) {
 
         my $name = $taxid_name_map{$taxid};
         if (!defined $taxid || !defined $name) {
-          print STDERR "\nNo mapping for viral neighbor $nbr_ac!\n";
+          print STDERR "\nNo mapping for sequence $nbr_ac - not writing it to it's own file!\n";
+		  close($FA_HANDLE) if $fa_handle_open;
+		  $fa_handle_open = 0;
           next;
         }
         (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
@@ -383,14 +393,19 @@ sub download_ncbi_search(@) {
         open($FA_HANDLE, ">", $file) or die "Couln't open file";
         print_header_line_ac($file, $nbr_ac, $taxid);
       }
-      print $FA_HANDLE $line;
+      print $FA_HANDLE $line if $fa_handle_open;
       #end_fork();
     }
+	close($FA_HANDLE) if $fa_handle_open;
     close($F);
     $retstart += $curr_retmax;
   }
   print STDERR "\n";
   wait_children();
+
+  foreach (@sorted_map_file_handles) {
+    close $_;
+  }
 #  $pm->wait_all_children();
 }
 
