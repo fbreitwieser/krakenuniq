@@ -25,6 +25,7 @@ use warnings;
 use File::Basename;
 use File::Path;
 use Getopt::Long;
+use File::Path qw/make_path/;
 
 my $PROG = basename $0;
 my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
@@ -98,7 +99,7 @@ if (! @ARGV && !$preload) {
 }
 
 if (!defined $report_file && !$preload) {
-  print STDERR "Need to specify a report file with --report-file!
+  print STDERR "Need to specify a report file with --report-file! Set to 'off' to suppress report generation.
 See --help for more details.\n";
   exit 1;
 }
@@ -165,6 +166,7 @@ if ($auto_detect) {
 
 
 if (defined $report_file && !-d dirname($report_file)) {
+  print STDERR "Creating directory for $report_file.\n";
   make_path(dirname($report_file));
 }
 
