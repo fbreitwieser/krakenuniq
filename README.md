@@ -50,3 +50,33 @@ OSX by default links `g++` to `clang` without OpenMP support. You can install `g
 brew install g++
 ./install_krakenhll -c g++-7
 ```
+
+### Custom databases with NCBI taxonomy
+To build a custom database with the NCBI taxonomy, first download the taxonomy files with
+```
+krakenhll-download --db DBDIR taxonomy
+```
+Then you can add the desired sequence files to the `DBDIR/library` directory:
+```
+cp SEQ1.fa SEQ2.fa DBDIR/library
+```
+KrakenHLL needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mapping can be provided in the `DBDIR/library/seqid2taxid.map`. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
+```
+Strain1_Chr1_Seq     <tab> 562 <tab> E. Coli Strain Foo
+Strain1_Chr2_Seq     <tab> 562 <tab> E. Coli Strain Foo
+Strain1_Plasmid1_Seq <tab> 562 <tab> E. Coli Strain Foo
+Strain2_Chr1_Seq     <tab> 621 <tab> S. boydii Strain Bar
+Strain2_Plasmid1_Seq <tab> 621 <tab> S. boydii Strain Bar
+```
+The third column is optional, and used by KrakenHLL only when `--taxids-for-genomes` is specified for `krakenhll-build` to add new nodes in the taxonomy tree for the genome. If you'd like to have the sequences identifier in the taxonomy report, too, specifiy `--taxids-for-sequences` for `krakenhll-build` as well.
+
+Finally, run `krakenhll-build`:
+```
+krakenhll-build --db DBDIR --taxids-for-genomes --taxids-for-sequences
+```
+
+Note that for custom databases with fewer sequences you might want to choose a smaller k (default: `--kmer-len 31`) and minimizer length (default: `--minimizer-len 15`).
+
+### Custom databases with custom taxonomies
+
+When using custom taxonomies, please provide `DBDIR/taxonomy/nodes.dmp` and `DBDIR/taxonomy/names.dmp` according to the format of NCBI taxonomy dumps.
