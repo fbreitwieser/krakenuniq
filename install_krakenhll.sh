@@ -73,9 +73,9 @@ if [ "$INSTALL_JELLYFISH" == "1" ]; then
   if [[ ! -d jellyfish ]]; then
     wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
     tar xf jellyfish-1.1.11.tar.gz
-    mv jellyfish-1.1.11 jellyfish
+    mv jellyfish-1.1.11 jellyfish-install
   fi
-  cd jellyfish
+  cd jellyfish-install
   [[ -f Makefile ]] || ./configure
   make
   #make install ## doest not work for me on OSX
