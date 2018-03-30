@@ -51,6 +51,10 @@ brew install g++
 ./install_krakenhll -c g++-7
 ```
 
+### Installing Jellfish v1.1.11
+
+Currently, KrakenHLL build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenHLL, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenhll` with `krakenhll --jellyfish-bin /usr/bin/jellyfish1`.
+
 ### Custom databases with NCBI taxonomy
 To build a custom database with the NCBI taxonomy, first download the taxonomy files with
 ```
