@@ -30,10 +30,10 @@ using namespace kraken;
 
 int main(int argc, char **argv) {
   if (argc != 4) {
-    std::cerr << "USAGE:\n" 
-      << "test_hll_on_db DATABASE SPARSE NR_KMERS\n"
-      << "\n"
-      << "Tests precision values 10-18. SPARSE can be 0 or 1. \n";
+    std::cerr << "USAGE: test_hll_on_db DATABASE SPARSE NR_KMERS\n"
+       "\n"
+       "Tests precision values 10-18 on the k-mers in the database. SPARSE can be 0 or 1. \n"
+       " Each k-mer in the database is sampled with a probability of NR_KMERS / (# of k-mers in the database).\n";
     return 1;
   }
 

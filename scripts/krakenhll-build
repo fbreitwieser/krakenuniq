@@ -326,11 +326,11 @@ sub shrink_db {
   if (! defined($new_db)) {
     die "Must specify new database name to perform shrink task\n";
   }
-  exec "krakenhll-shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
+  exec "shrink_db.sh", $new_count, $new_db, $shrink_block_offset;
 }
 
 sub standard_installation {
-  exec "krakenhll-standard_installation.sh";
+  exec "standard_installation.sh";
 }
 
 sub build_database {
@@ -353,13 +353,13 @@ sub build_database {
   $ENV{"KRAKEN_LIBRARY_DIRS"} = "@library_dirs";
   $ENV{"KRAKEN_TAXONOMY_DIR"} = $taxonomy_dir;
   my $opt = ($verbose? "-x" : "");
-  exec "krakenhll-build_db.sh";
+  exec "build_db.sh";
 }
 
 sub clean_database {
-  exec "krakenhll-clean_db.sh";
+  exec "clean_db.sh";
 }
 
 sub upgrade_database {
-  exec "krakenhll-upgrade_db.sh";
+  exec "upgrade_db.sh";
 }
