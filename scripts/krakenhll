@@ -42,6 +42,7 @@ $ENV{"PATH"} = "$KRAKEN_DIR:$ENV{PATH}";
 
 my $CLASSIFY = "$KRAKEN_DIR/classify";
 my $CREATE_TAXDB = "$KRAKEN_DIR/build_taxdb";
+my $READ_MERGER = "$KRAKEN_DIR/read_merger.pl";
 my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
 my $BZIP2_MAGIC = "BZ";
 
@@ -217,7 +218,7 @@ if ($paired) {
   push @merge_flags, "--gz" if $gunzip;
   push @merge_flags, "--bz2" if $bunzip2;
   push @merge_flags, "--check-names" if $check_names;
-  @pipe_argv = ("read_merger.pl", @merge_flags, @ARGV);
+  @pipe_argv = ($READ_MERGER, @merge_flags, @ARGV);
 }
 elsif ($compressed) {
   if ($gunzip) {
