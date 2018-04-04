@@ -46,7 +46,7 @@ string DB_filename, Index_filename,
   Kmer_count_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
-bool force_contaminant_taxid = false;
+bool Force_contaminant_taxid = false;
 uint32_t New_taxid_start = 1000000000;
 
 bool Allow_extra_kmers = false;
@@ -416,13 +416,13 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_
       #pragma omp critical(new_uid)
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
     } else {
-      if (!force_contaminant_taxid) {
+      if (!Force_contaminant_taxid) {
         *val_ptr = lca(Parent_map, taxid, *val_ptr);
       } else {
         if (*val_ptr == TID_CONTAMINANT1 || *val_ptr == TID_CONTAMINANT2) {
           // keep value
         } else if (is_contaminant_taxid) {
-          // When force_contaminant_taxid is set, do not compute lca, but assign the taxid
+          // When Force_contaminant_taxid is set, do not compute lca, but assign the taxid
           // of the (last) sequence to k-mers
           *val_ptr = taxid;
         } else {
@@ -472,7 +472,7 @@ void parse_command_line(int argc, char **argv) {
         #endif
         break;
       case 'T' :
-        force_contaminant_taxid = true;
+        Force_contaminant_taxid = true;
         break;
       case 'v' :
         verbose = true;
@@ -536,7 +536,8 @@ void usage(int exit_code) {
        << "  -m filename      Sequence ID to taxon map" << endl
        << "  -a               Add taxonomy IDs (starting with "<<(New_taxid_start+1)<<") for assemblies (third column in seqid2taxid.map) to Taxonomy DB" << endl
        << "  -A               Add taxonomy IDs (starting with "<<(New_taxid_start+1)<<") for sequences to Taxonomy DB" << endl
-       << "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
+       //<< "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
+       << "  -T               When a k-mer appears in a 'synthetic construct' sequence, force the taxID to be the 'synthetic construct' taxID, instead of the LCA." << endl
        << "  -I filename      Write UIDs into database, and output (binary) UID-to-taxid map to filename" << endl
        << "  -p               Pretend - do not write database back to disk (when working in RAM)" << endl
        << "  -v               Verbose output" << endl
