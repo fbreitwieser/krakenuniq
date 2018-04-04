@@ -533,8 +533,10 @@ sub download_viral_neighbors(@) {
 sub print_header_lines(@) {
   my ($file, $taxid, $name) = @_;
   return if -s "$file.map";
-  return unless -f $file;
-  print STDERR "Making map file for $file\n" if ($VERBOSE);
+  if (! -f $file) {
+	print STDERR "ERROR: $file does not exist - should not happen!?\n";
+  }
+  print STDERR "Writing mapping file for $file [$taxid, $name]\n" if $VERBOSE;
   $taxid = "$taxid\t$name" if defined $name;
   #`grep '^>' "$file" | sed -e 's/.//' -e 's/\\( .*\\|\$\\)/\t$taxid/' > "$file.map"`;
   open (my $F, ">", "$file.map");
@@ -624,7 +626,7 @@ sub download_domain(@) {
   my ($DATABASE, $domain_dir, $domain, $_assembly_level, @additional_filters) = @_;
   $_assembly_level =~ s/ /_/g;
   print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level";
-  print STDERR (defined @additional_filters? " and additional filters @additional_filters.\n" : ".\n");
+  print STDERR (@additional_filters? " and additional filters @additional_filters.\n" : ".\n");
   die unless defined $domain_dir && defined $domain;
   if (-d $domain_dir) {
     print STDERR "WARNING: $domain_dir already exists - potentially overwriting files.\n";
