@@ -46,6 +46,9 @@ my $DB_DIR;
 my $N_PROC=5;
 my $MAP_DIV="nucl_gb";
 my $CHANGE_HEADER=0;
+my $RETMODE="text";
+my $RETTYPE="fasta";
+my $NCBIDB="nuccore";
 my $DO_DUST=0;
 my $FILTER_UNPLACED=0;
 my $SEARCH_TERM;
@@ -104,6 +107,9 @@ WHEN USING DATABASE nucleotide:
  --mappings divisions  Try mapping accession IDs using the mapping files for the specified divisions (comma-separated).
                        Default: $MAP_DIV. Possible values: nucl_est, nucl_gb, nucl_gss, nucl_wgs.
 					   Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
+ --retmode RM          Specify return mode. Possible options: text (default), asn.1, xml.
+ --rettype RT          Specify return type for download. Note that no mapping files are generated when
+                       rettype is specified. Possible options: fasta (default), gb, gbc, native, acc, seqid, ft, gbwithparts, fasta_cds_na, fasta_cds_aa.
 
 WHEN USING DATABASE refseq OR genbank:
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
@@ -132,6 +138,9 @@ GetOptions(
   "mappings=s" => \$MAP_DIV,
   "dust|D" => \$DO_DUST,
   "change-header|l" => \$CHANGE_HEADER,
+  "rettype=s" => \$RETTYPE,
+  "retmode=s" => \$RETMODE,
+  "ncbidb=s" => \$NCBIDB,
   "force" => \$OVERWRITE_FILES,
   "verbose|v" => \$VERBOSE) or die "Error in command line arguments";
 
@@ -325,8 +334,8 @@ sub download_ncbi_search(@) {
   initialize_name_map();
 
   my $esearch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-  my $complete_url="$esearch_url?db=nuccore&usehistory=y&retmax=1&retmode=json&term=$term";
-  my $esearch_file = "$nbr_dir/esearch_neighbor_res.json";
+  my $complete_url="$esearch_url?db=$NCBIDB&usehistory=y&retmax=1&retmode=json&term=$term";
+  my $esearch_file = "$nbr_dir/esearch_res.json";
   download($complete_url, $esearch_file);
 
   my $n_res=`grep -m1 '"count":' $esearch_file | sed -e 's/.*: "//' -e 's/",.*//'`;
@@ -334,21 +343,22 @@ sub download_ncbi_search(@) {
   print STDERR "Downloading $n_res sequences into $nbr_dir.\n";
   return if (!defined $n_res || $n_res eq 0);
 
-  # Step 2: Download FASTAs, 10k at a time
+  # Step 2: Download FASTAs (or other formats), 10k at a time
   my $url_params=`cat $esearch_file | grep -e 'querykey' -e 'webenv' | sed -e 's/^ *"querykey": "/query_key=/' -e 's/^ *"webenv": "/webenv=/' -e 's/",//' | paste -sd\\&`;
   chomp $url_params;
-  die "error getting viral neighbors with url $complete_url" if (!defined $url_params || $url_params eq "");
+  die "error getting sequences with url $complete_url" if (!defined $url_params || $url_params eq "");
   my $retstart = 0;
   my $retmax = 10000;
   my @all_fas = ();
+  my $_RETMODE
   while ($retstart < $n_res) {
 
     my $curr_retmax = min($n_res, $retstart+$retmax);
     print STDERR "\r  Downloading sequences ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
 
     #start_fork() and next;
-	my $part_file = "$nbr_dir/dl_part_".($retstart+1)."-to-$curr_retmax.fna.tmp";
-    download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$curr_retmax", $part_file);
+	my $part_file = "$nbr_dir/dl_part_".($retstart+1)."-to-$curr_retmax.$RETTYPE.tmp";
+    download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&$url_params&rettype=$RETTYPE&retmode=$RETMODE&retstart=$retstart&retmax=$curr_retmax", $part_file);
 
     my $FA_HANDLE;
     my $fa_handle_open = 0;
@@ -370,7 +380,7 @@ sub download_ncbi_search(@) {
         }
 
         if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
-          my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
+          my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
           chomp $res;
           ($taxid) = split /\t/, $res;
         }
