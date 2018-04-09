@@ -22,9 +22,9 @@ install: $(PROGS)
 clean:
 	rm -rf $(PROGS) $(TEST_PROGS) *.o *.dSYM *.gch
 
-db_shrink: krakendb.o quickfile.o
+db_shrink: krakendb.o quickfile.o krakenutil.o
 
-db_sort: krakendb.o quickfile.o
+db_sort: krakendb.o quickfile.o krakenutil.o
 
 set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
 
@@ -36,7 +36,7 @@ count_unique: hyperloglogplus.o
 
 test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
-dump_db_kmers: krakendb.o quickfile.o
+dump_db_kmers: krakendb.o quickfile.o krakenutil.o
 
 classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o #taxdb.hpp report-cols.hpp readcounts.hpp
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
@@ -50,7 +50,7 @@ read_uid_mapping: quickfile.o krakenutil.o uid_mapping.o
 krakenutil.o: krakenutil.cpp krakenutil.hpp taxdb.hpp report-cols.hpp
 	$(CXX) $(CXXFLAGS) -c krakenutil.cpp
 
-krakendb.o: krakendb.cpp krakendb.hpp quickfile.hpp
+krakendb.o: krakendb.cpp krakendb.hpp krakenutil.o quickfile.hpp
 	$(CXX) $(CXXFLAGS) -c krakendb.cpp
 
 seqreader.o: seqreader.cpp seqreader.hpp quickfile.hpp

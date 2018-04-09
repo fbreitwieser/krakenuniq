@@ -64,6 +64,7 @@ bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
 bool full_report = false;
+bool Fallback_to_index_classification = false;
 
 bool Map_UIDs = false;
 string UID_to_TaxID_map_filename;
@@ -553,13 +554,22 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
         // go through multiple databases to map k-mer
         for (size_t i=0; i<KrakenDatabases.size(); ++i) {
           uint32_t* val_ptr = KrakenDatabases[i]->kmer_query(
-            cannonical_kmer, &db_statuses[i].current_bin_key,
-            &db_statuses[i].current_min_pos, &db_statuses[i].current_max_pos);
+            cannonical_kmer, 
+			&db_statuses[i].current_bin_key,
+            &db_statuses[i].current_min_pos, 
+			&db_statuses[i].current_max_pos);
           if (val_ptr) {
             taxon = *val_ptr;
             break;
           }
         }
+		if (Fallback_to_index_classification) {
+          for (size_t i=0; i<KrakenDatabases.size(); ++i) {
+		    taxon = KrakenDatabases[i]->kmer_index_query(cannonical_kmer, Parent_map);
+			if (taxon)
+			  break;
+          }
+		}
 
         // cerr << "taxon for " << *kmer_ptr << " is " << taxon << endl;
         my_taxon_counts[taxon].add_kmer(cannonical_kmer);
@@ -653,7 +663,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:F")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -661,6 +671,9 @@ void parse_command_line(int argc, char **argv) {
       case 'i' :
         Index_filenames.push_back(optarg);
         break;
+	  case 'F' : 
+		Fallback_to_index_classification = true;
+		break;
       case 't' :
         sig = atoll(optarg);
         if (sig <= 0)
@@ -763,6 +776,7 @@ void usage(int exit_code) {
        << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
        << "  -s               Print read sequence in Kraken output" << endl
+	   << "  -F               Fallback to index classification" << endl
        << "  -h               Print this message" << endl
        << endl
        << "At least one FASTA or FASTQ file must be specified." << endl

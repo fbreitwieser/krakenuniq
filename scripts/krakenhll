@@ -65,6 +65,7 @@ my $report_file;
 my $print_sequence = 0;
 my $uid_mapping = 0;
 my $hll_precision = 12;
+my $fallbackToIndexClassify = 0;
 
 GetOptions(
   "help" => \&display_help,
@@ -87,6 +88,7 @@ GetOptions(
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2,
   "uid-mapping" => \$uid_mapping,
+  "fallback-to-index-classification" => \$fallbackToIndexClassify,
   "only-classified-output" => \$only_classified_output,
 ) or die $!;
 
@@ -184,6 +186,7 @@ push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-c", if $only_classified_output;
 push @flags, "-M" if $preload;
+push @flags, "-F" if $fallbackToIndexClassify;
 push @flags, "-r", $report_file if defined $report_file;
 push @flags, "-a", $db_prefix[0]."/taxDB";
 push @flags, "-s" if $print_sequence;

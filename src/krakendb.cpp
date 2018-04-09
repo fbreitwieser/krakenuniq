@@ -20,6 +20,7 @@
 
 #include "kraken_headers.hpp"
 #include "krakendb.hpp"
+#include "krakenutil.hpp"
 #include "quickfile.hpp"
 #include <unordered_map>
 
@@ -237,8 +238,10 @@ uint64_t KrakenDB::canonical_representation(uint64_t kmer) {
 
 // perform search over last range to speed up queries
 // NOTE: retry_on_failure implies all pointer params are non-NULL
-uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
-                               int64_t *min_pos, int64_t *max_pos,
+uint32_t *KrakenDB::kmer_query(uint64_t kmer, 
+				               uint64_t *last_bin_key,
+                               int64_t *min_pos, 
+							   int64_t *max_pos,
                                bool retry_on_failure)
 {
   int64_t min, max, mid;
@@ -307,23 +310,26 @@ uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
       *max_pos = max;
     }
   }
-/*
-  if (answer == NULL && use_index_pos) {
-    b_key = bin_key(kmer);
-    min = index_ptr->at(b_key);
-    max = index_ptr->at(b_key + 1) - 1;
-	int lca = 0;
-  for (auto i = min; i <= max; i++) {
-    uint32_t* tax_ptr = ptr + pair_sz * i + key_len;
-	lca = lca(lca, *tax_ptr);
-  }
-  */
   return answer;
 }
 
 // Binary search w/in the k-mer's bin
 uint32_t *KrakenDB::kmer_query(uint64_t kmer) {
   return kmer_query(kmer, NULL, NULL, NULL, false);
+}
+
+uint32_t KrakenDB::kmer_index_query(uint64_t kmer, const std::unordered_map<uint32_t, uint32_t> &parent_map) {
+  char *ptr = get_pair_ptr();
+  size_t pair_sz = pair_size();
+  uint64_t b_key = bin_key(kmer);
+  int64_t min = index_ptr->at(b_key);
+  int64_t max = index_ptr->at(b_key + 1) - 1;
+  int32_t lca_taxid = 0;
+  for (auto i = min; i <= max; i++) {
+    uint32_t* tax_ptr = (uint32_t *) (ptr + pair_sz * i + key_len);
+    lca_taxid = lca(parent_map, lca_taxid, *tax_ptr);
+  }
+  return lca_taxid;
 }
 
 KrakenDBIndex::KrakenDBIndex() {

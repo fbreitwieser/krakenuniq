@@ -61,8 +61,10 @@ namespace kraken {
     // perform search over last range to speed up queries
     uint32_t *kmer_query(uint64_t kmer, uint64_t *last_bin_key,
                          int64_t *min_pos, int64_t *max_pos,
-                         bool retry_on_failure=true);
+                         bool retry_on_failure = true);
 
+   // perform a search over the index, and return the LCA of the range
+   uint32_t kmer_index_query(uint64_t kmer, const std::unordered_map<uint32_t, uint32_t> &parent_map);
 
     // return a count of k-mers for all taxons
     std::map<uint32_t,uint64_t> count_taxons();
