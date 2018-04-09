@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-#vim: expandtab:ts=2:sw=2 :
 
 # krakenhll-download.pl - based on centrifuge-download
 # (c) Florian Breitwieser, 2017-2018
@@ -98,10 +97,10 @@ WHEN USING DATABASE nucleotide:
  --term search_term    Download all sequences returned from a NCBI nucleotide search.
  --mappings divisions  Try mapping accession IDs using the mapping files for the specified divisions (comma-separated).
                        Default: $MAP_DIV. Possible values: nucl_est, nucl_gb, nucl_gss, nucl_wgs.
-					   Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
+                       Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
  --retmode RM          Specify return mode. Possible options: text (default), asn.1, xml.
  --rettype RT          Specify return type for download. Note that no mapping files are generated when
-                       rettype is specified. Possible options: fasta (default), gb, gbc, native, acc, seqid, ft, gbwithparts, fasta_cds_na, fasta_cds_aa.
+                       rettype is specified. Possible options: fasta (default), gb, gbc, native, acc, seqid, ft, gbwithparts, fasta_cds_na, fasta_cds_aa. Note that only gb and fasta files are split, while the other formats stay in chunks.
                        Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
 
 WHEN USING DATABASE refseq OR genbank:
@@ -134,8 +133,6 @@ GetOptions(
   "rettype=s" => \$RETTYPE,
   "retmode=s" => \$RETMODE,
   "ncbidb=s" => \$NCBIDB,
-=======
->>>>>>> 7ee555b65ab97db5a77f6fb1ba1ca688e29e1c9d
   "force" => \$OVERWRITE_FILES,
   "verbose|v" => \$VERBOSE) or die "Error in command line arguments";
 
@@ -345,70 +342,80 @@ sub download_ncbi_search(@) {
   my $retstart = 0;
   my $retmax = 10000;
   my @all_fas = ();
-  my $_RETMODE
   while ($retstart < $n_res) {
 
     my $curr_retmax = min($n_res, $retstart+$retmax);
     print STDERR "\r  Downloading sequences ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
 
     #start_fork() and next;
-	my $part_file = "$nbr_dir/dl_part_".($retstart+1)."-to-$curr_retmax.$RETTYPE.tmp";
+    my $part_file = "$nbr_dir/${NCBIDB}-results_".($retstart+1)."-to-$curr_retmax.${RETTYPE}";
     download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&$url_params&rettype=$RETTYPE&retmode=$RETMODE&retstart=$retstart&retmax=$curr_retmax", $part_file);
+    my $is_fasta = $RETTYPE eq 'fasta';
+    my $is_genbank = $RETTYPE eq 'gb';
 
-    my $FA_HANDLE;
-    my $fa_handle_open = 0;
-    open (my $F, "<", $part_file) or die "Couln't open downloaded file";
-    while (my $line = <$F>) {
-      next if $line eq "\n";
-      if ($line =~ /^>/) {
-        (my $nbr_ac = $line) =~ s/.//;
-        $nbr_ac =~ s/ .*//;
-        chomp $nbr_ac;
-   
-        my $taxid;
-        foreach (@sorted_map_file_handles) {
-          my $tell = alphabetic(*$_, $nbr_ac);
-          next unless defined $tell;
-          $taxid = <$_>;
-          $taxid =~ s/.*\t//;
-          chomp $taxid;
+    if ($is_fasta || $is_genbank) {
+      my $FA_HANDLE;
+      my $fa_handle_open = 0;
+      open (my $F, "<", $part_file) or die "Couln't open downloaded file";
+      while (my $line = <$F>) {
+        next if $line eq "\n";
+        my $is_header = ($is_fasta && $line =~ /^>/ ) || ($is_genbank && $line =~ /^LOCUS/);
+        if ($is_header) {
+          my $nbr_ac = $line;
+          chomp $nbr_ac;
+          if ($is_fasta) {
+            $nbr_ac =~ s/^>//;
+          } else { #genbank
+            $nbr_ac =~ s/^LOCUS\s*//;
+          }
+          $nbr_ac =~ s/[. ].*//;
+     
+          my $taxid;
+          foreach (@sorted_map_file_handles) {
+            my $tell = alphabetic(*$_, $nbr_ac);
+            next unless defined $tell;
+            $taxid = <$_>;
+            $taxid =~ s/.*\t//;
+            chomp $taxid;
+          }
+  
+          if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
+            my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
+            chomp $res;
+            ($taxid) = split /\t/, $res;
+          }
+  
+          my $name = $taxid_name_map{$taxid};
+          if (!defined $taxid || !defined $name) {
+            print STDERR "\nNo mapping for sequence $nbr_ac - not writing it to it's own file!\n";
+            close($FA_HANDLE) if $fa_handle_open;
+            $fa_handle_open = 0;
+            next;
+          }
+          (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
+          $name1 =~ s/__/_/g;
+          system("mkdir -p $nbr_dir/$name1-tax$taxid");
+          if ($fa_handle_open) {
+            close($FA_HANDLE);
+          } else {
+            $fa_handle_open = 1;
+          }
+          my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.$RETTYPE";
+          open($FA_HANDLE, ">", $file) or die "Couln't open file";
+          print_header_line_ac($file, $nbr_ac, $taxid);
         }
-
-        if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
-          my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
-          chomp $res;
-          ($taxid) = split /\t/, $res;
-        }
-
-        my $name = $taxid_name_map{$taxid};
-        if (!defined $taxid || !defined $name) {
-          print STDERR "\nNo mapping for sequence $nbr_ac - not writing it to it's own file!\n";
-          close($FA_HANDLE) if $fa_handle_open;
-          $fa_handle_open = 0;
-          next;
-        }
-        (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
-        $name1 =~ s/__/_/g;
-        system("mkdir -p $nbr_dir/$name1-tax$taxid");
-        if ($fa_handle_open) {
-          close($FA_HANDLE);
-        } else {
-          $fa_handle_open = 1;
-        }
-        my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.fna";
-        open($FA_HANDLE, ">", $file) or die "Couln't open file";
-        print_header_line_ac($file, $nbr_ac, $taxid);
+        print $FA_HANDLE $line if $fa_handle_open;
+        #end_fork();
       }
-      print $FA_HANDLE $line if $fa_handle_open;
-      #end_fork();
+      close($FA_HANDLE) if $fa_handle_open;
+      close($F);
+      unlink($part_file) or warn "Could not delete $part_file: $!\n";
     }
-    close($FA_HANDLE) if $fa_handle_open;
-    close($F);
     $retstart += $curr_retmax;
+    print STDERR " done \n";
+    wait_children();
+  
   }
-  print STDERR "\n";
-  wait_children();
-
   foreach (@sorted_map_file_handles) {
     close $_;
   }
@@ -418,6 +425,9 @@ sub download_ncbi_search(@) {
 sub get_sorted_maps(@) {
   my (@parts) = @_;
   my @res;
+  my $ac_col = 1;
+  my $ac_w_version_col = 2;
+  my $taxid_col = 3;
   my $dir = get_dir($BASE_DIR,"taxonomy");
   foreach (@parts) {
     my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
@@ -425,9 +435,9 @@ sub get_sorted_maps(@) {
 
     my $sorted_map_f = "$dir/$_.accession2taxid.sorted";
     if (!-s $sorted_map_f) {
-      print STDERR "Sorting mapping file ...\n";
+      print STDERR "Sorting mapping file (will take some time) ...\n";
       my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-      system("gunzip -c $dir/$_.accession2taxid.gz | cut -f 2,3 | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
+      system("gunzip -c $dir/$_.accession2taxid.gz | cut -f $ac_col,$taxid_col | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
     }
     push @res, $sorted_map_f;
   }
@@ -712,3 +722,4 @@ sub download_domain(@) {
   $msg .= " $download_failed downloads failed - maybe try re-running krakenhll-download." if ($download_failed > 0);
   print STDERR "  $msg\n";
 }
+# vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :
