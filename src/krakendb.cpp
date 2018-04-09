@@ -307,6 +307,17 @@ uint32_t *KrakenDB::kmer_query(uint64_t kmer, uint64_t *last_bin_key,
       *max_pos = max;
     }
   }
+/*
+  if (answer == NULL && use_index_pos) {
+    b_key = bin_key(kmer);
+    min = index_ptr->at(b_key);
+    max = index_ptr->at(b_key + 1) - 1;
+	int lca = 0;
+  for (auto i = min; i <= max; i++) {
+    uint32_t* tax_ptr = ptr + pair_sz * i + key_len;
+	lca = lca(lca, *tax_ptr);
+  }
+  */
   return answer;
 }
 
