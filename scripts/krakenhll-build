@@ -243,13 +243,16 @@ Task options (exactly one can be selected -- default is build):
                              existing non-library/taxonomy files before build
   --clean                    Remove unneeded files from a built database
   --shrink NEW_CT            Shrink an existing DB to have only NEW_CT k-mers
-  --standard                 Download and create default database
+  --standard                 Download and create default database, which contains complete genomes 
+                             for archaea, bacteria and viruses from RefSeq, as well as viral strains 
+                             from NCBI. Specify --taxids-for-genomes and --taxids-for-sequences
+                             separately, if desired.
+
   --help                     Print this message
   --version                  Print version information
 
 Options:
-  --db DBDIR                 Kraken DB directory (mandatory except for
-                             --help/--version)
+  --db DBDIR                 Kraken DB directory (mandatory except for --help/--version)
   --threads #                Number of threads (def: $DEF_THREAD_CT)
   --new-db NAME              New Kraken DB name (shrink task only; mandatory
                              for shrink task)
@@ -330,7 +333,13 @@ sub shrink_db {
 }
 
 sub standard_installation {
-  exec "standard_installation.sh";
+  print STDERR "krakenhll-download --db $db taxonomy contaminants\n";
+  system("krakenhll-download --db $db taxonomy contaminants");
+  
+  print STDERR "krakenhll-download --db $db refseq/archaea refseq/bacteria refseq/viral/Any viral-neighbors\n";
+  system("krakenhll-download --db $db refseq/archaea refseq/bacteria refseq/viral/Any viral-neighbors");
+  
+  build_database();
 }
 
 sub build_database {
