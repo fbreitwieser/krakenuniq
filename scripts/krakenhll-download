@@ -17,7 +17,8 @@ use Term::ANSIColor;
 use Getopt::Long;
 use LWP::UserAgent;
 use List::Util qw/min/;
-use lib "#####=KRAKEN_DIR=#####";
+use FindBin;
+use lib "$FindBin::RealBin";
 use File::SortedSeek qw/alphabetic/;
 
 sub download_taxonomy(@);
@@ -650,6 +651,7 @@ sub download_domain(@) {
     my $download_dir = "$domain_dir/$assembly_level";
     my $nbr_download_dir = "$domain_dir/Neighbors";
     foreach my $ext (split(/,/, $FNA_FILES)) {
+      start_fork() and next;
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
       my $nbr_fname = $bfname."-neighbors.fna";
@@ -661,9 +663,7 @@ sub download_domain(@) {
         ++$existing_files;
       } else {
         ++$downloaded_files;
-        start_fork() and next;
         download($full_ftp_path, "$download_dir/$fname.gz", { gunzip => 1 });
-        end_fork();
       }
 
       if ($CHANGE_HEADER) {
@@ -674,15 +674,14 @@ sub download_domain(@) {
       }
 
       if ($DO_DUST || !-s $fullfname1) {
-        start_fork() and next;
         ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
         system("dustmasker -infmt fasta -in '$download_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$fullfname1'");
         unlink("$download_dir/$fname");
-        end_fork();
       }
 
       ## Output sequenceID to taxonomy ID map
       print_header_lines($fullfname1, $taxid, "$assembly_accession $organism_name");
+      end_fork();
     }
   }
 
