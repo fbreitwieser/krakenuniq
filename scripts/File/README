@@ -1,0 +1,51 @@
+File::SortedSeek version 0.01
+=======================
+
+NAME
+
+File::SortedSeek -  A Perl module providing fast data access to very large files
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+If you insist on doing a cut an paste install you will need
+to install the following file in a location like this:
+
+usr/lib/perl5/site_perl/5.6.0/File/SortedSeek.pm
+
+On Win32 you will probably need to substitute something like
+C:\Perl\site\lib\  for  usr/lib/perl5/site_perl/5.6.0/
+
+Before installing any perl module on Win32 I recommend deactivating Norton Antivirus
+which conflicts with a lot of stuff, not just Perl and MakeMaker. If your system hangs
+when you try to install modules this is a probable cause.
+
+Then just:
+
+    perl Makefile.PL
+    nmake
+    nmake test
+    nmake install
+
+You can get a copy of nmake.exe from Microsoft at <http://download.microsoft.com/download/vc15/Patch/1.52/W95/EN-US/Nmake15.exe>
+
+DEPENDENCIES
+
+Nothing outside standard distribution. Specifically:
+
+Time::Local for logfile munging on date
+
+COPYRIGHT AND LICENCE
+
+This package is free software and is provided "as is" without express or
+implied warranty. It may be used, redistributed and/or modified under the terms
+of the Perl Artistic License (see http://www.perl.com/perl/misc/Artistic.html)
+
+Copyright (C) 2001 Dr James Freeman
+

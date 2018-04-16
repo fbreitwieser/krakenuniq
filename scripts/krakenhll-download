@@ -17,6 +17,7 @@ use Term::ANSIColor;
 use Getopt::Long;
 use LWP::UserAgent;
 use List::Util qw/min/;
+use lib "#####=KRAKEN_DIR=#####";
 use File::SortedSeek qw/alphabetic/;
 
 sub download_taxonomy(@);
