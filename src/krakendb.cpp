@@ -1,4 +1,5 @@
 /*
+ * vim :set ts=2 sw=2 sts=2 et:
  * Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
  * Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
  *
@@ -239,9 +240,9 @@ uint64_t KrakenDB::canonical_representation(uint64_t kmer) {
 // perform search over last range to speed up queries
 // NOTE: retry_on_failure implies all pointer params are non-NULL
 uint32_t *KrakenDB::kmer_query(uint64_t kmer, 
-				               uint64_t *last_bin_key,
+                               uint64_t *last_bin_key,
                                int64_t *min_pos, 
-							   int64_t *max_pos,
+                               int64_t *max_pos,
                                bool retry_on_failure)
 {
   int64_t min, max, mid;
@@ -325,6 +326,7 @@ uint32_t KrakenDB::kmer_index_query(uint64_t kmer, const std::unordered_map<uint
   int64_t min = index_ptr->at(b_key);
   int64_t max = index_ptr->at(b_key + 1) - 1;
   int32_t lca_taxid = 0;
+  std::cerr << "Looking at " << (max - min) << " kmers ...\n";
   for (auto i = min; i <= max; i++) {
     uint32_t* tax_ptr = (uint32_t *) (ptr + pair_sz * i + key_len);
     lca_taxid = lca(parent_map, lca_taxid, *tax_ptr);
