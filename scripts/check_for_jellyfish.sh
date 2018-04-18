@@ -25,6 +25,7 @@ set -u  # Protect against uninitialized vars.
 set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
+JELLYFISH_BIN=${JELLFISH_BIN:-}
 JELLYFISH1_BIN=""
 for JF in $JELLYFISH_BIN $(dirname $0)/jellyfish/bin/jellyfish  /usr/local/opt/jellyfish-1.1/bin/jellyfish jellyfish1 jellyfish; do
   if test -f $JF || command -v $JF >/dev/null 2>&1; then

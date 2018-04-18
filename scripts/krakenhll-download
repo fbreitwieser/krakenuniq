@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-#vim: et:ts=2:sw=2
+#vim: expandtab:ts=2:sw=2 :
 
 # krakenhll-download.pl - based on centrifuge-download
 # (c) Florian Breitwieser, 2017-2018
@@ -15,7 +15,7 @@ use IO::Uncompress::Gunzip qw/gunzip $GunzipError/;
 use autodie;
 use Term::ANSIColor;
 use Getopt::Long;
-use LWP::UserAgent;
+#use LWP::UserAgent;
 use List::Util qw/min/;
 use FindBin;
 use lib "$FindBin::RealBin";
@@ -33,6 +33,7 @@ sub get_sorted_maps(@);
 
 my $FTP="ftp://ftp.ncbi.nih.gov";
 my @ALL_GENOMES=qw/bacteria viral archaea fungi protozoa invertebrate plant vertebrate_mammalian vertebrate_other/;
+my %valid_domains = map { $_ => 1 } @ALL_GENOMES;
 my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
 my @ALL_ASSEMBLY_LEVELS=qw/Complete\ Genome Chromosome Scaffold Contig/;
 my @SMALL_GENOMES=qw/mitochondrion plasmid plastid/;
@@ -47,7 +48,7 @@ my $BASE_DIR;
 my $DB_DIR;
 my $N_PROC=5;
 my $MAP_DIV="nucl_gb";
-my $CHANGE_HEADER=0;
+my $WRITE_MAPS=1;
 my $DO_DUST=0;
 my $FILTER_UNPLACED=0;
 my $SEARCH_TERM;
@@ -72,13 +73,13 @@ ARGUMENT
               'taxonomy'        downloads the NCBI taxonomy mappings
               'genbank'         downloads GenBank genomes (see parameters -a and -d)
               'refseq'          downloads RefSeq genomes (see parameters -a and -d)
-			  'nucleotide'      specify --term to download nucleotide sequences retrieved from a NCBI search.
+              'nucleotide'      specify --term to download nucleotide sequences retrieved from a NCBI search.
               'viral-neighbors' downloads sequences listed as neighbors to RefSeq genomes in the NCBI viral genome resource.
                                 https://www.ncbi.nlm.nih.gov/genome/viruses/
 
     for refseq and genbank, the assemblies can be filtered:
               'refseq/DOMAIN'   downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria'). 
-			                    possible values: @ALL_GENOMES.
+                                possible values: @ALL_GENOMES.
               'refseq/DOMAIN/ASS_LEVEL'
                                 specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
               'refseq/DOMAIN/ASS_LEVEL/column1=value1(/column2=value2)*' 
@@ -105,7 +106,7 @@ WHEN USING DATABASE nucleotide:
  --term search_term    Download all sequences returned from a NCBI nucleotide search.
  --mappings divisions  Try mapping accession IDs using the mapping files for the specified divisions (comma-separated).
                        Default: $MAP_DIV. Possible values: nucl_est, nucl_gb, nucl_gss, nucl_wgs.
-					   Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
+                       Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
 
 WHEN USING DATABASE refseq OR genbank:
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
@@ -133,7 +134,6 @@ GetOptions(
   "term=s" => \$SEARCH_TERM,
   "mappings=s" => \$MAP_DIV,
   "dust|D" => \$DO_DUST,
-  "change-header|l" => \$CHANGE_HEADER,
   "force" => \$OVERWRITE_FILES,
   "verbose|v" => \$VERBOSE) or die "Error in command line arguments";
 
@@ -142,7 +142,7 @@ if (defined $BASE_DIR && defined $DB_DIR) {
   exit 1;
 }
 
-my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
+#my $ua = LWP::UserAgent->new( ssl_opts => { verify_hostname => 0 } );
 
 # Use current directory as base directory
 $BASE_DIR = "." unless defined $DB_DIR || defined $BASE_DIR;
@@ -168,11 +168,6 @@ if (!defined $ARGV[0] && !$INCLUDE_VIRAL_NEIGHBORS) {
   exit 1;
 }
 
-if ($INCLUDE_VIRAL_NEIGHBORS) {
-  my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
-  download_viral_neighbors_url($nbr_lib_dir);
-}
-
 foreach my $DATABASE (@ARGV) {
   if ( $DATABASE eq "taxonomy" ) { 
     download_taxonomy(get_dir($BASE_DIR,"taxonomy"));
@@ -194,10 +189,10 @@ foreach my $DATABASE (@ARGV) {
     download_viral_neighbors($nbr_lib_dir);
   } elsif ($DATABASE eq 'nucleotide') {
     if (!defined $SEARCH_TERM) {
-	  print STDERR "Please define a search term with --term when using database nucleotide. \n".
-	               " E.g. --term 'srcdb_refseq[prop] plasmid[title] complete sequence[title] txid2[organism]'\n.";
-	  exit 1;
-	}
+      print STDERR "Please define a search term with --term when using database nucleotide. \n".
+                   " E.g. --term 'srcdb_refseq[prop] plasmid[title] complete sequence[title] txid2[organism]'\n.";
+      exit 1;
+    }
     my $nbr_dir = $add_dir? "$BASE_DIR/library/nucleotide/" : "$BASE_DIR/nucleotide/";
     download_ncbi_search($nbr_dir, $SEARCH_TERM, get_sorted_maps(split /,/, $MAP_DIV));
   } else {
@@ -228,9 +223,9 @@ sub download(@) {
 
   if (!$OVERWRITE_FILES && (( defined $gunzipped_filename && -s $gunzipped_filename) || (!defined $gunzipped_filename && -s $file))) {
     print STDERR "Not fetching $url - file $file exists.\n" if $VERBOSE;
-  	if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
+      if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
       print colored("check\n", "green");
-	}
+    }
     return 1;
   }
   if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
@@ -242,14 +237,14 @@ sub download(@) {
     if (!-d dirname($file)) {
       make_path(dirname($file));
     }
-    my $response = $ua->get($url, ':content_file' => $file);
-    if (!$response->is_success) {
-	  my $status_line = $response->status_line;
-      print STDERR "\nFAIL: Error using LWP for downloading $url ($status_line) - tying curl.\n";
-	  system("curl '$url' -o $file") == 0 or die "Error curling $url.\n";
-    } else {
-      print STDERR "SUCCESS\n" if $VERBOSE;
-    }
+    #my $response = $ua->get($url, ':content_file' => $file);
+    #if (!$response->is_success) {
+    #  my $status_line = $response->status_line;
+    #  print STDERR "\nFAIL: Error using LWP for downloading $url ($status_line) - tying curl.\n";
+      system("curl '$url' -o $file") == 0 or die "Error fetching $url. Is curl installed?\n";
+    #} else {
+    #  print STDERR "SUCCESS\n" if $VERBOSE;
+    #}
   } else {
     if ( $DL_MOD_RSYNC && $url =~ /^ftp/ ) {
      $url =~ s/^ftp/rsync/;
@@ -257,14 +252,19 @@ sub download(@) {
     print STDERR "Fetching $url to $file ..." if $VERBOSE;
 
     my $ff = File::Fetch->new(uri=>"$url");
-    my $where = $ff->fetch(to=> dirname($file)) or die $ff->error;
+    my $where = $ff->fetch(to=> dirname($file));
+    if (!defined $where) {
+       print STDERR "Error downloading $url.\n";
+       print STDERR $ff->error if $VERBOSE;
+       return undef;
+    }
     move($where, $file);
   }
 
   if (defined $gunzipped_filename && $gunzipped_filename ne $file) {
     if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-	  print STDERR " gunzipping ...";
-	}
+      print STDERR " gunzipping ...";
+    }
     print STDERR " GUNZIPPING" if $VERBOSE;
     gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
     unlink $file;
@@ -274,7 +274,7 @@ sub download(@) {
     print STDERR " SUCCESS\n" if $VERBOSE;
     if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
       print STDERR " done.\n";
-	}
+    }
   } else {
     print STDERR "failed.\n";
   }
@@ -321,7 +321,7 @@ sub download_ncbi_search(@) {
   my @sorted_map_file_handles;
   foreach (@sorted_map_files) {
     open(my $FH, "<", $_) or die $!;
-	push @sorted_map_file_handles, $FH;
+    push @sorted_map_file_handles, $FH;
   }
 
   initialize_name_map();
@@ -349,7 +349,7 @@ sub download_ncbi_search(@) {
     print STDERR "\r  Downloading sequences ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
 
     #start_fork() and next;
-	my $part_file = "$nbr_dir/dl_part_".($retstart+1)."-to-$curr_retmax.fna.tmp";
+    my $part_file = "$nbr_dir/dl_part_".($retstart+1)."-to-$curr_retmax.fna.tmp";
     download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&$url_params&rettype=fasta&retstart=$retstart&retmax=$curr_retmax", $part_file);
 
     my $FA_HANDLE;
@@ -362,13 +362,13 @@ sub download_ncbi_search(@) {
         $nbr_ac =~ s/ .*//;
         chomp $nbr_ac;
    
-		my $taxid;
-		foreach (@sorted_map_file_handles) {
-		  my $tell = alphabetic(*$_, $nbr_ac);
-		  next unless defined $tell;
+        my $taxid;
+        foreach (@sorted_map_file_handles) {
+          my $tell = alphabetic(*$_, $nbr_ac);
+          next unless defined $tell;
           $taxid = <$_>;
-		  $taxid =~ s/.*\t//;
-		  chomp $taxid;
+          $taxid =~ s/.*\t//;
+          chomp $taxid;
         }
 
         if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
@@ -380,8 +380,8 @@ sub download_ncbi_search(@) {
         my $name = $taxid_name_map{$taxid};
         if (!defined $taxid || !defined $name) {
           print STDERR "\nNo mapping for sequence $nbr_ac - not writing it to it's own file!\n";
-		  close($FA_HANDLE) if $fa_handle_open;
-		  $fa_handle_open = 0;
+          close($FA_HANDLE) if $fa_handle_open;
+          $fa_handle_open = 0;
           next;
         }
         (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
@@ -399,7 +399,7 @@ sub download_ncbi_search(@) {
       print $FA_HANDLE $line if $fa_handle_open;
       #end_fork();
     }
-	close($FA_HANDLE) if $fa_handle_open;
+    close($FA_HANDLE) if $fa_handle_open;
     close($F);
     $retstart += $curr_retmax;
   }
@@ -426,7 +426,7 @@ sub get_sorted_maps(@) {
       my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
       system("gunzip -c $dir/$_.accession2taxid.gz | cut -f 2,3 | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
     }
-	push @res, $sorted_map_f;
+    push @res, $sorted_map_f;
   }
   return @res;
 }
@@ -528,10 +528,7 @@ sub download_contaminats(@) {
   close($E1);
   unlink("$CONTAMINANT_DIR/emvec.dat");
  
-  if ( $CHANGE_HEADER ) {
-    system("sed -i 's/^>/>taxid|$CONTAMINANT_TAXID /' $CONTAMINANT_DIR/UniVec.fna");
-    system("sed -i 's/^>/>taxid|$CONTAMINANT_TAXID /' $CONTAMINANT_DIR/EmVec.fna");
-  } else {
+  if ( $WRITE_MAPS ) {
     print_header_lines("$CONTAMINANT_DIR/UniVec.fna", $CONTAMINANT_TAXID, "UniVec");
     print_header_lines("$CONTAMINANT_DIR/EmVec.fna", $CONTAMINANT_TAXID, "EmVec");
   }
@@ -552,6 +549,8 @@ sub download_domain(@) {
   $_assembly_level =~ s/ /_/g;
   print STDERR "Downloading assembly summary file for $domain genomes, and filtering to assembly level $_assembly_level";
   print STDERR (@additional_filters? " and additional filters @additional_filters.\n" : ".\n");
+  die "Don't know domain $domain. Choose one of the following: ".(join(", ", @ALL_GENOMES))."\n" unless defined $valid_domains{$domain};
+
   die unless defined $domain_dir && defined $domain;
   if (-d $domain_dir) {
     print STDERR "WARNING: $domain_dir already exists - potentially overwriting files.\n";
@@ -626,6 +625,9 @@ sub download_domain(@) {
 
   my $downloaded_files = 0;
   my $existing_files = 0;
+  my $download_failed = 0;
+
+  my @fasta_files;
 
   my $i = 0;
   foreach my $g (@genomes_to_dl) {
@@ -650,11 +652,10 @@ sub download_domain(@) {
     $assembly_level =~ s/ /_/g;
     my $download_dir = "$domain_dir/$assembly_level";
     my $nbr_download_dir = "$domain_dir/Neighbors";
+    my @files;
     foreach my $ext (split(/,/, $FNA_FILES)) {
-      start_fork() and next;
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
-      my $nbr_fname = $bfname."-neighbors.fna";
       my $fname = $bfname.".fna";
       my $fullfname1 = $DO_DUST? "$download_dir/${bfname}_dustmasked.fna" : "$download_dir/$fname";
 
@@ -662,30 +663,49 @@ sub download_domain(@) {
         print STDERR "$download_dir/$fname exists - not downloading.. \n" if $VERBOSE;
         ++$existing_files;
       } else {
-        ++$downloaded_files;
-        download($full_ftp_path, "$download_dir/$fname.gz", { gunzip => 1 });
+        my $pid = start_fork();
+        unless ($pid) {
+          download($full_ftp_path, "$download_dir/$fname.gz", { gunzip => 1 });
+          ## Output sequenceID to taxonomy ID map
+          print_header_lines("$download_dir/$fname", $taxid, "$assembly_accession $organism_name");
+          end_fork();
+        }
       }
-
-      if ($CHANGE_HEADER) {
-        system("sed -i 's/^>/>kraken:taxid|$taxid /' '$download_dir/$fname'");
-      }
-      if ($FILTER_UNPLACED) {
-        die("Not implemented");
-      }
-
-      if ($DO_DUST || !-s $fullfname1) {
-        ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
-        system("dustmasker -infmt fasta -in '$download_dir/$fname' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$fullfname1'");
-        unlink("$download_dir/$fname");
-      }
-
-      ## Output sequenceID to taxonomy ID map
-      print_header_lines($fullfname1, $taxid, "$assembly_accession $organism_name");
-      end_fork();
+      push @fasta_files, "$download_dir/$fname";
     }
   }
 
+  ## if ($FILTER_UNPLACED) { die("Not implemented"); }
   wait_children();
+  foreach my $fasta_file (@fasta_files) {
+        if (-s $fasta_file) {
+          ++$downloaded_files;
+        } else {
+          ++$download_failed;
+        }
+  }
 
-  print STDERR "  downloaded $downloaded_files files, $existing_files already existed.\n";
+
+  if ($DO_DUST) {
+  foreach my $fasta_file (@fasta_files) {
+    ( my $fullfname1 = $fasta_file ) =~ s/.fna$/_dustmasked.fna/;
+    if (!$OVERWRITE_FILES && -s $fullfname1) {
+      print STDERR "$fullfname1 exists - not dusting.. \n" if $VERBOSE;
+    } else {
+      ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
+      my $pid = start_fork();
+      unless ($pid) {
+        system("dustmasker -infmt fasta -in '$fasta_file' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$fullfname1'");
+        unlink("$fasta_file");
+        end_fork();
+      }
+    }
+  }
+  wait_children();
+  }
+
+  my $msg  = "Found $downloaded_files files.";
+  $msg .= " Skipped download of $existing_files files that already existed." if $existing_files > 0;
+  $msg .= " $download_failed downloads failed - maybe try re-running krakenhll-download." if ($download_failed > 0);
+  print STDERR "  $msg\n";
 }

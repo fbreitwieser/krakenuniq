@@ -55,7 +55,7 @@ script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
-JELLYFISH_BIN=`$script_dir/krakenhll-check_for_jellyfish.sh`
+JELLYFISH_BIN=`$script_dir/check_for_jellyfish.sh`
 NCBI_SERVER="ftp.ncbi.nih.gov"
 FTP_SERVER="ftp://$NCBI_SERVER"
 
