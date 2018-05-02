@@ -65,34 +65,22 @@ my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
 
 my $USAGE="\n".basename($0).
-" [<options>] <database> <database>*
+" [<options>] <pattern> <pattern>*
 
-ARGUMENT
- <database>  Possible databases
-              'contaminants'    downloads contaminant sequences from UniVec and EmVec
-              'taxonomy'        downloads the NCBI taxonomy mappings
-              'genbank'         downloads GenBank genomes (see parameters -a and -d)
-              'refseq'          downloads RefSeq genomes (see parameters -a and -d)
-              'nucleotide'      specify --term to download nucleotide sequences retrieved from a NCBI search.
-              'viral-neighbors' downloads sequences listed as neighbors to RefSeq genomes in the NCBI viral genome resource.
-                                https://www.ncbi.nlm.nih.gov/genome/viruses/
-
-    for refseq and genbank, the assemblies can be filtered:
-              'refseq/DOMAIN'   downloads RefSeq genomes of DOMAIN (e.g. 'refseq/bacteria'). 
-                                possible values: @ALL_GENOMES.
-              'refseq/DOMAIN/ASS_LEVEL'
-                                specifiy assembly level (e.g. 'refseq/fungi/Chromosome' or 'refseq/viral/Any')
-              'refseq/DOMAIN/ASS_LEVEL/column1=value1(/column2=value2)*' 
-                                require specific column values in assembly_summary.txt.
-                                 e.g. 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download human assemblies
-                                   or 'genbank/bacteria/Any/species_taxid=9606' <- downloads Genbank assemblies not in RefSeq
-
-              
-  By default, 'refseq' and 'genbank' download the domains and assembly levels specied
-  with other parameters, however
-                   - refseq and genbank can be proceeded by '/DOMAIN' or '/DOMAIN/ASS_LEVEL', e.g.
-                     - refseq/archaea, refseq/viral/Any, or genbank/bacteria
-                     - if ASS_LEVEL is not given, the default is used
+ARGUMENTS
+ <pattern> can be one of
+     'contaminants'     Contaminant sequences from UniVec and EmVec.
+     'taxonomy'         NCBI taxonomy mappings from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
+     'nucleotide'       Download nucleotide sequences using a query specified using --term.
+     'viral-neighbors'  Download viral strain sequences from the NCBI Viral Genome Resource.
+     'genbank/DOMAIN'   Download all complete genomes for DOMAIN from GenBank.
+     'refseq/DOMAIN'    Download all complete genomes for DOMAIN from RefSeq.
+     'refseq/DOMAIN/ASS_LEVEL'
+     'refseq/DOMAIN/ASS_LEVEL/COLUMN=value1(/COLUMN=value2)*' 
+        Possible values for DOMAIN: @ALL_GENOMES.
+        Possible values for ASS_LEVEL: Any, Complete_Genome, Chromosome, Scaffold, Contig.
+        Possible values for COLUMN: Any column in the NCBI assembly_summary.txt, e.g. species_taxid or assembly_accession.
+        Example: 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download all human assemblies
 
 COMMON OPTIONS
  -o <directory>     Folder to which the files are downloaded. Default: '.'
