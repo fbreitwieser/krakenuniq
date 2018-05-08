@@ -52,9 +52,11 @@ GetOptions(
   "db=s" => \$db_prefix,
 );
 
+usage() if (scalar @ARGV == 0);
+
 eval { $db_prefix = krakenlib::find_db($db_prefix); };
 if ($@) {
-  die "$PROG: $@";
+  usage();
 }
 
 sub usage {
@@ -82,7 +84,7 @@ sub display_help {
 
 sub display_version {
   print "KrakenHLL version #####=VERSION=#####\n";
-  print "Copyright 2017, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
+  print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }
@@ -193,15 +195,16 @@ sub dfs_summation {
 
 sub load_taxonomy {
   my $prefix = shift;
-
+  print STDERR "Reading taxonomy ...";
   open(my $TAXDB, "<", "$prefix/taxDB") or die "Error opening $prefix/taxDB: $!";
   while (<$TAXDB>) {
     chomp;
     my ($taxID, $parentTaxID, $taxName, $taxRank) = split(/\t/);
     $name_map{$taxID} = $taxName;
-    push @{ $child_lists{$parentTaxID} }, $taxID;
+    push @{ $child_lists{$parentTaxID} }, $taxID unless $parentTaxID eq $taxID;
     $rank_map{$taxID} = $taxRank;
   }
   close($TAXDB);
+  print STDERR " done.\n";
 }
 # vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :

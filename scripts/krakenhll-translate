@@ -90,7 +90,7 @@ sub get_taxonomy_str {
   my $taxid = shift;
   if (! exists $known_taxonomy_strings{$taxid}) {
     my @nodes;
-    while ($taxid > 0) {
+    while (defined $parent_map{$taxid}) {
       if ($mpa_format) {
         my $rank_code = rank_code($rank_map{$taxid});
         my $name = $name_map{$taxid};
@@ -130,16 +130,17 @@ sub rank_code {
 
 sub load_taxonomy {
   my $prefix = shift;
-
+  print STDERR "Reading taxonomy ...";
   open(my $TAXDB, "<", "$prefix/taxDB") or die "Error opening $prefix/taxDB: $!";
   while (<$TAXDB>) {
     chomp;
     my ($taxID, $parentTaxID, $taxName, $taxRank) = split(/\t/);
     $name_map{$taxID} = $taxName;
-    $parent_map{$taxID} = $parentTaxID;
+    $parent_map{$taxID} = $parentTaxID unless $parentTaxID == $taxID;
     $rank_map{$taxID} = $taxRank;
   }
   close($TAXDB);
+  print STDERR " done.\n";
 }
 
 # vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :

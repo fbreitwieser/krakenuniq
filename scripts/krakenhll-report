@@ -72,8 +72,7 @@ OPTIONS:
   --taxon-list    Input files is list of taxon IDs instead of Kraken output.
   -h              This message.
   
-  For most use-cases, krakenhll --report-file is better than krakenhll-report, 
-  as it contains additional information on unique k-mer count and coverage. \n";
+This script should only be used when post-processing raw KrakenHLL output, and k-mer counts and coverages are not needed. For most use-cases, krakenhll --report-file is better than krakenhll-report. \n";
   my $default_db;
   eval { $default_db = krakenlib::find_db(); };
   if (defined $default_db) {
@@ -193,15 +192,16 @@ sub dfs_summation {
 
 sub load_taxonomy {
   my $prefix = shift;
-
+  print STDERR "Reading taxonomy ...";
   open(my $TAXDB, "<", "$prefix/taxDB") or die "Error opening $prefix/taxDB: $!";
   while (<$TAXDB>) {
     chomp;
     my ($taxID, $parentTaxID, $taxName, $taxRank) = split(/\t/);
     $name_map{$taxID} = $taxName;
-    push @{ $child_lists{$parentTaxID} }, $taxID;
+    push @{ $child_lists{$parentTaxID} }, $taxID unless $parentTaxID == $taxID;
     $rank_map{$taxID} = $taxRank;
   }
   close($TAXDB);
+  print STDERR " done.\n";
 }
 # vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :
