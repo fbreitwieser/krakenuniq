@@ -88,7 +88,7 @@ TAXONOMY_DIR="taxonomy/"
 
 if [ ! -s "library-files.txt" ]; then
     echo "Finding all library files"
-    find $FIND_OPTS $LIBRARY_DIR '(' -name '*.fna' -o -name '*.fa' -o -name '*.ffn' ')' > library-files.txt
+    find $FIND_OPTS $LIBRARY_DIR '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' ')' > library-files.txt
 fi
 
 file_sizes() {
