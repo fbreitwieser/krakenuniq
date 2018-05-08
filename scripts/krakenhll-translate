@@ -1,8 +1,9 @@
 #!/usr/bin/env perl
 
 # Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
+# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
 #
-# This file is part of the Kraken taxonomic sequence classification system.
+# This file is part of the KrakenHLL taxonomic sequence classification system.
 #
 # Kraken is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -126,33 +127,19 @@ sub rank_code {
   return "-";
 }
 
+
 sub load_taxonomy {
   my $prefix = shift;
 
-  open NAMES, "<", "$prefix/taxonomy/names.dmp"
-    or die "$PROG: can't open names file: $!\n";
-  while (<NAMES>) {
+  open(my $TAXDB, "<", "$prefix/taxDB") or die "Error opening $prefix/taxDB: $!";
+  while (<$TAXDB>) {
     chomp;
-    s/\t\|$//;
-    my @fields = split /\t\|\t/;
-    my ($node_id, $name, $type) = @fields[0,1,3];
-    if ($type eq "scientific name") {
-      $name_map{$node_id} = $name;
-    }
+    my ($taxID, $parentTaxID, $taxName, $taxRank) = split(/\t/);
+    $name_map{$taxID} = $taxName;
+    $parent_map{$taxID} = $parentTaxID;
+    $rank_map{$taxID} = $taxRank;
   }
-  close NAMES;
-
-  open NODES, "<", "$prefix/taxonomy/nodes.dmp"
-    or die "$PROG: can't open nodes file: $!\n";
-  while (<NODES>) {
-    chomp;
-    my @fields = split /\t\|\t/;
-    my ($node_id, $parent_id, $rank) = @fields[0,1,2];
-    if ($node_id == 1) {
-      $parent_id = 0;
-    }
-    $parent_map{$node_id} = $parent_id;
-    $rank_map{$node_id} = $rank;
-  }
-  close NODES;
+  close($TAXDB);
 }
+
+# vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :

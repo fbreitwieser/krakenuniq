@@ -1,8 +1,9 @@
 #!/usr/bin/env perl
 
 # Copyright 2013, Derrick Wood <dwood@cs.jhu.edu>
+# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
 #
-# This file is part of the Kraken taxonomic sequence classification system.
+# This file is part of the KrakenHLL taxonomic sequence classification system.
 #
 # Kraken is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -132,16 +133,12 @@ while (<>) {
 sub load_taxonomy {
   my $prefix = shift;
 
-  open NODES, "<", "$prefix/taxonomy/nodes.dmp"
-    or die "$PROG: can't open nodes file: $!\n";
-  while (<NODES>) {
+  open(my $TAXDB, "<", "$prefix/taxDB") or die "Error opening $prefix/taxDB: $!";
+  while (<$TAXDB>) {
     chomp;
-    my @fields = split /\t\|\t/;
-    my ($node_id, $parent_id) = @fields[0,1];
-    if ($node_id == 1) {
-      $parent_id = 0;
-    }
-    $parent_map{$node_id} = $parent_id;
+    my ($taxID, $parentTaxID, $taxName, $taxRank) = split(/\t/);
+    $parent_map{$taxID} = $parentTaxID;
   }
-  close NODES;
+  close($TAXDB);
 }
+# vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :
