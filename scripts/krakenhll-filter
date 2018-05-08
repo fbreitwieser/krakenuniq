@@ -1,8 +1,9 @@
 #!/usr/bin/env perl
 
 # Copyright 2013, Derrick Wood <dwood@cs.jhu.edu>
+# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
 #
-# This file is part of the Kraken taxonomic sequence classification system.
+# This file is part of the KrakenHLL taxonomic sequence classification system.
 #
 # Kraken is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,7 +49,7 @@ GetOptions(
 
 eval { $db_prefix = krakenlib::find_db($db_prefix); };
 if ($@) {
-  die "$PROG: $@";
+  usage();
 }
 
 if ($threshold < 0 || $threshold > 1) {
@@ -58,7 +59,10 @@ if ($threshold < 0 || $threshold > 1) {
 
 sub usage {
   my $exit_code = @_ ? shift : 64;
-  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] [--threshold NUM] <kraken output file(s)>\n";
+  print STDERR "Usage: $PROG [--db KRAKEN_DB_NAME] [--threshold NUM] <kraken output file(s)>
+
+Threshold must be between 0 and 1.
+";
   my $default_db;
   eval { $default_db = krakenlib::find_db(); };
   if (defined $default_db) {
@@ -73,7 +77,7 @@ sub display_help {
 
 sub display_version {
   print "KrakenHLL version #####=VERSION=#####\n";
-  print "Copyright 2017, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
+  print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }
@@ -106,7 +110,7 @@ while (<>) {
       if ($_ > 0) {
         $total_hits += $count;
         my $taxid = $_;
-        while ($taxid > 0) {
+        while (defined $parent_map{$taxid}) {
           $hit_sums{$taxid} += $count;
           $taxid = $parent_map{$taxid};
         }
@@ -117,7 +121,7 @@ while (<>) {
   my $pct = 0;
   # starting at called node, run up tree until threshold met
   my $new_taxon = $called_taxon;
-  while ($new_taxon > 0) {
+  while (defined $parent_map{$new_taxon}) {
     $pct = $hit_sums{$new_taxon} / $total_unambig;
     if ($pct >= $threshold - 1e-5) {  # epsilon check w/ float equality
       last;
@@ -131,17 +135,13 @@ while (<>) {
 
 sub load_taxonomy {
   my $prefix = shift;
-
-  open NODES, "<", "$prefix/taxonomy/nodes.dmp"
-    or die "$PROG: can't open nodes file: $!\n";
-  while (<NODES>) {
-    chomp;
-    my @fields = split /\t\|\t/;
-    my ($node_id, $parent_id) = @fields[0,1];
-    if ($node_id == 1) {
-      $parent_id = 0;
-    }
-    $parent_map{$node_id} = $parent_id;
+  print STDERR "Reading taxonomy ...";
+  open(my $TAXDB, "<", "$prefix/taxDB") or die "Error opening $prefix/taxDB: $!";
+  while (<$TAXDB>) {
+    my ($taxID, $parentTaxID) = split(/\t/);
+    $parent_map{$taxID} = $parentTaxID unless $parentTaxID == $taxID;
   }
-  close NODES;
+  close($TAXDB);
+  print STDERR " done.\n";
 }
+# vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :
