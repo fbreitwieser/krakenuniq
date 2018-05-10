@@ -186,7 +186,7 @@ LINE: while($line = readline $FQ) {
             }
         } else {
             ## output in FASTQ format
-            print $_;
+            print $line;
             for (my $i = 0; $i<3; $i++) {
                 $line = readline $FQ; 
                 print $line;
