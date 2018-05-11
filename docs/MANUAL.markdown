@@ -4,10 +4,11 @@ Introduction
 [KrakenHLL] is a taxonomic sequence classifier that assigns taxonomic labels to short DNA reads. It's based on [Kraken] ([Wood and Salzberg, Genome Biology 2014])
 extended with unique $k$-mer counting using the HyperLogLog algorithm for better precision, as well as a couple other additional features.
 
-KrakenHLL has in principle the same usage and system requirements as [Kraken], as defined in the [Kraken manual]. This manual thus descibes the additional features of KrakenHLL (unique k-mer counting, hierarchical classification, taxonomy extended to include nodes for ) and how to switch from [Kraken] to [KrakenHLL]. For visualization of [KrakenHLL] results, please consider [Pavian]. For a more detailed of the method please refer to the [KrakenHLL preprint]. Thank you!
+KrakenHLL has in principle the same usage and system requirements as Kraken, as defined in the [Kraken manual]. This manual thus descibes the additional features of KrakenHLL (unique k-mer counting, hierarchical classification, taxonomy extended to include nodes for ) and how to switch from Kraken to KrakenHLL. [Pavian] works great for visualizing and analyzing KrakenHLL results! For a more detailed of the method please refer to the [KrakenHLL preprint]. Thank you!
 
 [KrakenHLL]:                  http://ccb.jhu.edu/software/krakenhll/
 [KrakenHLL GitHub repository]:   https://github.com/fbreitwieser/krakenhll
+[Pavian]:   https://github.com/fbreitwieser/pavian
 [KrakenHLL preprint]:            https://www.biorxiv.org/content/early/2018/04/03/262956   
 [Kraken]:                     http://ccb.jhu.edu/software/kraken/
 [Wood and Salzberg, Genome Biology 2014]:               http://genomebiology.com/2014/15/3/R46
