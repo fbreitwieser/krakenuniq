@@ -70,3 +70,20 @@ KrakenHLL has a new taxonomy format based on code from k-SLAM (Ainsworth, et al.
 Taxonomy ID<tab>Parent Taxonomy ID<tab>Rank<tab>Scientific Name
 ```
 KrakenHLL reports all 27 ranks defined in the NCBI taxonomy, instead of just five abbreviated ranks in Kraken (‘D’ for superkingdom, ‘O’ for order, ‘P’ for phylum, ‘F’ for family, ‘G’ for genus, ‘S’ for species). For example, there are species groups and subgroups, subfamilies and varietas.
+
+References
+==========
+-Ainsworth, D., et al. k-SLAM: accurate and ultra-fast taxonomic classification and gene identification for large metagenomic data sets. Nucleic Acids Res. 2017;45(4):1649-1656.
+-Breitwieser, F.P. and Salzberg, S.L. Pavian: Interactive analysis of metagenomics data for microbiomics and pathogen identification. BioRxiv 2016.
+-Brister, J.R., et al. NCBI viral genomes resource. Nucleic Acids Res 2015;43(Database issue):D571-577.
+-Ertl, O. New Cardinality Estimation Methods for HyperLogLog Sketches. arXiv:1706.07290 2017.
+-Flajolet, P., et al. HyperLogLog: the analysis of a near-optimal cardinality estimation algorithm. In, AofA: Analysis of Algorithms. Juan les Pins, France: Discrete Mathematics and Theoretical Computer Science; 2007. p. 137-156.
+-Heule, S., Nunkesser, M. and Hall, A. HyperLogLog in practice. 2013:683.
+-Langmead, B. and Salzberg, S.L. Fast gapped-read alignment with Bowtie 2. Nat Methods 2012;9(4):357-359.
+-Li, H., et al. The Sequence Alignment/Map format and SAMtools. Bioinformatics 2009;25(16):2078-2079.
+-McIntyre, A.B.R., et al. Comprehensive benchmarking and ensemble approaches for metagenomic classifiers. Genome biology 2017;18(1).
+-Menzel, P., Ng, K.L. and Krogh, A. Fast and sensitive taxonomic classification for metagenomics with Kaiju. Nat. Commun. 2016;7:11257.
+-Salzberg, S.L., et al. Next-generation sequencing in neuropathologic diagnosis of infections of the nervous system. Neurology(R) neuroimmunology & neuroinflammation 2016;3(4):e251.
+-Whang, K.-Y., Vander-Zanden, B.T. and Taylor, H.M. A linear-time probabilistic counting algorithm for database applications. ACM Trans. Database Syst. 1990;15(2):208-229.
+
+
