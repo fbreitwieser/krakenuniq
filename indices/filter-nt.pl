@@ -101,7 +101,8 @@ while (<$TL>) {
   chomp;
   my ($taxid, $name) = split /\t/;
   if ($taxid == 0) {
-    $name =~ s/ ?#.*//;
+    $name =~ s/#.*$//;
+    $name =~ s/\s+$//;
     die "Got no taxIDs for name '$name'!" unless defined $name_map{$name};
     push @rejected_taxon_list, @{$name_map{$name}};
   } elsif ($taxid == abs($taxid)) {
