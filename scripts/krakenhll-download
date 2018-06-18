@@ -14,6 +14,7 @@ use IO::Uncompress::Gunzip qw/gunzip $GunzipError/;
 use autodie;
 use Term::ANSIColor;
 use Getopt::Long;
+use LWP::Simple;
 #use LWP::UserAgent;
 use List::Util qw/min/;
 use FindBin;
@@ -28,25 +29,26 @@ sub print_header_line_ac(@);
 sub download_domain(@);
 sub download_viral_neighbors(@);
 sub download_ncbi_search(@);
+sub download_ncbi_acs(@);
 sub get_sorted_maps(@);
 
 my $FTP="ftp://ftp.ncbi.nih.gov";
 my @ALL_GENOMES=qw/bacteria viral archaea fungi protozoa invertebrate plant vertebrate_mammalian vertebrate_other/;
 my %valid_domains = map { $_ => 1 } @ALL_GENOMES;
 my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
-my @ALL_ASSEMBLY_LEVELS=qw/Complete\ Genome Chromosome Scaffold Contig/;
+my @ALL_ASSEMBLY_LEVELS=qw/Complete_Genome Chromosome Scaffold Contig/;
 my @SMALL_GENOMES=qw/mitochondrion plasmid plastid/;
 
 ## Option parsing
 my $DATABASE="refseq";
-my $ASSEMBLY_LEVEL="Complete Genome";
+my $ASSEMBLY_LEVEL="Complete_Genome";
 my $REFSEQ_CATEGORY;
 my $TAXID;
 
 my $BASE_DIR;
 my $DB_DIR;
 my $N_PROC=5;
-my $MAP_DIV="nucl_gb";
+my $MAP_DIV;
 my $CHANGE_HEADER=0;
 my $RETMODE="text";
 my $RETTYPE="fasta";
@@ -60,12 +62,13 @@ my $OVERWRITE_FILES=0;
 my $DOMAINS;
 my $DL_MOD_RSYNC;
 my $n_children = 0;
-my $INCLUDE_VIRAL_NEIGHBORS = 0;
+my $NUC_AC;
 my %taxid_name_map;
 my @pids;
 
 my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
+my $vir_nbr_search_term = "viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and (complete[title]) not unverified[title])";
 
 my $USAGE="\n".basename($0).
 " [<options>] <pattern> <pattern>*
@@ -76,6 +79,7 @@ ARGUMENTS
      'taxonomy'         NCBI taxonomy mappings from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
      'nucleotide'       Download nucleotide sequences using a query specified using --term.
      'viral-neighbors'  Download viral strain sequences from the NCBI Viral Genome Resource.
+                        (Search: \"$vir_nbr_search_term\").
      'genbank/DOMAIN'   Download all complete genomes for DOMAIN from GenBank.
      'refseq/DOMAIN'    Download all complete genomes for DOMAIN from RefSeq.
      'refseq/DOMAIN/ASS_LEVEL'
@@ -93,15 +97,20 @@ COMMON OPTIONS
  --overwrite        Redownload and overwrite files with the same name.
  --verbose          Be verbose.
 
-WHEN USING DATABASE nucleotide:
- --term search_term    Download all sequences returned from a NCBI nucleotide search.
- --mappings divisions  Try mapping accession IDs using the mapping files for the specified divisions (comma-separated).
-                       Default: $MAP_DIV. Possible values: nucl_est, nucl_gb, nucl_gss, nucl_wgs.
+WHEN USING DATABASE nucleotide or viral-neighbors:
+ --search SEARCH_TERM  Download all sequences returned from a NCBI nucleotide search.
+                       When used with viral-neighbors, it subsets the viral genomes by the search.
+                       E.g. \"txid1570291[Organism]\" for Ebola virus sequences (taxonomy ID 1570291).
+ --ac AC1,AC2          Alternative to --search. Download specified ACs of nucleotide database.
+ --mapping-file MAP    Map accessions using the specified mapping file(s) (comma-separated).
+                       Possible values: nucl_est, nucl_gb, nucl_gss, nucl_wgs.
+                       For viral-neighbors, the default is nucl_gb. Unset by giving it an empty string.
                        Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
  --retmode RM          Specify return mode. Possible options: text (default), asn.1, xml.
  --rettype RT          Specify return type for download. Note that no mapping files are generated when
-                       rettype is specified. Possible options: fasta (default), gb, gbc, native, acc, seqid, ft, gbwithparts, fasta_cds_na, fasta_cds_aa. Note that only gb and fasta files are split, while the other formats stay in chunks.
-                       Downloaded from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/.
+                       rettype is specified. Possible options: fasta (default), gb, gbc, native, acc, seqid, ft, 
+                       gbwithparts, fasta_cds_na, fasta_cds_aa. Note that only gb and fasta files are split, while the other formats stay in chunks.
+                       The resulting files will have the rettype as extension.
 
 WHEN USING DATABASE refseq OR genbank:
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
@@ -109,7 +118,6 @@ WHEN USING DATABASE refseq OR genbank:
  -u                 Filter unplaced sequences.
  -l                 Modify sequence header to include taxonomy ID for Kraken (i.e. add '>kraken:taxid|TAXID' to each sequence).
  --dust, -D         Mask low-complexity regions using dustmasker.
- --include-viral-neighbors  Include viral neighbors. Deprecated. Add 'viral-neighbors' to the arguments, instead.
 ";
 
 # arguments: $OPTFIND (current index), $OPTARG (argument for option), $OPTERR (bash-specific)
@@ -124,10 +132,11 @@ GetOptions(
   "taxonomy-id|t=s" => \$TAXID,
   "fna=s" => \$FNA_FILES,
   "rsync|R" => \$DL_MOD_RSYNC,
-  "include-viral-neighbors" => \$INCLUDE_VIRAL_NEIGHBORS,
   "filter-unplaced|u" => \$FILTER_UNPLACED,
+  "search=s" => \$SEARCH_TERM,
   "term=s" => \$SEARCH_TERM,
-  "mappings=s" => \$MAP_DIV,
+  "ac=s" => \$NUC_AC,
+  "mapping-file=s" => \$MAP_DIV,
   "dust|D" => \$DO_DUST,
   "change-header|l" => \$CHANGE_HEADER,
   "rettype=s" => \$RETTYPE,
@@ -162,7 +171,7 @@ if (defined $TAXID) {
   %select_taxonomy_ids = map { $_ => 1 } split(/,/, $TAXID);
 }
 
-if (!defined $ARGV[0] && !$INCLUDE_VIRAL_NEIGHBORS) {
+if (!defined $ARGV[0]) {
   print STDERR $USAGE;
   exit 1;
 }
@@ -183,17 +192,32 @@ foreach my $DATABASE (@ARGV) {
           download_domain($db, $lib_dir, $domain, $assembly_level, @additional_filters);
       }
     }
-  } elsif ($DATABASE eq'viral-neighbors') {
+  } elsif ($DATABASE eq 'viral-neighbors') {
     my $nbr_lib_dir = $add_dir? "$BASE_DIR/library/viral/Neighbors" : "$BASE_DIR/viral/Neighbors";
-    download_viral_neighbors($nbr_lib_dir);
-  } elsif ($DATABASE eq 'nucleotide') {
-    if (!defined $SEARCH_TERM) {
-      print STDERR "Please define a search term with --term when using database nucleotide. \n".
-                   " E.g. --term 'srcdb_refseq[prop] plasmid[title] complete sequence[title] txid2[organism]'\n.";
+    my $addon_search_term = $SEARCH_TERM;
+    download_viral_neighbors($nbr_lib_dir, $addon_search_term);
+  } elsif ($DATABASE eq 'nucleotide' || $DATABASE eq 'assembly' || $DATABASE eq 'genome') {
+    my $ncbi_db = $DATABASE;
+    $ncbi_db = "nuccore" if $ncbi_db eq "nucleotide";
+    my $nbr_dir = $add_dir? "$BASE_DIR/library/$DATABASE/" : "$BASE_DIR/$DATABASE/";
+
+    if (!defined $NUC_AC && !defined $SEARCH_TERM) {
+      print STDERR "Please define a search term with --search when using database nucleotide, or provide ACs with --ac. \n".
+                   " E.g. --search 'srcdb_refseq[prop] plasmid[title] complete sequence[title] txid2[organism]'\n.";
       exit 1;
     }
-    my $nbr_dir = $add_dir? "$BASE_DIR/library/nucleotide/" : "$BASE_DIR/nucleotide/";
-    download_ncbi_search($nbr_dir, $SEARCH_TERM, get_sorted_maps(split /,/, $MAP_DIV));
+
+    if (defined $NUC_AC) {
+      if ($DATABASE eq 'assembly') {
+        download_ncbi_search($nbr_dir, $ncbi_db, $NUC_AC."[Assembly Accession]")
+      } else {
+        download_ncbi_acs($nbr_dir, $ncbi_db, $NUC_AC, get_sorted_maps($MAP_DIV));
+      }
+    } 
+    
+    if (defined $SEARCH_TERM) {
+      download_ncbi_search($nbr_dir, $ncbi_db, $SEARCH_TERM, get_sorted_maps($MAP_DIV));
+    }
   } else {
     print STDERR "Unknown database $DATABASE. \n";
     print STDERR $USAGE;
@@ -236,6 +260,8 @@ sub download(@) {
     if (!-d dirname($file)) {
       make_path(dirname($file));
     }
+    $url =~ s/\[/%5B/g;
+    $url =~ s/\]/%5D/g;
     #my $response = $ua->get($url, ':content_file' => $file);
     #if (!$response->is_success) {
     #  my $status_line = $response->status_line;
@@ -313,9 +339,118 @@ sub end_fork() {
   exit() unless $N_PROC <= 1;
 }
 
+sub link_to_taxonomy(@) {
+  my ($db1, $id_list) = @_;
+  my $db2 = 'taxonomy';     # &db
+  my $linkname = 'link_to_tax';
+
+  #assemble the esearch URL
+  my $base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+  my $url = $base . "esearch.fcgi?db=$db1&term=$id_list";
+
+  #post the esearch URL
+  print STDERR $url,"\n";
+  my $output = get($url);
+  print STDERR $output;
+
+  #parse WebEnv and QueryKey
+  my $web1 = $1 if ($output =~ /<WebEnv>(\S+)<\/WebEnv>/);
+  my $key1 = $1 if ($output =~ /<QueryKey>(\d+)<\/QueryKey>/);
+
+  #assemble the elink URL
+  $base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+  $url = $base . "elink.fcgi?dbfrom=$db1&db=$db2&query_key=$key1";
+  $url .= "&WebEnv=$web1&linkname=$linkname&cmd=neighbor_history";
+
+  #post the elink URL
+  print STDERR $url,"\n";
+  $output = get($url);
+  print STDERR $output;
+
+
+  #parse WebEnv and QueryKey
+  my $web2 = $1 if ($output =~ /<WebEnv>(\S+)<\/WebEnv>/);
+  my $key2 = $1 if ($output =~ /<QueryKey>(\d+)<\/QueryKey>/);
+
+  ### include this code for ESearch-ELink-ESummary
+  #assemble the esummary URL
+  $url = $base . "esummary.fcgi?db=$db2&query_key=$key2&WebEnv=$web2";
+
+  #post the esummary URL
+  print STDERR $url,"\n";
+  my $docsums = get($url);
+  print "$docsums";
+
+  ### include this code for ESearch-ELink-EFetch
+  #assemble the efetch URL
+  $url = $base . "efetch.fcgi?db=$db2&query_key=$key2&WebEnv=$web2";
+  $url .= "&rettype=xml&retmode=xml";
+  print STDERR $url,"\n";
+
+  #post the efetch URL
+  my $data = get($url);
+  print "$data";
+}
+
+sub get_taxid(@) {
+  my ($ncbi_database, $nbr_ac, @sorted_map_file_handles) = @_;
+  my $taxid;
+  foreach (@sorted_map_file_handles) {
+    my $tell = alphabetic(*$_, $nbr_ac);
+    next unless defined $tell;
+    $taxid = <$_>;
+    $taxid =~ s/.*\t//;
+    chomp $taxid;
+  }
+  
+  if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
+    link_to_taxonomy($ncbi_database, $nbr_ac);
+		exit 1;
+    #($taxid) = split /\t/, $res;
+  }
+  
+  if (!defined $taxid) {
+    print STDERR "\nNo taxid mapping for sequence $nbr_ac!\n";
+  }
+  return $taxid;
+}
+
+sub download_ncbi_acs(@) {
+  my ($nbr_dir, $ncbi_database, $acs, @sorted_map_files) = @_;
+  my @acs = split(/,/, $acs);
+
+  my @sorted_map_file_handles;
+  foreach (@sorted_map_files) {
+    open(my $FH, "<", $_) or die $!;
+    push @sorted_map_file_handles, $FH;
+  }
+
+  initialize_name_map();
+
+  my $efetch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$ncbi_database&rettype=$RETTYPE&id=";
+  print STDERR "Downloading ".scalar(@acs)." sequences into $nbr_dir.\n";
+  foreach my $ac (@acs) {
+    my $taxid = get_taxid($ncbi_database, $ac, @sorted_map_file_handles);
+    die "TaxID for $ac??" unless defined $taxid;
+    my $name = $taxid_name_map{$taxid};
+    die "Name for $ac??" unless defined $name;
+    (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
+    $name1 =~ s/__/_/g;
+    system("mkdir -p $nbr_dir/$name1-tax$taxid");
+    my $file = "$nbr_dir/$name1-tax$taxid/$ac.$RETTYPE";
+    download($efetch_url.$ac, $file);
+    print_header_line_ac($file, $ac, $taxid);
+  }
+  foreach (@sorted_map_file_handles) {
+    close $_;
+  }
+#  $pm->wait_all_children();
+}
+
 sub download_ncbi_search(@) {
-  my ($nbr_dir, $term, @sorted_map_files) = @_;
-  $term =~ s/ /+/g;
+  my ($nbr_dir, $ncbi_database, $search_term, @sorted_map_files) = @_;
+  return unless defined $search_term;
+  $search_term =~ s/ /+/g;
 
   my @sorted_map_file_handles;
   foreach (@sorted_map_files) {
@@ -326,7 +461,7 @@ sub download_ncbi_search(@) {
   initialize_name_map();
 
   my $esearch_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
-  my $complete_url="$esearch_url?db=$NCBIDB&usehistory=y&retmax=1&retmode=json&term=$term";
+  my $complete_url="$esearch_url?db=$ncbi_database&usehistory=y&retmax=1&retmode=json&term=$search_term";
   my $esearch_file = "$nbr_dir/esearch_res.json";
   download($complete_url, $esearch_file);
 
@@ -336,9 +471,17 @@ sub download_ncbi_search(@) {
   return if (!defined $n_res || $n_res eq 0);
 
   # Step 2: Download FASTAs (or other formats), 10k at a time
-  my $url_params=`cat $esearch_file | grep -e 'querykey' -e 'webenv' | sed -e 's/^ *"querykey": "/query_key=/' -e 's/^ *"webenv": "/webenv=/' -e 's/",//' | paste -sd\\&`;
-  chomp $url_params;
-  die "error getting sequences with url $complete_url" if (!defined $url_params || $url_params eq "");
+  my $querykey = `grep "querykey" $esearch_file`;
+  $querykey =~ /"querykey": "(.*)"/;
+  $querykey = $1;
+
+  my $webenv = `grep "webenv" $esearch_file`;
+  $webenv =~ /"webenv": "(.*)"/;
+  $webenv = $1;
+
+  my $url_params="query_key=$querykey&webenv=$webenv";
+  die "Error getting sequences with URL $complete_url . Check $esearch_file." if (!defined $url_params || $url_params eq "");
+  print STDERR $url_params."\n";
   my $retstart = 0;
   my $retmax = 10000;
   my @all_fas = ();
@@ -348,8 +491,8 @@ sub download_ncbi_search(@) {
     print STDERR "\r  Downloading sequences ".($retstart+1)." to $curr_retmax of $n_res ..." unless $VERBOSE;
 
     #start_fork() and next;
-    my $part_file = "$nbr_dir/${NCBIDB}-results_".($retstart+1)."-to-$curr_retmax.${RETTYPE}";
-    download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&$url_params&rettype=$RETTYPE&retmode=$RETMODE&retstart=$retstart&retmax=$curr_retmax", $part_file);
+    my $part_file = "$nbr_dir/${ncbi_database}-results_".($retstart+1)."-to-$curr_retmax.${RETTYPE}";
+    download("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$ncbi_database&$url_params&rettype=$RETTYPE&retmode=$RETMODE&retstart=$retstart&retmax=$curr_retmax", $part_file);
     my $is_fasta = $RETTYPE eq 'fasta';
     my $is_genbank = $RETTYPE eq 'gb';
 
@@ -380,7 +523,7 @@ sub download_ncbi_search(@) {
           }
   
           if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
-            my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$NCBIDB&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
+            my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$ncbi_database&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
             chomp $res;
             ($taxid) = split /\t/, $res;
           }
@@ -423,13 +566,16 @@ sub download_ncbi_search(@) {
 }
 
 sub get_sorted_maps(@) {
-  my (@parts) = @_;
+  my ($maps_definition) = @_;
+  return unless defined $maps_definition;
+  return if $maps_definition eq "";
   my @res;
   my $ac_col = 1;
   my $ac_w_version_col = 2;
   my $taxid_col = 3;
   my $dir = get_dir($BASE_DIR,"taxonomy");
-  foreach (@parts) {
+  foreach (split(/,/, $maps_definition)) {
+    next if $_ eq "";
     my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
     download($url, "$dir/$_.accession2taxid.gz", { verbose => 1 });
 
@@ -462,10 +608,12 @@ sub initialize_name_map() {
 }
 
 sub download_viral_neighbors(@) {
-  my ($nbr_dir) = @_;
+  my ($nbr_dir, $addon_search_term) = @_;
   print STDERR "Downloading viral neighbors.\n";
-  my $term="viruses[organism] not cellular organisms[orgn] not wgs[prop] not gbdiv syn[prop] and (nuccore genome samespecies[filter] and (complete[title]) not unverified[title])";
-  download_ncbi_search($nbr_dir, $term, get_sorted_maps("nucl_gb"));
+  my $search_term = $vir_nbr_search_term;
+  $search_term .= "+AND+$addon_search_term" if defined $addon_search_term;
+  my @maps = defined $MAP_DIV? get_sorted_maps($MAP_DIV) : get_sorted_maps("nucl_gb");
+  download_ncbi_search($nbr_dir, "nuccore", $search_term, @maps);
 }
 
 sub print_header_lines(@) {
