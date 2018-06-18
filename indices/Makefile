@@ -1,9 +1,10 @@
 
-all: nt
+all: nt-db
 
 THREADS=10
 DODUST=1
-nt: nt/database.kdb
+
+nt-db: nt/database.kdb
 
 .PHONY: all
 
@@ -11,7 +12,7 @@ mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 TAXONLIST=$(mkfile_path)/microbial-taxa-incl-helminths.tsv
 
 nt:
-	make -p nt
+	mkdir -p nt
 
 nt/nt.gz: nt
 	curl -o nt/nt.gz ftp://ftp.ncbi.nih.gov/blast/db/FASTA/nt.gz
@@ -42,9 +43,10 @@ nt/nt-microbial.fna: nt/taxonomy/nodes.dmp nt/taxonomy/names.dmp $(TAXONLIST) nt
 	mv nt/nt-microbial.fna.tmp nt/nt-microbial.fna
 
 ifeq ($(DODUST), 1)
-		DB_F=nt/library/nt-microbial.fna
+DB_F=nt/library/nt-microbial.fna
 else
-		DB_F=nt/library/nt-microbial-dustmasked.fna
+DB_F=nt/library/nt-microbial-dustmasked.fna
+endif
 
 nt/library/nt-microbial.fna: nt/nt-microbial.fna
 	cp -v nt/nt-microbial.fna nt/library/nt-microbial.fna
