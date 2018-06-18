@@ -80,7 +80,11 @@ if (defined $options{t}) {
 print STDERR "Getting all reads from $KRAKEN_FILE ".
             ($is_inverted ? "not matched to" : "matched to")." the following taxa: ",join(", ",(keys %taxon_id)),"\n";
 
-open($KRAKEN,"<",$KRAKEN_FILE) ||  die ("can't open file $KRAKEN_FILE.\n");
+if ($KRAKEN_FILE =~ /.gz$/) {
+	open($KRAKEN, "gunzip -c $KRAKEN_FILE |") ||  die ("can't open file $KRAKEN_FILE: $! \n");
+} else {
+	open($KRAKEN,"<",$KRAKEN_FILE) ||  die ("can't open file $KRAKEN_FILE.\n");
+}
 
 ## open fastq_files
 my ($FQ,$FQ_2);
