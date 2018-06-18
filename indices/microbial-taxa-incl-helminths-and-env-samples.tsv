@@ -4,6 +4,7 @@
 2	Bacteria
 2157	Archaea
 10239	Viruses
+12884	Viroids # Added
 33630	Alveolata
 554915	Amoebozoa
 5794	Apicomplexa
@@ -36,7 +37,6 @@
 589438	Telonemida
 137418	Trimastix
 1084709	Tsukubamonadidae
-6199	Cestoda (flatworms / tapeworms) # added eukaryotic parasites
-6179	Digenea (flatworms / flukes)    # added eukaryotic parasites
-6231	Nematoda (roundworms)           # added eukaryotic parasites
-0	environmental samples # remove environmental samples
+6199	Cestoda (Tapeworms)   # Added
+6178	Trematoda (Flukes)    # Added
+6231	Nematoda (Roundworms) # Added
