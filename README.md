@@ -55,6 +55,16 @@ brew install g++
 
 Currently, KrakenHLL build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenHLL, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenhll` with `krakenhll --jellyfish-bin /usr/bin/jellyfish1`.
 
+### Building a microbial nt database
+
+In the `indices` directory, we provide scripts and Makefile to build a database from the microbial part of nt. The resulting database will be over 200GB in size. You can adapt the taxon list (which is based on [Kaiju's](https://raw.githubusercontent.com/bioinformatics-centre/kaiju/master/util/taxonlist.tsv)) to your needs - we provide versions with all bacteria (`bacteria-taxa.tsv`), viruses (`viral-taxa.tsv`), all microbial taxa including fungi and protists with or without helmints (`microbial-taxa.tsv` and `microbial-taxa-incl-helminths.tsv`, resp.). Have a look in the files to see the filtered taxa.
+
+Command line:
+```
+make -f KRAKENHLL_DIR/indices/Makefile TAXONLIST=KRAKENHLL_DIR/indices/microbial-taxa-incl-helminths.tsv DUST=1 THREADS=10
+```
+
+
 ### Custom databases with NCBI taxonomy
 To build a custom database with the NCBI taxonomy, first download the taxonomy files with
 ```
