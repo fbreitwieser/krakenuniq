@@ -23,6 +23,7 @@ use File::SortedSeek qw/alphabetic/;
 
 sub download_taxonomy(@);
 sub download_contaminats(@);
+sub download_nt(@);
 sub download(@);
 sub print_header_lines(@);
 sub print_header_line_ac(@);
@@ -38,6 +39,8 @@ my %valid_domains = map { $_ => 1 } @ALL_GENOMES;
 my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
 my @ALL_ASSEMBLY_LEVELS=qw/Complete_Genome Chromosome Scaffold Contig/;
 my @SMALL_GENOMES=qw/mitochondrion plasmid plastid/;
+
+my $FILTER_NT_SCRIPT = "$FindBin::RealBin/krakenhll-filter_nt";
 
 ## Option parsing
 my $DATABASE="refseq";
@@ -63,8 +66,69 @@ my $DOMAINS;
 my $DL_MOD_RSYNC;
 my $n_children = 0;
 my $NUC_AC;
+my $EXCLUDE_ENVIRONMENTAL_TAXIDS = 0;
 my %taxid_name_map;
 my @pids;
+
+
+# Taxa list modified from https://raw.githubusercontent.com/bioinformatics-centre/kaiju/master/util/taxonlist.tsv
+my %taxa_lists = (
+  bacteria => [
+    2,    #	Bacteria
+  ],
+  archaea => [
+    2157  # Archaea
+  ], 
+  viral => [
+    10239, # Viruses
+    12884, # Viroids 
+  ],
+  fungi => [
+    4751, # Fungi
+  ],
+  protozoa => [
+    33630, # Alveolata - 'with cavities' / flattened alveoli under the membrane 
+    ## 5794, # Apicomplexa - parasitic alveolates w/ apicoplast plastid
+    ## 88547, # Syndiniales - dinoflagellates, found exclusively as endosymbionts
+    554915, # Amoebozoa - protists w/ pseudopods w/ wide range in size
+    ## 5758, # Entamoeba - internal amoebal parasites
+    554296, # Apusozoa - flagellate protists feeding on bacteria
+    1401294, # Breviatea - flagellate amoeboid protists w/o mitochondrion
+    193537, # Centroheliozoa - helizoical protists w/ stiff arms (axopodia) radiating from their pody
+    3041, # Chlorophyta - green algaea
+    28009, # Choanoflagellida - colonial flagellate protists
+    190322, # Collodictyonidae - aquatic protists w/ 2 to 4 terminal flagella
+    3027, # Cryptophyta - algae w/ plastids and two flagella
+    33682, # Euglenozoa - flagellate excavates
+    ## 5653, # Kinetoplastida - euglenzoa with a larged massed DNA organelled called kinetoplast
+    207245, # Fornicata - excavates
+    38254, # Glaucocystophyceae - freshwater algae
+    2830, # Haptophyta - algae
+    5752, # Heterolobosea - colorless non-photosynthetic excavates
+    556282, # Jakobida - excavaes
+    339960, # Katablepharidophyta - heterotrophic flagellates
+    136087, # Malawimonadidae
+    66288, # Oxymonadida - flagellated protozoa found exclusively in the intestines of termites and other wood-eating insects
+    759891, # Palpitomonas - marine biflagellate 
+    5719, # Parabasalia - group of flagellated protists in symbiotic and parasitic animal relationships
+    419944, # Picozoa - marine unicellular heterotrophic eukaryotes
+    543769, # Rhizaria - amoeboids with filose, reticulose, or microtubule-supported pseudopods
+    2763, # Rhodophyta - red algae
+    33634, # Stramenopiles -  algae, ranging from the giant multicellular kelp to the unicellular diatoms. Also including Phytophthora of Irish potato famine infamy and Pythium which causes seed rot and damping off
+    589438, # Telonemida - protist phylum with affinity to chromist lineages
+    137418, # Trimastix
+    1084709, # Tsukubamonadidae
+  ],
+  parasitic_worms => [
+    6199, # Cestoda (Tapeworms)
+    6178, # Trematoda (Flukes)
+    37945, # Monogenea
+    6231, # Nematoda (Roundworms)
+  ]
+);
+
+my @taxa_lists = sort keys %taxa_lists;
+my $TAXA_LIST = "bacteria,archaea,viral,fungi,protozoa";
 
 my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
@@ -78,6 +142,7 @@ ARGUMENTS
      'contaminants'     Contaminant sequences from UniVec and EmVec.
      'taxonomy'         NCBI taxonomy mappings from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
      'nucleotide'       Download nucleotide sequences using a query specified using --term.
+     'microbial-nt'     Download microbial sequences from nt database.
      'viral-neighbors'  Download viral strain sequences from the NCBI Viral Genome Resource.
                         (Search: \"$vir_nbr_search_term\").
      'genbank/DOMAIN'   Download all complete genomes for DOMAIN from GenBank.
@@ -96,6 +161,7 @@ COMMON OPTIONS
  --rsync, -R        Download using rsync.
  --overwrite        Redownload and overwrite files with the same name.
  --verbose          Be verbose.
+ --dust, -D         Mask low-complexity regions using dustmasker.
 
 WHEN USING DATABASE nucleotide or viral-neighbors:
  --search SEARCH_TERM  Download all sequences returned from a NCBI nucleotide search.
@@ -112,12 +178,17 @@ WHEN USING DATABASE nucleotide or viral-neighbors:
                        gbwithparts, fasta_cds_na, fasta_cds_aa. Note that only gb and fasta files are split, while the other formats stay in chunks.
                        The resulting files will have the rettype as extension.
 
+WHEN USING DATABASE nt:
+ --taxa TAXLIST     Provide list of taxa that are kept in the database. Comma separated, supply either taxIDs or
+                    one of the following division names: @taxa_lists
+                    Default: \"$TAXA_LIST\"
+ --exclude-environmental-taxa
+                    Exclude taxa that are named 'environmental samples'.
+
 WHEN USING DATABASE refseq OR genbank:
  --fna <seq types>  Comma-separated list of sequence types, including genomic, rna, rna_from_genomic, cds_from_genomic. Default: $FNA_FILES.
                     See the assembly project FTP site for available sequences
  -u                 Filter unplaced sequences.
- -l                 Modify sequence header to include taxonomy ID for Kraken (i.e. add '>kraken:taxid|TAXID' to each sequence).
- --dust, -D         Mask low-complexity regions using dustmasker.
 ";
 
 # arguments: $OPTFIND (current index), $OPTARG (argument for option), $OPTERR (bash-specific)
@@ -137,6 +208,8 @@ GetOptions(
   "term=s" => \$SEARCH_TERM,
   "ac=s" => \$NUC_AC,
   "mapping-file=s" => \$MAP_DIV,
+  "taxa=s" => \$TAXA_LIST,
+  "exclude-environmental-taxa" => \$EXCLUDE_ENVIRONMENTAL_TAXIDS,
   "dust|D" => \$DO_DUST,
   "change-header|l" => \$CHANGE_HEADER,
   "rettype=s" => \$RETTYPE,
@@ -161,8 +234,8 @@ my $add_dir = defined $DB_DIR;
 $BASE_DIR = $DB_DIR if defined $DB_DIR;
 sub get_dir {
   my ($dir, $name) = @_;
-  my $dir1 = $add_dir? "$dir/$name" : $dir;
-  make_path $dir1;
+  my $dir1 = $add_dir && defined $name? "$dir/$name" : $dir;
+  -d "$dir1/" || make_path $dir1;
   return $dir1;
 }
 
@@ -218,6 +291,10 @@ foreach my $DATABASE (@ARGV) {
     if (defined $SEARCH_TERM) {
       download_ncbi_search($nbr_dir, $ncbi_db, $SEARCH_TERM, get_sorted_maps($MAP_DIV));
     }
+  } elsif ($DATABASE eq 'nt') {
+    download_taxonomy(get_dir($BASE_DIR,"taxonomy"));
+    download_nt($BASE_DIR, get_dir($BASE_DIR,"taxonomy"), get_dir($BASE_DIR,"library"));
+
   } else {
     print STDERR "Unknown database $DATABASE. \n";
     print STDERR $USAGE;
@@ -241,16 +318,19 @@ sub download(@) {
   }
 
   if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-    print STDERR "$file ";
   }
 
-  if (!$OVERWRITE_FILES && (( defined $gunzipped_filename && -s $gunzipped_filename) || (!defined $gunzipped_filename && -s $file))) {
-    print STDERR "Not fetching $url - file $file exists.\n" if $VERBOSE;
+  if (!$OVERWRITE_FILES) {
+    my $res_file = defined $gunzipped_filename? $gunzipped_filename : $file;
+    if (-s $res_file) {
+      print STDERR "Not fetching $url - file $res_file exists.\n" if $VERBOSE;
       if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-      print colored("check\n", "green");
+        check_file($res_file);
+      }
+      return 1;
     }
-    return 1;
   }
+  print STDERR "$file ";
   if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
     print STDERR ": downloading ...";
   }
@@ -292,7 +372,9 @@ sub download(@) {
     }
     print STDERR " GUNZIPPING" if $VERBOSE;
     gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
-    unlink $file;
+    if (! defined $opts->{'dont-unlink-gz-file'}) {
+      unlink $file;
+    }
     $file = $gunzipped_filename;
   }
   if (-s $file || (defined $gunzipped_filename && -s $gunzipped_filename)) {
@@ -565,6 +647,17 @@ sub download_ncbi_search(@) {
 #  $pm->wait_all_children();
 }
 
+sub download_maps(@) {
+  my ($dir, @maps_def) = @_;
+  my @files;
+  foreach (@maps_def) {
+    my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
+    download($url, "$dir/$_.accession2taxid.gz", { verbose => 1 });
+    push @files, "$dir/$_.accession2taxid.gz";
+  }
+  return @files;
+}
+
 sub get_sorted_maps(@) {
   my ($maps_definition) = @_;
   return unless defined $maps_definition;
@@ -576,18 +669,67 @@ sub get_sorted_maps(@) {
   my $dir = get_dir($BASE_DIR,"taxonomy");
   foreach (split(/,/, $maps_definition)) {
     next if $_ eq "";
-    my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
-    download($url, "$dir/$_.accession2taxid.gz", { verbose => 1 });
+    download_maps($dir, $_);
 
     my $sorted_map_f = "$dir/$_.accession2taxid.sorted";
     if (!-s $sorted_map_f) {
-      print STDERR "Sorting mapping file (will take some time) ...\n";
       my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-      system("gunzip -c $dir/$_.accession2taxid.gz | cut -f $ac_col,$taxid_col | $sort_cmd -T $dir > $sorted_map_f") == 0 or die "Error sorting: $!";
+      system_l("Sorting maping file (will take some time)", "gunzip -c $dir/$_.accession2taxid.gz | cut -f $ac_col,$taxid_col > $sorted_map_f.tmp && $sort_cmd -T $dir $sorted_map_f.tmp > $sorted_map_f && rm $sorted_map_f.tmp");
     }
+    check_file("$dir/$_.accession2taxid.sorted");
     push @res, $sorted_map_f;
   }
   return @res;
+}
+
+sub human_size {
+  my $size = shift;
+  my @units = qw/B KB MB GB/;
+  my $i = 0;
+  foreach (; $i < scalar(@units); ++$i) {
+    last if $size < 1024;
+    $size /= 1024;
+  }
+  return sprintf("%.2f %s", $size, $units[$i]);
+}
+
+sub check_file {
+  my ($f) = @_;
+  printf STDERR "%-50s ", $f;
+  my $size = -s $f;
+  if ($size) {
+    print STDERR colored("check", "green"), " [", human_size($size), "]\n";
+    return 1;
+  } else {
+    print STDERR colored("N/A", "red"), "\n";
+    return 0;
+  }
+}
+
+sub elapsed_time {
+  my $t0 = shift;
+
+  my $elapsed = time - $t0;
+  my @elapsed;
+  my $m = int($elapsed / 60); $elapsed -= 60*$m;
+  my $h = int($m / 60); $m -= 60*$h;
+  my $d = int($h / 24); $h -= 24*$d;
+  my @res = "${elapsed}s";
+  push @res, "${m}m" if ($m > 0);
+  push @res, "${h}h" if ($h > 0);
+  push @res, "${d}d" if ($d > 0);
+  return join("",reverse @res);
+}
+
+sub system_l {
+  my ($msg, $cmd) = @_;
+  print STDERR $msg if defined $msg;
+  my $t0 = time;
+  print STDERR " [",colored($cmd, "yellow"),"] ...";
+  system($cmd) == 0 or die $?;
+
+
+  print STDERR " done (took ",(elapsed_time($t0)),")\n";
 }
 
 sub initialize_name_map() {
@@ -650,6 +792,198 @@ sub print_header_line_ac(@) {
   close($F);
 }
 
+sub download_nt(@) {
+  my ($BASE_DIR, $TAX_DIR, $LIB_DIR) = @_;
+	my $nt_loc = "ftp://ftp.ncbi.nih.gov/blast/db/FASTA/nt.gz";
+  download($nt_loc, "$BASE_DIR/nt.fna.gz", { gunzip => 1, verbose => 1, 'dont-unlink-gz-file' => 1 } );
+  my $nt_file = "$BASE_DIR/nt.fna";
+  my @tax_maps = download_maps($TAX_DIR, "nucl_gb", "nucl_wgs");
+
+  my ($ac_index_for_nt, $child_map, $env_taxIDs, $division_taxIDs, $taxid_to_acs);
+  my $do_filter = 0;
+  my %division_taxa;
+  my %all_taxa;
+
+  foreach my $division (split(/,/, $TAXA_LIST)) {
+    my $microbial_nt_file = "$LIB_DIR/nt-$division.fna";
+    my $dusted_file = "$LIB_DIR/nt-$division-dustmasked.fna";
+    if ((!$DO_DUST && !-s $microbial_nt_file) || ($DO_DUST && !-s $dusted_file)) {
+      if (!$do_filter) {
+        $ac_index_for_nt = get_nt_ac_index($nt_file);
+        $child_map = read_child_map("$TAX_DIR/nodes.dmp");
+        $env_taxIDs = get_environmental_samples_taxids("$TAX_DIR/names.dmp") if $EXCLUDE_ENVIRONMENTAL_TAXIDS;
+      }
+      $do_filter = 1;
+      my $accepted_taxa = get_accepted_taxa($division, $child_map, $env_taxIDs);
+      $division_taxa{$division} = $accepted_taxa;
+      $all_taxa{$_} = 1 foreach (keys %$accepted_taxa);
+    }
+  }
+  #print "\nALL_TAXA:\n"; foreach ((keys %all_taxa)[0..5]) { print "$_ => $all_taxa{$_}\n"; }; 
+  #print "\nNT_INDEX\n"; foreach ((keys %$ac_index_for_nt)[0..5]) { print "$_ => $ac_index_for_nt->{$_}\n"; }; 
+  #print "\nCHILD_MAP\n"; foreach ((keys %$child_map)[0..5]) { print "$_ => @{$child_map->{$_}}\n"; }; 
+  #print "\nENV_TAXIDs\n"; foreach ((keys %$env_taxIDs)[0..5]) { print "$_ => $env_taxIDs->{$_}\n"; }; 
+  #print STDERR "Got ",scalar(keys %all_taxa)," taxa.\n";
+  if ($do_filter) {
+    $taxid_to_acs = get_tax_mappings(\@tax_maps, \%all_taxa, $ac_index_for_nt);
+  }
+  #print "\nTAXID_TO_ACS\n"; foreach ((keys %$taxid_to_acs)[0..5]) { print "$_ => $taxid_to_acs->{$_}\n"; }; 
+
+  open (my $NT, "<", $nt_file) or die $!;
+  foreach my $division (split(/,/, $TAXA_LIST)) {
+    my $microbial_nt_file = "$LIB_DIR/nt-$division.fna";
+    my $dusted_file = "$LIB_DIR/nt-$division-dustmasked.fna";
+    if ((!$DO_DUST && !-s $microbial_nt_file) || ($DO_DUST && !-s $dusted_file)) {
+      write_filtered_nt($NT, $division_taxa{$division}, $taxid_to_acs, $ac_index_for_nt, $microbial_nt_file);
+
+    }
+    check_file($microbial_nt_file) if -s $microbial_nt_file;
+    if ($DO_DUST) {
+      if (!-s $dusted_file) {
+        my $cmd = "dustmasker -infmt fasta -in $microbial_nt_file -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > $dusted_file.tmp && mv $dusted_file.tmp $dusted_file && mv $microbial_nt_file $BASE_DIR";
+        system_l("Masking low-complexity sequences", $cmd);
+      }
+      check_file($dusted_file);
+    }
+  }
+  close $NT;
+}
+
+sub get_accepted_taxa {
+  my ($division, $child_map, $env_taxIDs) = @_;
+
+  my @taxIDs;
+  if ($division =~ /^taxID([0-9]*)$/) {
+    @taxIDs = ($1);
+  } elsif (defined $taxa_lists{$division})  {
+    @taxIDs = @{$taxa_lists{$division}};
+  } else {
+    die "Don't know nt division '$division'. Chose one of ".(join(" ", sort keys %taxa_lists))." or a specific taxID ('taxID12345')\n";
+  }
+  my %accepted_taxa;
+  foreach my $taxID (@taxIDs) {
+    $accepted_taxa{$_} = 1 foreach(get_descendants($child_map, $taxID, $env_taxIDs));
+  }
+  return \%accepted_taxa;
+}
+
+sub write_filtered_nt {
+  my ($NT, $accepted_taxa, $taxid_to_ac, $ac_to_pos, $new_nt) = @_;
+  open (my $NEWNT, ">", $new_nt) or die $!;
+  open (my $MAP_F, ">", "$new_nt.map") or die $!;
+
+  print STDERR "Writing $new_nt ... ";
+  my $t0 = time;
+  my $line;
+  foreach my $taxid (sort {$a <=> $b} keys %$accepted_taxa) {
+    foreach my $ac (@{$taxid_to_ac->{$taxid}}) {
+      seek($NT, $ac_to_pos->{$ac}, 0);
+      $line = <$NT>;
+      print $NEWNT $line;
+      print $MAP_F $ac,"\t",$taxid,"\n";
+      while ($line = <$NT>) {
+        last if ($line =~ /^>/);
+        print $NEWNT $line;
+      }
+    }
+  }
+  close $NEWNT;
+  close $MAP_F;
+  print STDERR "Done (took ",elapsed_time($t0),").\n";
+}
+
+sub read_child_map {
+  my $nodes_file = shift;
+  my %child_map;
+  -f $nodes_file or die "Nodes files $nodes_file is not a file";
+
+  print STDERR "Reading taxonomy tree from $nodes_file ... ";
+  my $t0 = time;
+  open(my $N, "<", $nodes_file) or die $!;
+  while (<$N>) {
+    my ($taxid, $parent_taxid) = split /\t\|\t/;
+    push @{$child_map{$parent_taxid}}, $taxid if $taxid ne $parent_taxid;
+    die "parent??" unless defined $parent_taxid;
+  }
+  close($N);
+  print STDERR "Got ",(scalar keys %child_map), " nodes (took ",elapsed_time($t0),").\n";
+  return \%child_map;
+}
+
+sub get_environmental_samples_taxids {
+  my $names_file = shift;
+  -f $names_file or die "Names files $names_file is not a file";
+  my %env_taxIDs;
+  print STDERR "Reading names from $names_file ... ";
+  my $t0 = time;
+  open(my $M, "<", $names_file) or die $!;
+  while (<$M>) {
+    next unless /scientific name\t|$/;
+    my ($taxID, $name) = split /\t\|\t/;
+    $env_taxIDs{$taxID} = 1 if $name eq "environmental samples";
+  }
+  close($M);
+  print STDERR "Done (took ",elapsed_time($t0),".\n";
+  return \%env_taxIDs;
+}
+
+sub get_nt_ac_index {
+  my ($nt_file) = @_;
+  my %ac_to_pos;
+  print STDERR "Reading headers from nt file ... ";
+  my $t0 = time;
+  open (my $NTG, "-|", "grep --byte-offset '^>' $nt_file");
+  while (my $line = <$NTG>) {
+    $line =~ /^([0-9]*):>([^ ]*)/;
+    # record the position of this AC
+    $ac_to_pos{$2} = $1;
+  }
+  print STDERR "Got ", scalar(keys %ac_to_pos), " ACs (took ",elapsed_time($t0),").\n";
+  return \%ac_to_pos;
+}
+
+sub get_descendants {
+  my ($child_map, $taxid, $env_taxIDs) = @_;
+  my @all_taxa = $taxid;
+  
+  if (defined $child_map->{$taxid}) {
+    foreach my $child_taxid (@{$child_map->{$taxid}}) {
+      next if defined $env_taxIDs && defined $env_taxIDs->{$child_taxid}; 
+      push @all_taxa, get_descendants($child_map, $child_taxid, $env_taxIDs);
+    }
+  }
+  return @all_taxa;
+}
+
+sub get_tax_mappings {
+  my ($ac_taxid_files, $accepted_taxa, $ac_to_pos) = @_;
+  my %taxid_to_acs;
+
+  foreach my $ac_taxid_file (@$ac_taxid_files) {
+    print STDERR "Reading AC to taxonomy ID mapping from $ac_taxid_file ... ";
+    my $t0 = time;
+    my $FP1;
+    if ($ac_taxid_file =~ /.gz$/) {
+      open($FP1, "-|", "gunzip -c '$ac_taxid_file'") or die $!;
+    } else {
+      open($FP1, "<", $ac_taxid_file) or die $!;
+    }
+
+    # format: accession <tab> accession.version <tab> taxid <tab> gi
+    # currently we look for a mapping with the version number
+    while ( <$FP1> ) {
+      my (undef, $ac, $taxid) = split;
+      next unless defined $taxid;
+      if (defined $accepted_taxa->{$taxid} && defined( $ac_to_pos->{ $ac } ) ) {
+        push @{ $taxid_to_acs{ $taxid } }, $ac;
+      }
+    }
+    close $FP1;
+    print STDERR "Done (took ", elapsed_time($t0),").\n";
+  }
+  print STDERR "Got mappings for ", scalar(keys %taxid_to_acs), " taxa.\n";
+  return (\%taxid_to_acs);
+}
 
 sub download_contaminats(@) {
   my ($CONTAMINANT_DIR) = @_;
@@ -697,12 +1031,16 @@ sub download_contaminats(@) {
 
 sub download_taxonomy(@) {
   my ($dir) = @_;
-  print STDERR "Downloading NCBI taxonomy ... \n";
-  make_path $dir;
+  -d $dir || make_path $dir;
 
-  download("$FTP/pub/taxonomy/taxdump.tar.gz", "$dir/taxdump.tar.gz");
-  system("tar -C $dir -zxvf $dir/taxdump.tar.gz nodes.dmp names.dmp 1>&2");
-  system("date > $dir/timestamp");
+  if (!-s "$dir/taxdump.tar.gz") {
+    download("$FTP/pub/taxonomy/taxdump.tar.gz", "$dir/taxdump.tar.gz");
+    system_l("Storing taxonomy timestamp", "date > $dir/timestamp");
+  }
+  system_l("Extracting nodes file","tar -C $dir -zxvf $dir/taxdump.tar.gz nodes.dmp 1>&2") unless -s "$dir/nodes.dmp";
+  check_file("$dir/nodes.dmp");
+  system_l("Extracting names file","tar -C $dir -zxvf $dir/taxdump.tar.gz names.dmp 1>&2") unless -s "$dir/names.dmp";
+  check_file("$dir/names.dmp");
 }
 
 sub download_domain(@) {
@@ -812,7 +1150,6 @@ sub download_domain(@) {
     
     $assembly_level =~ s/ /_/g;
     my $download_dir = "$domain_dir/$assembly_level";
-    my $nbr_download_dir = "$domain_dir/Neighbors";
     my @files;
     foreach my $ext (split(/,/, $FNA_FILES)) {
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
