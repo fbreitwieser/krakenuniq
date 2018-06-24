@@ -122,7 +122,8 @@ my %taxa_lists = (
   parasitic_worms => [
     6199, # Cestoda (Tapeworms)
     6178, # Trematoda (Flukes)
-    37945, # Monogenea
+    37945, # Monogenea 
+    10232, # Acanthocephala
     6231, # Nematoda (Roundworms)
   ]
 );
@@ -763,6 +764,7 @@ sub print_header_lines(@) {
   return if -s "$file.map";
   if (! -f $file) {
     print STDERR "ERROR: $file does not exist - should not happen!?\n";
+    return;
   }
   print STDERR "Writing mapping file for $file [$taxid, $name]\n" if $VERBOSE;
   $taxid = "$taxid\t$name" if defined $name;
@@ -875,8 +877,12 @@ sub write_filtered_nt {
   print STDERR "Writing $new_nt ... ";
   my $t0 = time;
   my $line;
+  my $n_taxa = 0;
+  my $n_acs = 0;
   foreach my $taxid (sort {$a <=> $b} keys %$accepted_taxa) {
+    ++$n_taxa;
     foreach my $ac (@{$taxid_to_ac->{$taxid}}) {
+      ++$n_acs;
       seek($NT, $ac_to_pos->{$ac}, 0);
       $line = <$NT>;
       print $NEWNT $line;
@@ -889,7 +895,7 @@ sub write_filtered_nt {
   }
   close $NEWNT;
   close $MAP_F;
-  print STDERR "Done (took ",elapsed_time($t0),").\n";
+  print STDERR "Done, wrote $n_acs sequences for $n_taxa taxa (took ",elapsed_time($t0),").\n";
 }
 
 sub read_child_map {
