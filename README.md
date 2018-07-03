@@ -61,7 +61,7 @@ KrakenHLL supports building databases on subsets of the NCBI nucleotide collecti
 
 Example command line:
 ```
-krakenhll-download --db DB --taxa "archaea,bacteria,viral,fungi,protozoa,helminths" --dust --exclude-environmental-taxa
+krakenhll-download --db DB --taxa "archaea,bacteria,viral,fungi,protozoa,helminths" --dust --exclude-environmental-taxa nt
 ```
 
 
