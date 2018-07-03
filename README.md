@@ -47,7 +47,7 @@ For usage, see `krakenhll --help`. Note that you can use the same database as Kr
  ### Installing KrakenHLL on MacOS
 OSX by default links `g++` to `clang` without OpenMP support. You can install `g++` with HomeBrew and use the `-c` option of `krakenhll_install.sh` to specify the HomeBrew `g++`: 
 ``` 
-brew install g++
+brew install gcc
 ./install_krakenhll -c g++-7
 ```
 
