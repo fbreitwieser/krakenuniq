@@ -74,7 +74,7 @@ Then you can add the desired sequence files to the `DBDIR/library` directory:
 ```
 cp SEQ1.fa SEQ2.fa DBDIR/library
 ```
-KrakenHLL needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mapping can be provided in the `DBDIR/library/seqid2taxid.map`. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
+KrakenHLL needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mappings can be provided in the `DBDIR/library/*.map` - KrakenHLL pools all `.map` files inside of the `library/` folder prior to database building. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
 ```
 Strain1_Chr1_Seq     <tab> 562 <tab> E. Coli Strain Foo
 Strain1_Chr2_Seq     <tab> 562 <tab> E. Coli Strain Foo
