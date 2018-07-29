@@ -368,7 +368,9 @@ sub download_ncbi_search(@) {
 
         my $name = $taxid_name_map{$taxid};
         if (!defined $taxid || !defined $name) {
-          print STDERR "\nNo mapping for viral neighbor $nbr_ac!\n";
+          print STDERR "\nNo mapping for sequence $nbr_ac - not writing it to it's own file!\n";
+          close $FA_HANDLE if $fa_handle_open;
+	  $fa_handle_open = 0;
           next;
         }
         (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
@@ -383,9 +385,10 @@ sub download_ncbi_search(@) {
         open($FA_HANDLE, ">", $file) or die "Couln't open file";
         print_header_line_ac($file, $nbr_ac, $taxid);
       }
-      print $FA_HANDLE $line;
+      print $FA_HANDLE $line if $fa_handle_open;
       #end_fork();
     }
+    close ($FA_HANDLE) if $fa_handle_open;
     close($F);
     $retstart += $curr_retmax;
   }
