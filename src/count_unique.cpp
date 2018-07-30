@@ -99,7 +99,7 @@ void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool show_rel
 
 
 void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr, bool test_mode, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) {
-  hll.add(nr);
+  hll.insert(nr);
   ++ctr;
   if (test_mode) {
     // prints numbers at powers of 10 and 10 points in-between

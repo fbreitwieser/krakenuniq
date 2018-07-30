@@ -1120,7 +1120,7 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
   const auto r_it = _taxCounts.find(tax.taxonomyID);
   const bool has_tax_data = r_it != _taxCounts.end();
 
-  long long unique_kmers_for_clade = rc.kmers.cardinality();
+  const uint64_t unique_kmers_for_clade = rc.uniqueKmerCount();
   double genome_size = double(tax.genomeSize+tax.genomeSizeOfChildren);
 
   for (size_t i = 0; i< _report_cols.size(); ++i) {
@@ -1130,15 +1130,15 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
       case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
       case REPORTCOLS::TAX_ID:            _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
       case REPORTCOLS::DEPTH:             _reportOfb << depth; break;
-      case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*reads(rc)/_total_n_reads; break;
+      case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*rc.readCount()/_total_n_reads; break;
            //case REPORTCOLS::ABUNDANCE:      _reportOfb << 100*counts.abundance[0]; break;
            //case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
       case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_data? reads(r_it->second) : 0); break;
-      case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << reads(rc); break;
-      case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_data? r_it->second.kmers.cardinality() : 0); break;
+      case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << rc.readCount(); break;
+      case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_data? r_it->second.kmerCount() : 0); break;
       case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << unique_kmers_for_clade; break;
-      case REPORTCOLS::NUM_KMERS:        _reportOfb << (has_tax_data? r_it->second.kmers.nObserved() : 0); break;
-      case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << rc.kmers.nObserved(); break;
+      case REPORTCOLS::NUM_KMERS:        _reportOfb << (has_tax_data? r_it->second.kmerCount() : 0); break;
+      case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << rc.kmerCount(); break;
       case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
       case REPORTCOLS::CLADE_KMER_COVERAGE: 
                 if (genome_size == 0) { 
@@ -1146,7 +1146,7 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
                 } else {
             _reportOfb << setprecision(4) << (unique_kmers_for_clade  / genome_size); 
                 }; break;
-      case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(rc.kmers.nObserved()) / unique_kmers_for_clade ); break;
+      case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(rc.kmerCount()) / unique_kmers_for_clade ); break;
       case REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
                 //case REPORTCOLS::GENOME_SIZE: ; break;
                 //case REPORTCOLS::NUM_WEIGHTED_READS: ; break;

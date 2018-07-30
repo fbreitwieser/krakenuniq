@@ -88,8 +88,8 @@ public:
   void reset(); // Note: sets sparse=true
 
   // Add items or other HLL to this sketch
-  void add(uint64_t item);
-  void add(vector<uint64_t> items);
+  void insert(uint64_t item);
+  void insert(const vector<uint64_t>& items);
 
   // Merge another sketch into this one
   // TODO: assumes equal bit_mixers! but does not check that
