@@ -35,8 +35,8 @@ Example:
 
 my %options=(
     i=>0,
-	a=>0,
-	f=>0
+    a=>0,
+    f=>0
 );
 getopts("fviapt:", \%options) || die $usage;
 my $is_paired = $options{p};
@@ -57,7 +57,9 @@ sub get_children {
   return @children;
 }
 
-my %taxon_id = map {$_ => 0} split(/,/,$ARGV[0]);
+my ($TAXIDS, $KRAKEN_FILE, $FQ_FILE) = @ARGV;
+
+my %taxon_id = map {$_ => 0} split(/,/,$TAXIDS);
 if (defined $options{t}) {
   print STDERR "Reading $options{t} to get children ... ";
   open(my $TAXDB, "<", $options{t});
@@ -75,26 +77,30 @@ if (defined $options{t}) {
   print STDERR "found $n_children children in total. \n";
 }
 
-print STDERR "Getting all reads ".
-            ($is_inverted ? "not matched to" : "matched to")." the following taxon: ",join(", ",(keys %taxon_id)),"\n";
+print STDERR "Getting all reads from $KRAKEN_FILE ".
+            ($is_inverted ? "not matched to" : "matched to")." the following taxa: ",join(", ",(keys %taxon_id)),"\n";
 
-open($KRAKEN,"<",$ARGV[1]) ||  die ("can't open file $ARGV[1].\n");
+if ($KRAKEN_FILE =~ /.gz$/) {
+	open($KRAKEN, "gunzip -c $KRAKEN_FILE |") ||  die ("can't open file $KRAKEN_FILE: $! \n");
+} else {
+	open($KRAKEN,"<",$KRAKEN_FILE) ||  die ("can't open file $KRAKEN_FILE.\n");
+}
 
 ## open fastq_files
 my ($FQ,$FQ_2);
-if ($ARGV[2] =~ /.gz$/) {
+if ($FQ_FILE =~ /.gz$/) {
     if ($is_paired) {
-        open $FQ, "gunzip -c ".get_p($ARGV[2],1)." |" or die $!;
-        open $FQ_2, "gunzip -c ".get_p($ARGV[2],2)." |" or die $!;
+        open $FQ, "gunzip -c ".get_p($FQ_FILE,1)." |" or die $!;
+        open $FQ_2, "gunzip -c ".get_p($FQ_FILE,2)." |" or die $!;
     } else {
-        open $FQ, "gunzip -c $ARGV[2] |" or die $!;
+        open $FQ, "gunzip -c $FQ_FILE |" or die $!;
     }
 } else {
     if ($is_paired) {
-        open $FQ, '<', get_p($ARGV[2],1) or die $!;
-        open $FQ_2, '<', get_p($ARGV[2],2) or die $!;
+        open $FQ, '<', get_p($FQ_FILE,1) or die $!;
+        open $FQ_2, '<', get_p($FQ_FILE,2) or die $!;
     } else {
-        open $FQ, '<', $ARGV[2] or die $!;
+        open $FQ, '<', $FQ_FILE or die $!;
     }
 }
 
@@ -114,8 +120,8 @@ while (<$KRAKEN>) {
 }
 
 my $sum_reads = 0;
-for my $taxon (keys %taxon_id) {
-    printf STDERR "  Got %5s reads for %s\n",$taxon_id{$taxon},$taxon;
+for my $taxon (sort { $a <=> $b } keys %taxon_id) {
+    printf STDERR "  Found %5s reads for %s\n",$taxon_id{$taxon},$taxon;
     $sum_reads += $taxon_id{$taxon};
 }
 exit(0) if $sum_reads==0;
@@ -124,93 +130,93 @@ $options{f} = 1 if ($options{a});
 
 my $cnt=0;
 $\ = undef ;
-print STDERR "Going through FA/FQ file to get reads";
+print STDERR "Extracting $sum_reads ".($options{a}? "sequences from FASTA":"reads from FASTQ")." file $FQ_FILE ... \n";
 my $previous;
 
 my $start_symbol = $options{a}? '>' : '@';
 
 my $line;
-while(<$FQ>) {
+LINE: while($line = readline $FQ) {
 
-    next unless (/^$start_symbol/);   # if not at first line of fastq entry
-    my ($id, $other) = split(" ");
+    next unless ( $line =~ /^$start_symbol/);   # if not at first line of fastq entry
+    my ($id, $other) = split(" ", $line);
 
     $id =~ s/^$start_symbol//; # get rid of ">" character
     $id =~ s/ .*//;            # remove everything after the space
     if ($is_paired) {
         # remove pair-specific part of read IDs (if present)
-		#$id =~ s#[/\.][12]$##;  # || die "$id??";
+        #$id =~ s#[/\.][12]$##;  # || die "$id??";
     }
     $id =~ s#[/\.][12]$##;  # always remove [12] ends
-	#$id =~ s#/[12]$##; ## paired read ends
+    #$id =~ s#/[12]$##; ## paired read ends
 
     my $print_this_read = defined $print_it{$id};
     $print_this_read = !$print_this_read if $is_inverted;
 
     if ($print_this_read) { # print all 4 lines
+        ++$cnt;
+        if ($cnt % 100 eq 0) {
+            printf STDERR "\rNumber of extracted reads: %10s",$cnt; 
+            $|++;
+        }
         if ($options{f}) {
             ## output in FASTA format
             #print ">",$id," matches ",$print_it{$id},"\n";
             print ">",$id,"\n";
-            print <$FQ>;
+            $line = readline $FQ;
+            print $line;
  
             if ($options{a}) {
-			  if ($is_paired) {
-					  die "options a,f and p cannot be used at the same time";
-			  }
-			  my $next;
-              while ($next = <$FQ> && !$next =~ /^>/ ) {
-                print $next;
+              if ($is_paired) {
+                      die "options a,f and p cannot be used at the same time";
               }
-              $_ = $next;
-              redo; # redo the with $_ set to $next
+              while ($line = readline $FQ) {
+                ## Go through multi-line FASTA
+                redo LINE if ($line =~ /^>/ );  ## re-evaluate headers
+                print $line;
+              }
             } else {
-			  # FASTQ file - skip qualities and mapping info
-              <$FQ>;
-              <$FQ>;
-			  if ($is_paired) {
-				<$FQ_2>;
-            	print ">",$id,"\n";
-				$line = <$FQ_2>;
-				print $line;
-				<$FQ_2>;
-				<$FQ_2>;
-			  }
+              # FASTQ file - skip qualities and mapping info
+              readline $FQ;
+              readline $FQ;
+              if ($is_paired) {
+                readline $FQ_2;
+                print ">",$id,"\n";
+                $line = readline $FQ_2;
+                print $line;
+                readline $FQ_2;
+                readline $FQ_2;
+              }
             }
         } else {
             ## output in FASTQ format
-            print $_;
+            print $line;
             for (my $i = 0; $i<3; $i++) {
-				$line = <$FQ>; 
-				print $line;
+                $line = readline $FQ; 
+                print $line;
             }
             if ($is_paired) {
                 for (my $i = 0; $i<4; $i++) {
-					$line = <$FQ_2>;
-					print $line;
+                    $line = readline $FQ_2;
+                    print $line;
                 }
             }
         }
 
-        ++$cnt;
-        if ($cnt % 100 eq 0) {
-            printf STDERR "\rnumber of extracted reads: %10s",$cnt; 
-            $|++;
-        }
         last if $cnt >= $sum_reads;
     } else {
         if (!$options{a}) {
             # skip next 3 fastq lines
-            for (my $i = 0; $i<3; $i++) { <$FQ>; }
+            for (my $i = 0; $i<3; $i++) { readline $FQ; }
             # skip next 4 fastq lines in mate-pair (when paired) - header was not read
             if ($is_paired) { 
-                for (my $i = 0; $i<4; $i++) { <$FQ_2>; } 
+                for (my $i = 0; $i<4; $i++) { readline $FQ_2; } 
             }
 
         }
     }
 }
-printf STDERR "\rnumber of extracted reads: %10s",$cnt; 
+printf STDERR "\rNumber of extracted reads: %10s",$cnt; 
 print STDERR "\n\n";
 
 close $KRAKEN;

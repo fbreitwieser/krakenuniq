@@ -88,6 +88,7 @@ echo make -C $DIR/src $MAKE_CLEAN install $MAKE_ARGS
 make -C $DIR/src $MAKE_CLEAN  install $MAKE_ARGS || { echo "Error building KrakenHLL. See $(basename $0) -h for options." >&2; exit 1; }
 for file in $DIR/scripts/*
 do
+  [[ -f $file ]] || continue;
   perl -pl -e 'BEGIN { while (@ARGV) { $_ = shift; ($k,$v) = split /=/, $_, 2; $H{$k} = $v } }'\
            -e 's/#####=(\w+)=#####/$H{$1}/g' \
            "KRAKEN_DIR=$KRAKEN_DIR" "VERSION=$VERSION" \
@@ -97,6 +98,8 @@ do
     chmod +x "$KRAKEN_DIR/$(basename $file)"
   fi
 done
+mkdir -p $KRAKEN_DIR/File
+cp -r $DIR/scripts/File/* $KRAKEN_DIR/File
 
 echo -n "
 Kraken installation complete.

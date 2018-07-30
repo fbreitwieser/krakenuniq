@@ -47,13 +47,23 @@ For usage, see `krakenhll --help`. Note that you can use the same database as Kr
  ### Installing KrakenHLL on MacOS
 OSX by default links `g++` to `clang` without OpenMP support. You can install `g++` with HomeBrew and use the `-c` option of `krakenhll_install.sh` to specify the HomeBrew `g++`: 
 ``` 
-brew install g++
-./install_krakenhll -c g++-7
+brew install gcc
+./install_krakenhll -c g++-8
 ```
 
 ### Installing Jellfish v1.1.11
 
 Currently, KrakenHLL build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenHLL, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenhll` with `krakenhll --jellyfish-bin /usr/bin/jellyfish1`.
+
+### Building a microbial nt database
+
+KrakenHLL supports building databases on subsets of the NCBI nucleotide collection nr/nt, which is most prominently the standard database for BLASTn. On the command line, you can specify to extract all bacterial, viral, archaeal, protozoan, fungal and helminth sequences. The list of protozoan taxa is based on [Kaiju's](https://raw.githubusercontent.com/bioinformatics-centre/kaiju/master/util/taxonlist.tsv).
+
+Example command line:
+```
+krakenhll-download --db DB --taxa "archaea,bacteria,viral,fungi,protozoa,helminths" --dust --exclude-environmental-taxa nt
+```
+
 
 ### Custom databases with NCBI taxonomy
 To build a custom database with the NCBI taxonomy, first download the taxonomy files with
@@ -64,7 +74,7 @@ Then you can add the desired sequence files to the `DBDIR/library` directory:
 ```
 cp SEQ1.fa SEQ2.fa DBDIR/library
 ```
-KrakenHLL needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mapping can be provided in the `DBDIR/library/seqid2taxid.map`. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
+KrakenHLL needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mappings can be provided in the `DBDIR/library/*.map` - KrakenHLL pools all `.map` files inside of the `library/` folder prior to database building. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
 ```
 Strain1_Chr1_Seq     <tab> 562 <tab> E. Coli Strain Foo
 Strain1_Chr2_Seq     <tab> 562 <tab> E. Coli Strain Foo
