@@ -41,6 +41,7 @@ $ENV{"KRAKEN_DIR"} = $KRAKEN_DIR;
 $ENV{"PATH"} = "$KRAKEN_DIR:$ENV{PATH}";
 
 my $CLASSIFY = "$KRAKEN_DIR/classify";
+my $CLASSIFY_EXACT = "$KRAKEN_DIR/classifyExact";
 my $CREATE_TAXDB = "$KRAKEN_DIR/build_taxdb";
 my $READ_MERGER = "$KRAKEN_DIR/read_merger.pl";
 my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
@@ -65,6 +66,7 @@ my $report_file;
 my $print_sequence = 0;
 my $uid_mapping = 0;
 my $hll_precision = 12;
+my $use_exact_counting = 0;
 
 GetOptions(
   "help" => \&display_help,
@@ -82,7 +84,8 @@ GetOptions(
   "report-file=s" => \$report_file,
   "preload" => \$preload,
   "paired" => \$paired,
-  "precision=i", \$hll_precision,
+  "hll-precision=i", \$hll_precision,
+  "exact-cardinality", \$use_exact_counting,
   "check-names" => \$check_names,
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2,
@@ -256,8 +259,9 @@ if (@pipe_argv) {
   }
 }
 
-print STDERR "$CLASSIFY @flags @ARGV\n";
-exec $CLASSIFY, @flags, @ARGV;
+my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
+print STDERR "$cmd @flags @ARGV\n";
+exec $cmd, @flags, @ARGV;
 die "$PROG: exec error: $!\n";
 
 sub usage {
@@ -275,7 +279,8 @@ Options:
   --fastq-input           Input is FASTQ format
   --gzip-compressed       Input is gzip compressed
   --bzip2-compressed      Input is bzip2 compressed
-  --precision INT         Precision for unique k-mer counting, between 10 and 18 (default: $hll_precision)
+  --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: $hll_precision)
+  --exact-cardinality     Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
   --quick                 Quick operation (use first hit or hits)
   --min-hits NUM          In quick op., number of hits req'd for classification
                           NOTE: this is ignored if --quick is not specified

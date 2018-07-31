@@ -18,16 +18,15 @@
  */
 
 #include "hyperloglogplus.hpp"
+#include "khset64.h"
 #include <iostream>
 #include <fstream>
 #include <random>
 #include <limits>
-
- #include <ctype.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 
 using namespace std;
 
@@ -44,7 +43,8 @@ int usage(int exit_code) {
 "  -t             Test mode - print cardinalities regularily\n"
 "  -y             Show relative error along with cardinality estimates\n"
 "  -e             Use improved cardinality estimator by Otmar Ertl, too\n"
-"  -E             Use exact cardinality counting (implemented w/ unordered_set, not working w/ test mode)\n ";
+"  -U             Use exact cardinality counting implemented w/ unordered_set (not working w/ test mode)\n"
+"  -K             Use exact cardinality counting implemented w/ khash (not working w/ test mode)\n";
     return exit_code;
   }
 
@@ -120,7 +120,8 @@ int main(int argc, char **argv) {
   bool test_mode = false;
   bool heule_too = true;
   bool ertl_too = false;
-  bool exact_counting = false;
+  bool exact_counting_unordered_set = false;
+  bool exact_counting_khash = false;
   bool flajolet_too = false;
   bool show_rel_error = false;
   bool use_stdin = true;
@@ -129,12 +130,13 @@ int main(int argc, char **argv) {
 
   int c;
 
-  while ((c = getopt (argc, argv, "shtep:r:yx:fE")) != -1)
+  while ((c = getopt (argc, argv, "shtep:r:yx:fUK")) != -1)
     switch (c) {
       case 's': sparse = true; break;
       case 't': test_mode = true; break;
       case 'e': ertl_too = true; break;
-      case 'E': exact_counting = true; break;
+      case 'U': exact_counting_unordered_set = true; break;
+      case 'K': exact_counting_khash = true; break;
       case 'f': flajolet_too = true; break;
       case 'y': show_rel_error = true; break;
       case 'p': p = stoi(optarg); break;
@@ -157,6 +159,7 @@ int main(int argc, char **argv) {
         abort ();
       }
 
+  bool exact_counting = exact_counting_khash || exact_counting_unordered_set;
   HyperLogLogPlusMinus<uint64_t> hll(p, sparse); // unique k-mer count per taxon
   //HyperLogLogPlusMinus<uint64_t> hll(p, sparse, wang_mixer); // unique k-mer count per taxon
 
@@ -181,20 +184,26 @@ int main(int argc, char **argv) {
     cout << '\n';
   } 
   uint64_t ctr = 0;
+  
   unordered_set<uint64_t> exact_counter;
+  khset64_t exact_counter_khash;
 
   if (use_stdin) {
     uint64_t nr;
     while (cin >> nr) {
-      if (exact_counting) {
-	exact_counter.insert(nr);
+      if (exact_counting_unordered_set) {
+	      exact_counter.insert(nr);
+      } else if (exact_counter_khash) {
+        exact_counter_khash.insert(nr);
       } else {
         add_to_hll(hll, nr, ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
       }
     }
     if (!test_mode) {
-      if (exact_counting) {
+      if (exact_counting_unordered_set) {
         cout << exact_counter.size() << "\n";
+      } else if (exact_counter_khash) {
+        cout << exact_counter_khash.size() << "\n";
       } else {
         print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
       }
@@ -210,15 +219,19 @@ int main(int argc, char **argv) {
     for (size_t j = 0; j < n_redo; ++j) {
 
       for(size_t i = 0; i < n_rand; i++) {
-        if (exact_counting) {
-	  exact_counter.insert(distr(rng));
+        if (exact_counting_unordered_set) {
+	        exact_counter.insert(distr(rng));
+        } else if (exact_counting_khash) {
+          exact_counter_khash.insert(distr(rng));
         } else {
           add_to_hll(hll, distr(rng), ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
 	}
       }
       if (!test_mode) {
-        if (exact_counting) {
+        if (exact_counting_unordered_set) {
           cout << exact_counter.size() << "\n";
+        } else if (exact_counting_khash) {
+          cout << exact_counter_khash.size() << "\n";
         } else {
           print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
         }

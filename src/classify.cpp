@@ -27,7 +27,6 @@
 #include "taxdb.hpp"
 #include "gzstream.h"
 #include "uid_mapping.hpp"
-#include ""
 #include <sstream>
 #include <unordered_set>
 
@@ -37,13 +36,11 @@ int New_taxid_start = 1000000000;
 using namespace std;
 using namespace kraken;
 
-#define USE_HLL_CARDINALITY_ESTIMATION
-#ifdef USE_HLL_CARDINALITY_ESTIMATION
-using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
-#elif USE_KHASH_EXACT_COUNTING
-using READCOUNTS = ReadCounts<unordered_set<uint64_t> >;
+#ifdef EXACT_COUNTING
+#include "khset64.h"
+using READCOUNTS = ReadCounts< khset64_t >;
 #else
-using READCOUNTS = ReadCounts<unordered_set<uint64_t> >;
+using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
 #endif
 
 

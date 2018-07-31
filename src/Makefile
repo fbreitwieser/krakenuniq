@@ -1,9 +1,10 @@
 CXX = g++
 FOPENMP?=-fopenmp
 NDEBUG=-D NDEBUG
+
 CXXFLAGS = -Wall -Wextra -Wfatal-errors -pipe -O2 -std=c++11 $(FOPENMP) -I./gzstream $(NDEBUG) ${CPPFLAGS} 
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
-PROGS1 = classify db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb 
+PROGS1 = classify classifyExact db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb 
 TEST_PROGS = grade_classification test_hll_on_db dump_db_kmers
 #PROGS = $(PROGS1) $(TEST_PROGS)
 PROGS = $(PROGS1)
@@ -32,14 +33,17 @@ grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
-count_unique: hyperloglogplus.o
+count_unique: hyperloglogplus.o third_party/khash.h
 
 test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
 dump_db_kmers: krakendb.o quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o #taxdb.hpp report-cols.hpp readcounts.hpp
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o third_party/khash.h #taxdb.hpp report-cols.hpp readcounts.hpp
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
+
+classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o third_party/khash.h #taxdb.hpp report-cols.hpp readcounts.hpp
+	$(CXX) $(CXXFLAGS) -DEXACT_COUNTING -o classifyExact $^ $(LIBFLAGS)
 
 build_taxdb: quickfile.o #taxdb.hpp report-cols.hpp
 

@@ -66,14 +66,14 @@ namespace kraken {
       kmers += other.kmers;
       return *this;
     }
-
+/*
     ReadCounts& operator+=(ReadCounts&& other) {
       n_reads += other.n_reads;
       n_kmers += other.n_kmers;
       kmers += std::move(other.kmers);
       return *this;
     }
-
+*/
 
     bool operator<(const ReadCounts& other) {
       if (n_reads < other.n_reads) {
@@ -96,10 +96,10 @@ namespace kraken {
   // Overload operator += for set, so that it can be used for merging
   template <typename T>
   unordered_set<T>& operator+=(unordered_set<T>& left, const unordered_set<T>& right) {
-      left.insert(right.begin(), right.end());
-      return left;
+    left.insert(right.begin(), right.end());
+    return left;
   }
-
+  
   template<>
   uint64_t ReadCounts< HyperLogLogPlusMinus<uint64_t> >::uniqueKmerCount() const {
     return(kmers.cardinality());

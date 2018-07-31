@@ -71,8 +71,11 @@ private:
   HASH (*bit_mixer) (uint64_t);
 
   // sparse versions of p and m
-  static const uint8_t  pPrime = 25; // precision when using a sparse representation
-                                     // fixed to 25, because 25 + 6 bits for rank + 1 flag bit = 32
+  static const uint8_t  pPrime = 25; // precision when using a sparse representation 
+                                     // which encodes the rank + index in 32 bits:
+                                     //  25 bits for index + 
+                                     //   6 bits for rank + 
+                                     //   1 flag bit indicating if bits p..pPrime are 0
   static const uint32_t mPrime = 1 << pPrime; // 2^pPrime
 
 public:
