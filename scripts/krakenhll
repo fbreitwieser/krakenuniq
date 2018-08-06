@@ -25,6 +25,8 @@ use warnings;
 use File::Basename;
 use File::Path;
 use Getopt::Long;
+use Time::Piece;
+use Cwd;
 use File::Path qw/make_path/;
 
 my $PROG = basename $0;
@@ -85,7 +87,7 @@ GetOptions(
   "preload" => \$preload,
   "paired" => \$paired,
   "hll-precision=i", \$hll_precision,
-  "exact-cardinality", \$use_exact_counting,
+  "exact", \$use_exact_counting,
   "check-names" => \$check_names,
   "gzip-compressed" => \$gunzip,
   "bzip2-compressed" => \$bunzip2,
@@ -173,6 +175,15 @@ if (defined $report_file && !-d dirname($report_file)) {
   print STDERR "Creating directory for $report_file.\n";
   make_path(dirname($report_file));
 }
+
+if (-s $report_file) {
+  print STDERR "Warning: Overwriting $report_file.\n";
+}
+
+my $date = localtime()->datetime();
+my $wd = getcwd;
+my $db_size = -s $kdb_files[0];
+system("printf '# KrakenUniq v#####=VERSION=##### DATE: $date DB_SIZE: $db_size WD: $wd\n# CL: ' > '$report_file' && tr '\\0' ' ' < /proc/$$/cmdline | sed 's/\$/\n/' >> '$report_file'") == 0 or die "Couldn't write report header.\n";
 
 # set flags for classifier
 my @flags;
@@ -280,7 +291,7 @@ Options:
   --gzip-compressed       Input is gzip compressed
   --bzip2-compressed      Input is bzip2 compressed
   --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: $hll_precision)
-  --exact-cardinality     Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
+  --exact                 Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
   --quick                 Quick operation (use first hit or hits)
   --min-hits NUM          In quick op., number of hits req'd for classification
                           NOTE: this is ignored if --quick is not specified
@@ -314,7 +325,7 @@ sub display_help {
 
 sub display_version {
   print "KrakenHLL version #####=VERSION=#####\n";
-  print "Copyright 2017, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
+  print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }

@@ -113,6 +113,13 @@ void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr,
 }
 
 
+  template <typename T>
+  unordered_set<T>& operator+=(unordered_set<T>& left, const unordered_set<T>& right) {
+    left.insert(right.begin(), right.end());
+    return left;
+  }
+
+
 int main(int argc, char **argv) {
 
   size_t p = 10;
@@ -126,7 +133,7 @@ int main(int argc, char **argv) {
   bool show_rel_error = false;
   bool use_stdin = true;
   size_t n_rand = 1;
-  size_t n_redo = 1;
+  size_t n_redo = 2;
 
   int c;
 
@@ -217,27 +224,32 @@ int main(int argc, char **argv) {
     // Define output distribution (default range for unsigned: 0 to MAX)
     std::uniform_int_distribution<uint64_t> distr;
     for (size_t j = 0; j < n_redo; ++j) {
-
+      unordered_set<uint64_t> exact_counter1;
+      khset64_t exact_counter_khash1;
       for(size_t i = 0; i < n_rand; i++) {
         if (exact_counting_unordered_set) {
-	        exact_counter.insert(distr(rng));
+	        exact_counter1.insert(distr(rng));
         } else if (exact_counting_khash) {
-          exact_counter_khash.insert(distr(rng));
+          exact_counter_khash1.insert(distr(rng));
         } else {
           add_to_hll(hll, distr(rng), ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
-	}
+        }
       }
       if (!test_mode) {
         if (exact_counting_unordered_set) {
-          cout << exact_counter.size() << "\n";
+          cout << exact_counter1.size() << "\n";
         } else if (exact_counting_khash) {
-          cout << exact_counter_khash.size() << "\n";
+          cout << exact_counter_khash1.size() << "\n";
         } else {
           print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
         }
       }
+	  //exact_counter += exact_counter1;
+	  exact_counter_khash += std::move(exact_counter_khash1);
+      cout << exact_counter_khash.size() << "\n";
+      //cout << exact_counter.size() << "\n";
       hll.reset();
-      exact_counter.clear();
+      exact_counter1.clear();
       ctr = 0;
     }
   }

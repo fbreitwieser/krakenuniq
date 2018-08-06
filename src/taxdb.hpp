@@ -55,11 +55,6 @@ void log_msg (const std::string& s);
 
 template<typename T> uint64_t string_to_T(std::string str);
 
-template <typename T> 
-inline uint64_t reads(const T read_count);
-
-inline uint64_t reads(const uint64_t read_count);
-
 std::vector<std::string> in_betweens(const std::string &s, const char start_char, const char end_char, size_t start_at = 0);
 
 std::vector<std::string> tokenise(const std::string &s, const std::string& delimiter, size_t max_fields = 0, size_t end_chars = 0);
@@ -321,18 +316,6 @@ uint64_t string_to_T(string str) {
   return result;
 }
 
-template <typename T>
-uint64_t reads(const T) {
-  cerr << "No reads function for type!! " << endl;
-  throw ;
-  return(0);
-}
-
-inline
-uint64_t reads(const uint64_t read_count) {
-  return(read_count);
-}
-
 std::vector<std::string> in_betweens(const std::string &s, const char start_char, const char end_char, size_t start_at) {
   std::vector<std::string> tokens;
   size_t i = 0;
@@ -396,40 +379,6 @@ std::vector<std::string> get_fields(const std::string &s, const std::string& del
   return tokens;
 }
 
-
-//template<>
-//TaxonomyEntry<uint32_t, uint64_t>::TaxonomyEntry () {
-//  readCounts = 0;
-//  readCountsOfChildren = 0;
-//}
-/*
-   template<typename TAXID>
-   bool TaxonomyEntryPtr_comp<TAXID>::operator() ( const TaxonomyEntry<TAXID>* a, const TaxonomyEntry<TAXID>* b) const {
-
-   return (
-   (reads(a->readCounts)+reads(a->readCountsOfChildren)) > (reads(b->readCounts)+reads(b->readCountsOfChildren)));
-   }
-   */
-/*
-   template<typename TAXID>
-   TAXID TaxonomyDB<TAXID>::getByScientificName(string name) const {
-   for (const auto & tax : entries) {
-   if (tax.second.scientificName == name) {
-   return tax.first;
-   }
-   }
-   return 0;
-   }
-
-   template<typename TAXID>
-   std::unordered_map<std::string, TAXID> TaxonomyDB<TAXID>::getScientificNameMap() const {
-   std::unordered_map<std::string, TAXID> scientificNameMap;
-   for (const auto & tax : entries) {
-   scientificNameMap[tax.second.scientificName] = tax.first;
-   }
-   return scientificNameMap;
-   }
-   */
 
 template<typename TAXID>
 unordered_map<TAXID, TAXID> TaxonomyDB<TAXID>::getParentMap() const {
@@ -1047,7 +996,8 @@ void TaxReport<TAXID,READCOUNTS>::printReport(const std::string& format) {
      if (it != _taxdb.entries.end()) {
       const auto it2 = _cladeCounts.find(&(it->second));
       if (it2 != _cladeCounts.end()) 
-  _total_n_reads += reads(it2->second);
+        //_total_n_reads += reads(it2->second);
+        _total_n_reads += it2->second.readCount();
      }
    }
 
@@ -1091,7 +1041,7 @@ void TaxReport<TAXID,READCOUNTS>::printReport(const TaxonomyEntry<TAXID>& tax, u
     if (taxit_ptr == _cladeCounts.end())
       return;
     const auto & cladecounts = taxit_ptr->second;
-    if (!_show_zeros && reads(cladecounts) == 0)
+    if (!_show_zeros && cladecounts.readCount() == 0)
       return;
 
     printLine(tax, cladecounts, depth);
@@ -1133,7 +1083,7 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
       case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*rc.readCount()/_total_n_reads; break;
            //case REPORTCOLS::ABUNDANCE:      _reportOfb << 100*counts.abundance[0]; break;
            //case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
-      case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_data? reads(r_it->second) : 0); break;
+      case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_data? r_it->second.readCount() : 0); break;
       case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << rc.readCount(); break;
       case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_data? r_it->second.kmerCount() : 0); break;
       case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << unique_kmers_for_clade; break;

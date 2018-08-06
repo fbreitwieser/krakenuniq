@@ -22,6 +22,8 @@
 
 #include "kraken_headers.hpp"
 #include "hyperloglogplus.hpp"
+#include "khset64.h"
+#include <unordered_set>
 
 namespace kraken {
   static size_t HLL_PRECISION = 14;
@@ -38,7 +40,9 @@ namespace kraken {
     ReadCounts() : n_reads(0), n_kmers(0) {
     }
 
-    ReadCounts(const ReadCounts& other) : n_reads(other.n_reads), n_kmers(other.n_kmers), kmers(other.kmers) {
+    //ReadCounts(const ReadCounts& other) = delete;
+    
+	ReadCounts(const ReadCounts& other) : n_reads(other.n_reads), n_kmers(other.n_kmers), kmers(other.kmers) {
     }
 
     ReadCounts& operator=(const ReadCounts& other) {
@@ -47,6 +51,7 @@ namespace kraken {
       kmers = other.kmers;
       return *this;
     }
+	
 
     ReadCounts& operator=(ReadCounts&& other) {
       n_reads = other.n_reads;
@@ -107,6 +112,11 @@ namespace kraken {
 
   template<>
   uint64_t ReadCounts< unordered_set<uint64_t> >::uniqueKmerCount() const {
+    return(kmers.size());
+  }
+
+  template<>
+  uint64_t ReadCounts< khset64_t >::uniqueKmerCount() const {
     return(kmers.size());
   }
 }

@@ -38,7 +38,8 @@ using namespace kraken;
 
 #ifdef EXACT_COUNTING
 #include "khset64.h"
-using READCOUNTS = ReadCounts< khset64_t >;
+//using READCOUNTS = ReadCounts< khset64_t >;
+using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
 #else
 using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
 #endif
@@ -112,7 +113,7 @@ inline bool ends_with(std::string const & value, std::string const & ending)
             return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
 
-ostream* cout_or_file(string file) {
+ostream* cout_or_file(string file, bool append = false) {
     if (file == "-")
       return &cout;
 
@@ -122,7 +123,7 @@ ostream* cout_or_file(string file) {
       Open_gzstreams.push_back(ogzs);
       return ogzs;
     } else {
-      ofstream* ofs = new ofstream(file.c_str());
+      ofstream* ofs = append? new ofstream(file.c_str(), std::ofstream::app) : new ofstream(file.c_str());
       ofs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_fstreams.push_back(ofs);
       return ofs;
@@ -270,7 +271,7 @@ int main(int argc, char **argv) {
       }
       taxdb.readGenomeSizes(fname);
     }
-     Report_output = cout_or_file(Report_output_file);
+     Report_output = cout_or_file(Report_output_file, true);
   
     TaxReport<uint32_t,READCOUNTS> rep = TaxReport<uint32_t, READCOUNTS>(*Report_output, taxdb, taxon_counts, false);
     if (HLL_PRECISION > 0) {
@@ -417,7 +418,8 @@ void process_file(char *filename) {
         total_bases += total_nt;
         //if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
         if (Print_Progress) {  
-          cerr << "\rProcessed " << total_sequences << " sequences (" << total_classified << " classified) ...";
+          fprintf(stderr, "\r Processed %lu sequences (%.2f%% classified)",
+                          total_sequences, total_classified * 100.0 / total_sequences);
         }
       }
     }
