@@ -16,7 +16,7 @@ mkdir -p log kraken report
 for J in 1 2; do
 	for THREADS in 4 2 1; do 
 
-		krakenhll --preload --db $DB --report-file /dev/null --fasta <(printf ">A\nA") > /dev/null
+		krakenuniq --preload --db $DB --report-file /dev/null --fasta <(printf ">A\nA") > /dev/null
 		for B in $*; do 
 			echo $B
 			if [[ "$B" == *.gz ]]; then
@@ -27,7 +27,7 @@ for J in 1 2; do
 				PARAM=
 			fi
 			echo $BN && BN="$BN.$DB_BN.t$THREADS.j$J" 
-			$TIME -o log/$BN.krakenhll.timing.log krakenhll --db $DB --fastq $PARAM --report-file report/$BN.krakenhll.report --threads $THREADS $B > kraken/$BN.krakenhll.kraken 2> log/$BN.krakenhll.log; 
+			$TIME -o log/$BN.krakenuniq.timing.log krakenuniq --db $DB --fastq $PARAM --report-file report/$BN.krakenuniq.report --threads $THREADS $B > kraken/$BN.krakenuniq.kraken 2> log/$BN.krakenuniq.log; 
 		done
 
 		kraken --preload --db $DB --fasta <(printf ">A\nA") > /dev/null

@@ -1,9 +1,9 @@
-KrakenHLL taxonomic sequence classification system with unique k-mer counting
+KrakenUniq taxonomic sequence classification system with unique k-mer counting
 ===============================================
 
 [Kraken](https://github.com/DerrickWood/kraken) is a fast taxonomic classifier for metagenomics data. This project, kraken-hll, adds some additional functionality - most notably a unique k-mer count using the HyperLogLog algorithm. Spurious identifications due to sequence contamination in the dataset or database often leads to many reads, however they usually cover only a small portion of the genome. 
 
-KrakenHLL computes the number of unique k-mers observed for each taxon, which allows to filter more false positives.  Here's a small example of a classification against a viral database with k=25. There are three species identified by just one read - Enterobacteria phage BP-4795, Salmonella phage SEN22, Sulfolobus monocaudavirus SMV1. Out of those, the identification of Salmonella phage SEN22 is the strongest, as there read was matched with 116 k-mers that are unique to the sequence, while the match to Sulfolobus monocaudavirus SMV1 is only based on a single 25-mer.
+KrakenUniq computes the number of unique k-mers observed for each taxon, which allows to filter more false positives.  Here's a small example of a classification against a viral database with k=25. There are three species identified by just one read - Enterobacteria phage BP-4795, Salmonella phage SEN22, Sulfolobus monocaudavirus SMV1. Out of those, the identification of Salmonella phage SEN22 is the strongest, as there read was matched with 116 k-mers that are unique to the sequence, while the match to Sulfolobus monocaudavirus SMV1 is only based on a single 25-mer.
 
 ```
 99.0958 2192    2192    255510  272869  no rank 0   unclassified
@@ -31,50 +31,50 @@ KrakenHLL computes the number of unique k-mers observed for each taxon, which al
 
 ## Usage
 
-For usage, see `krakenhll --help`. Note that you can use the same database as Kraken with one difference - instead of the files `DB_DIR/taxonomy/nodes.dmp` and `DB_DIR/taxonomy/names.dmp` than kraken relies upon, `kraken-hll` needs the file `DB_DIR/taxDB`. This can be generated with the script `build_taxdb`: `KRAKEN_DIR/build_taxdb DB_DIR/taxonomy/names.dmp DB_DIR/taxonomy/nodes.dmp > DB_DIR/taxDB`. The code behind the taxDB is based on [k-SLAM](https://github.com/aindj/k-SLAM).
+For usage, see `krakenuniq --help`. Note that you can use the same database as Kraken with one difference - instead of the files `DB_DIR/taxonomy/nodes.dmp` and `DB_DIR/taxonomy/names.dmp` than kraken relies upon, `kraken-hll` needs the file `DB_DIR/taxDB`. This can be generated with the script `build_taxdb`: `KRAKEN_DIR/build_taxdb DB_DIR/taxonomy/names.dmp DB_DIR/taxonomy/nodes.dmp > DB_DIR/taxDB`. The code behind the taxDB is based on [k-SLAM](https://github.com/aindj/k-SLAM).
 
 ### Differences to `kraken`
- - Use `krakenhll --report-file FILENAME ...` to write the kraken report to `FILENAME`.
- - Use `krakenhll --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenhll-build --generate-taxonomy-ids-for-sequences` since the taxDB between the databases has to be absolutely the same.
+ - Use `krakenuniq --report-file FILENAME ...` to write the kraken report to `FILENAME`.
+ - Use `krakenuniq --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenuniq-build --generate-taxonomy-ids-for-sequences` since the taxDB between the databases has to be absolutely the same.
  - Add a suffix `.gz` to output files to generate gzipped output files
 
 ### Differences to `kraken-build`
- - Use `krakenhll-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
+ - Use `krakenuniq-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
  - `seqid2taxid.map` mapping sequence IDs to taxonomy IDs does NOT parse or require `>gi|`, but rather the sequence ID is the header up to just before the first space
  
  ## FAQ
  
- ### Installing KrakenHLL on MacOS
-OSX by default links `g++` to `clang` without OpenMP support. You can install `g++` with HomeBrew and use the `-c` option of `krakenhll_install.sh` to specify the HomeBrew `g++`: 
+ ### Installing KrakenUniq on MacOS
+OSX by default links `g++` to `clang` without OpenMP support. You can install `g++` with HomeBrew and use the `-c` option of `krakenuniq_install.sh` to specify the HomeBrew `g++`: 
 ``` 
 brew install gcc
-./install_krakenhll -c g++-8
+./install_krakenuniq -c g++-8
 ```
 
 ### Installing Jellfish v1.1.11
 
-Currently, KrakenHLL build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenHLL, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenhll` with `krakenhll --jellyfish-bin /usr/bin/jellyfish1`.
+Currently, KrakenUniq build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenUniq, use the `-j` flag for the `install_krakenuniq.sh` script. Alternatively, you can specify the Jellyfish path to `krakenuniq` with `krakenuniq --jellyfish-bin /usr/bin/jellyfish1`.
 
 ### Building a microbial nt database
 
-KrakenHLL supports building databases on subsets of the NCBI nucleotide collection nr/nt, which is most prominently the standard database for BLASTn. On the command line, you can specify to extract all bacterial, viral, archaeal, protozoan, fungal and helminth sequences. The list of protozoan taxa is based on [Kaiju's](https://raw.githubusercontent.com/bioinformatics-centre/kaiju/master/util/taxonlist.tsv).
+KrakenUniq supports building databases on subsets of the NCBI nucleotide collection nr/nt, which is most prominently the standard database for BLASTn. On the command line, you can specify to extract all bacterial, viral, archaeal, protozoan, fungal and helminth sequences. The list of protozoan taxa is based on [Kaiju's](https://raw.githubusercontent.com/bioinformatics-centre/kaiju/master/util/taxonlist.tsv).
 
 Example command line:
 ```
-krakenhll-download --db DB --taxa "archaea,bacteria,viral,fungi,protozoa,helminths" --dust --exclude-environmental-taxa nt
+krakenuniq-download --db DB --taxa "archaea,bacteria,viral,fungi,protozoa,helminths" --dust --exclude-environmental-taxa nt
 ```
 
 
 ### Custom databases with NCBI taxonomy
 To build a custom database with the NCBI taxonomy, first download the taxonomy files with
 ```
-krakenhll-download --db DBDIR taxonomy
+krakenuniq-download --db DBDIR taxonomy
 ```
 Then you can add the desired sequence files to the `DBDIR/library` directory:
 ```
 cp SEQ1.fa SEQ2.fa DBDIR/library
 ```
-KrakenHLL needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mappings can be provided in the `DBDIR/library/*.map` - KrakenHLL pools all `.map` files inside of the `library/` folder prior to database building. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
+KrakenUniq needs a _sequence ID to taxonomy ID mapping_ for each sequence. This mappings can be provided in the `DBDIR/library/*.map` - KrakenUniq pools all `.map` files inside of the `library/` folder prior to database building. Format: three tab-separated fields that are, in order, the sequence ID (i. e. the sequence header without '>' up to the first space), the taxonomy ID and the genome or assembly name:
 ```
 Strain1_Chr1_Seq     <tab> 562 <tab> E. Coli Strain Foo
 Strain1_Chr2_Seq     <tab> 562 <tab> E. Coli Strain Foo
@@ -82,11 +82,11 @@ Strain1_Plasmid1_Seq <tab> 562 <tab> E. Coli Strain Foo
 Strain2_Chr1_Seq     <tab> 621 <tab> S. boydii Strain Bar
 Strain2_Plasmid1_Seq <tab> 621 <tab> S. boydii Strain Bar
 ```
-The third column is optional, and used by KrakenHLL only when `--taxids-for-genomes` is specified for `krakenhll-build` to add new nodes in the taxonomy tree for the genome. If you'd like to have the sequences identifier in the taxonomy report, too, specifiy `--taxids-for-sequences` for `krakenhll-build` as well.
+The third column is optional, and used by KrakenUniq only when `--taxids-for-genomes` is specified for `krakenuniq-build` to add new nodes in the taxonomy tree for the genome. If you'd like to have the sequences identifier in the taxonomy report, too, specifiy `--taxids-for-sequences` for `krakenuniq-build` as well.
 
-Finally, run `krakenhll-build`:
+Finally, run `krakenuniq-build`:
 ```
-krakenhll-build --db DBDIR --taxids-for-genomes --taxids-for-sequences
+krakenuniq-build --db DBDIR --taxids-for-genomes --taxids-for-sequences
 ```
 
 Note that for custom databases with fewer sequences you might want to choose a smaller k (default: `--kmer-len 31`) and minimizer length (default: `--minimizer-len 15`).

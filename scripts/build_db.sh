@@ -2,7 +2,7 @@
 #vim: noai:ts=2:sw=2
 
 # Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
-# Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+# Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
 #
 # This file is part of the Kraken taxonomic sequence classification system.
 #
@@ -268,7 +268,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   REPNAME=database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
-    krakenhll --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 
@@ -301,7 +301,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    krakenhll --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
   fi
 fi
 
