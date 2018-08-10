@@ -245,11 +245,10 @@ int main(int argc, char **argv) {
         }
       }
 	  //exact_counter += exact_counter1;
-	  exact_counter_khash += std::move(exact_counter_khash1);
+	  exact_counter_khash = std::move(exact_counter_khash1);
       cout << exact_counter_khash.size() << "\n";
       //cout << exact_counter.size() << "\n";
       hll.reset();
-      exact_counter1.clear();
       ctr = 0;
     }
   }

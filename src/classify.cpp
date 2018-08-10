@@ -28,7 +28,6 @@
 #include "gzstream.h"
 #include "uid_mapping.hpp"
 #include <sstream>
-#include <unordered_set>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 int New_taxid_start = 1000000000;
@@ -38,8 +37,9 @@ using namespace kraken;
 
 #ifdef EXACT_COUNTING
 #include "khset64.h"
-//using READCOUNTS = ReadCounts< khset64_t >;
-using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
+using READCOUNTS = ReadCounts< khset64_t >;
+//#include <unordered_set>
+//using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
 #else
 using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
 #endif

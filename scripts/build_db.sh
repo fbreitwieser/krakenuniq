@@ -251,6 +251,10 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   	echo " Adding taxonomy IDs for genomes"
   	PARAM="$PARAM -A"
     fi
+	if [[ "$KRAKEN_MIN_CONTIG_SIZE" != "" ]]; then
+	  echo "Excluding sequences smaller than $KRAKEN_MIN_CONTIG_SIZE"
+	  PARAM="$PARAM -E $KRAKEN_MIN_CONTIG_SIZE"
+	fi
     start_time1=$(date "+%s.%N")
     set -x
       set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
