@@ -675,7 +675,7 @@ sub get_sorted_maps(@) {
     my $sorted_map_f = "$dir/$_.accession2taxid.sorted";
     if (!-s $sorted_map_f) {
       my $sort_cmd = system("sort --help | grep -q parallel") == 0? "sort --parallel $N_PROC" : "sort";
-      system_l("Sorting maping file (will take some time)", "gunzip -c $dir/$_.accession2taxid.gz | cut -f $ac_col,$taxid_col > $sorted_map_f.tmp && $sort_cmd -T $dir $sorted_map_f.tmp > $sorted_map_f && rm $sorted_map_f.tmp");
+      system_l("Sorting maping file (will take some time)", "gunzip -c $dir/$_.accession2taxid.gz | cut -f $ac_w_version_col,$taxid_col > $sorted_map_f.tmp && $sort_cmd -T $dir $sorted_map_f.tmp > $sorted_map_f && rm $sorted_map_f.tmp");
     }
     check_file("$dir/$_.accession2taxid.sorted");
     push @res, $sorted_map_f;
