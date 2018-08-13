@@ -48,7 +48,7 @@ for my $file (@ARGV) {
   if (! -e $file) {
     die "$PROG: $file does not exist\n";
   } 
-  if (! -f $file) {
+  if (! (-f $file || -p $file)) {
     die "$PROG: $file is not a regular file\n";
   }
 }
