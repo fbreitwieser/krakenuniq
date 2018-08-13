@@ -51,9 +51,9 @@ brew install gcc
 ./install_krakenhll -c g++-8
 ```
 
-### Installing Jellfish v1.1.11
+### Installing Jellyfish v1.1.11
 
-Currently, KrakenHLL build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenHLL, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenhll` with `krakenhll --jellyfish-bin /usr/bin/jellyfish1`.
+Currently, KrakenHLL build depends depends on Jellyfish v1.1.11 . To install Jellyfish alongside KrakenHLL, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenhll` with `krakenhll --jellyfish-bin /usr/bin/jellyfish1`.
 
 ### Building a microbial nt database
 
