@@ -1,6 +1,6 @@
 /*
  * Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
- * Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+ * Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
  *
  * This file is part of the Kraken taxonomic sequence classification system.
  *
@@ -35,12 +35,28 @@ int New_taxid_start = 1000000000;
 using namespace std;
 using namespace kraken;
 
+#define USE_KHSET_FOR_EXACT_COUNTING
+
+#ifdef EXACT_COUNTING
+  #ifdef USE_KHSET_FOR_EXACT_COUNTING
+    #include "khset.h"
+    using READCOUNTS = ReadCounts< khset64_t >;
+  #else
+    #include <unordered_set>
+    using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
+  #endif
+#else
+  using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
+#endif
+
+
+
 void parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 void process_file(char *filename);
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
-                       unordered_map<uint32_t, ReadCounts>&);
+                       unordered_map<uint32_t, READCOUNTS>&);
 inline void print_sequence(ostringstream* oss_ptr, const DNASequence& dna);
 string hitlist_string(const vector<uint32_t> &taxa, const vector<char>& ambig_list);
 
@@ -48,7 +64,7 @@ string hitlist_string(const vector<uint32_t> &taxa, const vector<char>& ambig_li
 set<uint32_t> get_ancestry(uint32_t taxon);
 void report_stats(struct timeval time1, struct timeval time2);
 double get_seconds(struct timeval time1, struct timeval time2);
-unordered_map<uint32_t, ReadCounts> taxon_counts; // stats per taxon
+unordered_map<uint32_t, READCOUNTS> taxon_counts; // stats per taxon
 
 int Num_threads = 1;
 vector<string> DB_filenames;
@@ -102,7 +118,7 @@ inline bool ends_with(std::string const & value, std::string const & ending)
             return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
 
-ostream* cout_or_file(string file) {
+ostream* cout_or_file(string file, bool append = false) {
     if (file == "-")
       return &cout;
 
@@ -112,7 +128,7 @@ ostream* cout_or_file(string file) {
       Open_gzstreams.push_back(ogzs);
       return ogzs;
     } else {
-      ofstream* ofs = new ofstream(file.c_str());
+      ofstream* ofs = append? new ofstream(file.c_str(), std::ofstream::app) : new ofstream(file.c_str());
       ofs->exceptions( ifstream::failbit | ifstream::badbit );
       Open_fstreams.push_back(ofs);
       return ofs;
@@ -260,9 +276,9 @@ int main(int argc, char **argv) {
       }
       taxdb.readGenomeSizes(fname);
     }
-     Report_output = cout_or_file(Report_output_file);
+     Report_output = cout_or_file(Report_output_file, true);
   
-    TaxReport<uint32_t,ReadCounts> rep = TaxReport<uint32_t, ReadCounts>(*Report_output, taxdb, taxon_counts, false);
+    TaxReport<uint32_t,READCOUNTS> rep = TaxReport<uint32_t, READCOUNTS>(*Report_output, taxdb, taxon_counts, false);
     if (HLL_PRECISION > 0) {
       if (full_report) {
         rep.setReportCols(vector<string> { 
@@ -378,7 +394,7 @@ void process_file(char *filename) {
       if (total_nt == 0)
         break;
       
-      unordered_map<uint32_t, ReadCounts> my_taxon_counts;
+      unordered_map<uint32_t, READCOUNTS> my_taxon_counts;
       uint64_t my_total_classified = 0;
       kraken_output_ss.str("");
       classified_output_ss.str("");
@@ -407,7 +423,8 @@ void process_file(char *filename) {
         total_bases += total_nt;
         //if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
         if (Print_Progress) {  
-          cerr << "\rProcessed " << total_sequences << " sequences (" << total_classified << " classified) ...";
+          fprintf(stderr, "\r Processed %lu sequences (%.2f%% classified)",
+                          total_sequences, total_classified * 100.0 / total_sequences);
         }
       }
     }
@@ -522,7 +539,7 @@ string hitlist_string_depr(const vector<uint32_t> &taxa)
 
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
-                       unordered_map<uint32_t, ReadCounts>& my_taxon_counts) {
+                       unordered_map<uint32_t, READCOUNTS>& my_taxon_counts) {
   vector<uint32_t> taxa;
   vector<uint8_t> ambig_list;
   unordered_map<uint32_t, uint32_t> hit_counts;
@@ -591,7 +608,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
       call = resolve_tree(hit_counts, Parent_map);
   }
 
-  ++(my_taxon_counts[call].n_reads);
+  my_taxon_counts[call].incrementReadCount();
 
   if (Print_unclassified && !call) 
     print_sequence(&uoss, dna);

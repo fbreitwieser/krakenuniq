@@ -630,12 +630,32 @@ sub download_ncbi_search(@) {
           open($FA_HANDLE, ">", $file) or die "Couln't open file";
           print_header_line_ac($file, $nbr_ac, $taxid);
         }
-        print $FA_HANDLE $line if $fa_handle_open;
-        #end_fork();
+
+        if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
+          my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
+          chomp $res;
+          ($taxid) = split /\t/, $res;
+        }
+
+        my $name = $taxid_name_map{$taxid};
+        if (!defined $taxid || !defined $name) {
+          print STDERR "\nNo mapping for viral neighbor $nbr_ac!\n";
+          next;
+        }
+        (my $name1 = $name) =~ s/[^a-zA-Z0-9_]/_/g;
+        $name1 =~ s/__/_/g;
+        system("mkdir -p $nbr_dir/$name1-tax$taxid");
+        if ($fa_handle_open) {
+          close($FA_HANDLE);
+        } else {
+          $fa_handle_open = 1;
+        }
+        my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.fna";
+        open($FA_HANDLE, ">", $file) or die "Couln't open file";
+        print_header_line_ac($file, $nbr_ac, $taxid);
       }
-      close($FA_HANDLE) if $fa_handle_open;
-      close($F);
-      unlink($part_file) or warn "Could not delete $part_file: $!\n";
+      print $FA_HANDLE $line;
+      #end_fork();
     }
     $retstart += $curr_retmax;
     print STDERR " done \n";

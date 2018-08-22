@@ -3,7 +3,7 @@
  * Modified work copyright 2017 Florian Breitwieser 
  *
  * The original file is part of SLAM
- * The modified file is part of KrakenHLL
+ * The modified file is part of KrakenUniq
  *
  * SLAM is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -54,11 +54,6 @@ namespace patch
 void log_msg (const std::string& s);
 
 template<typename T> uint64_t string_to_T(std::string str);
-
-template <typename T> 
-inline uint64_t reads(const T read_count);
-
-inline uint64_t reads(const uint64_t read_count);
 
 std::vector<std::string> in_betweens(const std::string &s, const char start_char, const char end_char, size_t start_at = 0);
 
@@ -292,7 +287,7 @@ class TaxReport {
     uint64_t _total_n_reads = 0;
     bool _show_zeros;
     void printLine(const TaxonomyEntry<TAXID>& tax, const READCOUNTS& rc, unsigned depth);
-	READCOUNTS setCladeCounts(const TaxonomyEntry<TAXID>* tax, unordered_map<const TaxonomyEntry<TAXID>*, unordered_set<const TaxonomyEntry<TAXID>*> >& _children);
+    READCOUNTS setCladeCounts(const TaxonomyEntry<TAXID>* tax, unordered_map<const TaxonomyEntry<TAXID>*, unordered_set<const TaxonomyEntry<TAXID>*> >& _children);
 
   public:
     TaxReport(std::ostream& _reportOfb, const TaxonomyDB<TAXID> & taxdb, const std::unordered_map<TAXID, READCOUNTS>&, bool _show_zeros);
@@ -319,18 +314,6 @@ uint64_t string_to_T(string str) {
   T result;
   stream >> result;
   return result;
-}
-
-template <typename T>
-uint64_t reads(const T) {
-  cerr << "No reads function for type!! " << endl;
-  throw ;
-  return(0);
-}
-
-inline
-uint64_t reads(const uint64_t read_count) {
-  return(read_count);
 }
 
 std::vector<std::string> in_betweens(const std::string &s, const char start_char, const char end_char, size_t start_at) {
@@ -396,40 +379,6 @@ std::vector<std::string> get_fields(const std::string &s, const std::string& del
   return tokens;
 }
 
-
-//template<>
-//TaxonomyEntry<uint32_t, uint64_t>::TaxonomyEntry () {
-//  readCounts = 0;
-//  readCountsOfChildren = 0;
-//}
-/*
-   template<typename TAXID>
-   bool TaxonomyEntryPtr_comp<TAXID>::operator() ( const TaxonomyEntry<TAXID>* a, const TaxonomyEntry<TAXID>* b) const {
-
-   return (
-   (reads(a->readCounts)+reads(a->readCountsOfChildren)) > (reads(b->readCounts)+reads(b->readCountsOfChildren)));
-   }
-   */
-/*
-   template<typename TAXID>
-   TAXID TaxonomyDB<TAXID>::getByScientificName(string name) const {
-   for (const auto & tax : entries) {
-   if (tax.second.scientificName == name) {
-   return tax.first;
-   }
-   }
-   return 0;
-   }
-
-   template<typename TAXID>
-   std::unordered_map<std::string, TAXID> TaxonomyDB<TAXID>::getScientificNameMap() const {
-   std::unordered_map<std::string, TAXID> scientificNameMap;
-   for (const auto & tax : entries) {
-   scientificNameMap[tax.second.scientificName] = tax.first;
-   }
-   return scientificNameMap;
-   }
-   */
 
 template<typename TAXID>
 unordered_map<TAXID, TAXID> TaxonomyDB<TAXID>::getParentMap() const {
@@ -953,20 +902,20 @@ READCOUNTS TaxReport<TAXID,READCOUNTS>::setCladeCounts(const TaxonomyEntry<TAXID
     if (itt == _taxCounts.end()) {
       // cerr << "This leaf node [taxid "<< tax->taxonomyID <<"] has no taxon count" << endl;
       return(READCOUNTS());
-	}
-	_cladeCounts[tax] = itt->second;
+    }
+    _cladeCounts[tax] = itt->second;
   } else {
     auto c = itc->second.begin();
 
-  	READCOUNTS rc = setCladeCounts(*c, _children);
+      READCOUNTS rc = setCladeCounts(*c, _children);
 
-	for (++c; c != itc->second.end(); ++c) {
+    for (++c; c != itc->second.end(); ++c) {
       rc += setCladeCounts(*c, _children);
-	}
-	if (itt != _taxCounts.end())
+    }
+    if (itt != _taxCounts.end())
       rc += itt->second;
 
-	_cladeCounts[tax] = rc;
+    _cladeCounts[tax] = rc;
   }
   return _cladeCounts.at(tax);
 }*/
@@ -1006,10 +955,10 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB
     READCOUNTS rc = *(cit->second.front());
     for (size_t j = 1; j < cit->second.size(); ++j)
        rc += *(cit->second[j]);
-    //READCOUNTS rc = mergeReadCounts(cit->second);
+
     #pragma omp critical(update_clade_counts)
     {
-      _cladeCounts[cit->first] = std::move(rc);
+      _cladeCounts.insert( std::make_pair( cit->first, std::move(rc) ) );
     }
   }
   
@@ -1047,7 +996,8 @@ void TaxReport<TAXID,READCOUNTS>::printReport(const std::string& format) {
      if (it != _taxdb.entries.end()) {
       const auto it2 = _cladeCounts.find(&(it->second));
       if (it2 != _cladeCounts.end()) 
-  _total_n_reads += reads(it2->second);
+        //_total_n_reads += reads(it2->second);
+        _total_n_reads += it2->second.readCount();
      }
    }
 
@@ -1091,7 +1041,7 @@ void TaxReport<TAXID,READCOUNTS>::printReport(const TaxonomyEntry<TAXID>& tax, u
     if (taxit_ptr == _cladeCounts.end())
       return;
     const auto & cladecounts = taxit_ptr->second;
-    if (!_show_zeros && reads(cladecounts) == 0)
+    if (!_show_zeros && cladecounts.readCount() == 0)
       return;
 
     printLine(tax, cladecounts, depth);
@@ -1103,8 +1053,8 @@ void TaxReport<TAXID,READCOUNTS>::printReport(const TaxonomyEntry<TAXID>& tax, u
     for (size_t i =0; i < tax.children.size(); ++i) {
       auto it = _cladeCounts.find(tax.children[i]);
       if (it != _cladeCounts.end()) {
-  pos.push_back(i);
-  rc[i] = &(it->second);
+        pos.push_back(i);
+        rc[i] = &(it->second);
       }
     }
     std::sort(pos.begin(), pos.end(), [&](size_t a, size_t b) { return *(rc.at(b)) < *(rc.at(a)) ;} );
@@ -1120,7 +1070,7 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
   const auto r_it = _taxCounts.find(tax.taxonomyID);
   const bool has_tax_data = r_it != _taxCounts.end();
 
-  long long unique_kmers_for_clade = rc.kmers.cardinality();
+  const uint64_t unique_kmers_for_clade = rc.uniqueKmerCount();
   double genome_size = double(tax.genomeSize+tax.genomeSizeOfChildren);
 
   for (size_t i = 0; i< _report_cols.size(); ++i) {
@@ -1130,15 +1080,15 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
       case REPORTCOLS::SPACED_NAME:       _reportOfb << string(2*depth, ' ') + tax.scientificName; break;
       case REPORTCOLS::TAX_ID:            _reportOfb << (tax.taxonomyID == (uint32_t)-1? -1 : (int32_t) tax.taxonomyID); break;
       case REPORTCOLS::DEPTH:             _reportOfb << depth; break;
-      case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*reads(rc)/_total_n_reads; break;
+      case REPORTCOLS::PERCENTAGE:       _reportOfb << setprecision(4) << 100.0*rc.readCount()/_total_n_reads; break;
            //case REPORTCOLS::ABUNDANCE:      _reportOfb << 100*counts.abundance[0]; break;
            //case REPORTCOLS::ABUNDANCE_LEN:  _reportOfb << 100*counts.abundance[1]; break;
-      case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_data? reads(r_it->second) : 0); break;
-      case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << reads(rc); break;
-      case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_data? r_it->second.kmers.cardinality() : 0); break;
+      case REPORTCOLS::NUM_READS:        _reportOfb << (has_tax_data? r_it->second.readCount() : 0); break;
+      case REPORTCOLS::NUM_READS_CLADE:  _reportOfb << rc.readCount(); break;
+      case REPORTCOLS::NUM_UNIQUE_KMERS: _reportOfb << (has_tax_data? r_it->second.kmerCount() : 0); break;
       case REPORTCOLS::NUM_UNIQUE_KMERS_CLADE:  _reportOfb << unique_kmers_for_clade; break;
-      case REPORTCOLS::NUM_KMERS:        _reportOfb << (has_tax_data? r_it->second.kmers.nObserved() : 0); break;
-      case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << rc.kmers.nObserved(); break;
+      case REPORTCOLS::NUM_KMERS:        _reportOfb << (has_tax_data? r_it->second.kmerCount() : 0); break;
+      case REPORTCOLS::NUM_KMERS_CLADE:  _reportOfb << rc.kmerCount(); break;
       case REPORTCOLS::NUM_KMERS_IN_DATABASE: _reportOfb << tax.genomeSize; break;
       case REPORTCOLS::CLADE_KMER_COVERAGE: 
                 if (genome_size == 0) { 
@@ -1146,7 +1096,7 @@ void TaxReport<TAXID,READCOUNTS>::printLine(const TaxonomyEntry<TAXID>& tax, con
                 } else {
             _reportOfb << setprecision(4) << (unique_kmers_for_clade  / genome_size); 
                 }; break;
-      case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(rc.kmers.nObserved()) / unique_kmers_for_clade ); break;
+      case REPORTCOLS::CLADE_KMER_DUPLICITY: _reportOfb << setprecision(3) << ( double(rc.kmerCount()) / unique_kmers_for_clade ); break;
       case REPORTCOLS::NUM_KMERS_IN_DATABASE_CLADE: _reportOfb << tax.genomeSize + tax.genomeSizeOfChildren; break;
                 //case REPORTCOLS::GENOME_SIZE: ; break;
                 //case REPORTCOLS::NUM_WEIGHTED_READS: ; break;

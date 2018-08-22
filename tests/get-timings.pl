@@ -16,13 +16,13 @@ my $K="kraken";
 
 print join($sep,qw/sample mbpm1 mbpm2 time1 time2 time3 mem1 mem2/),"\n";
 for my $hll_t (@ARGV) {
-		my $bn = `basename $hll_t .krakenhll.timing.log`; chomp $bn;
+		my $bn = `basename $hll_t .krakenuniq.timing.log`; chomp $bn;
 		die "$hll_t should be an hll timing log" if $bn eq $hll_t;
 		print "$bn$sep";
 		(my $hll = $hll_t) =~ s/.timing//;
-		(my $k = $hll) =~ s/krakenhll/$K/;
-		(my $k_t = $hll_t) =~ s/krakenhll/$K/;
-		(my $kr_t = $hll_t) =~ s/krakenhll/$K-report/;
+		(my $k = $hll) =~ s/krakenuniq/$K/;
+		(my $k_t = $hll_t) =~ s/krakenuniq/$K/;
+		(my $kr_t = $hll_t) =~ s/krakenuniq/$K-report/;
 
 		my $hm = `grep -o '[0-9\.]* Mbp/m' $hll | sed 's/ .*//'`; chomp $hm;
 		print $hm,$sep;

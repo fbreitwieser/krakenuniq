@@ -1,14 +1,14 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
- * This file is part of the KrakenHLL taxonomic sequence classification system.
+ * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
- * KrakenHLL is free software: you can redistribute it and/or modify
+ * KrakenUniq is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * KrakenHLL is distributed in the hope that it will be useful,
+ * KrakenUniq is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -18,18 +18,18 @@
  */
 
 #include "hyperloglogplus.hpp"
+#include "khset.h"
 #include <iostream>
 #include <fstream>
 #include <random>
 #include <limits>
-
- #include <ctype.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-
 using namespace std;
+using namespace kraken;
 
 int usage(int exit_code) {
   std::cerr << 
@@ -44,7 +44,8 @@ int usage(int exit_code) {
 "  -t             Test mode - print cardinalities regularily\n"
 "  -y             Show relative error along with cardinality estimates\n"
 "  -e             Use improved cardinality estimator by Otmar Ertl, too\n"
-"  -E             Use exact cardinality counting (implemented w/ unordered_set, not working w/ test mode)\n ";
+"  -U             Use exact cardinality counting implemented w/ unordered_set (not working w/ test mode)\n"
+"  -K             Use exact cardinality counting implemented w/ khash (not working w/ test mode)\n";
     return exit_code;
   }
 
@@ -100,7 +101,7 @@ void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool show_rel
 
 
 void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr, bool test_mode, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) {
-  hll.add(nr);
+  hll.insert(nr);
   ++ctr;
   if (test_mode) {
     // prints numbers at powers of 10 and 10 points in-between
@@ -113,6 +114,13 @@ void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr,
 }
 
 
+  template <typename T>
+  unordered_set<T>& operator+=(unordered_set<T>& left, const unordered_set<T>& right) {
+    left.insert(right.begin(), right.end());
+    return left;
+  }
+
+
 int main(int argc, char **argv) {
 
   size_t p = 10;
@@ -120,7 +128,8 @@ int main(int argc, char **argv) {
   bool test_mode = false;
   bool heule_too = true;
   bool ertl_too = false;
-  bool exact_counting = false;
+  bool exact_counting_unordered_set = false;
+  bool exact_counting_khash = false;
   bool flajolet_too = false;
   bool show_rel_error = false;
   bool use_stdin = true;
@@ -129,12 +138,13 @@ int main(int argc, char **argv) {
 
   int c;
 
-  while ((c = getopt (argc, argv, "shtep:r:yx:fE")) != -1)
+  while ((c = getopt (argc, argv, "shtep:r:yx:fUK")) != -1)
     switch (c) {
       case 's': sparse = true; break;
       case 't': test_mode = true; break;
       case 'e': ertl_too = true; break;
-      case 'E': exact_counting = true; break;
+      case 'U': exact_counting_unordered_set = true; break;
+      case 'K': exact_counting_khash = true; break;
       case 'f': flajolet_too = true; break;
       case 'y': show_rel_error = true; break;
       case 'p': p = stoi(optarg); break;
@@ -157,6 +167,7 @@ int main(int argc, char **argv) {
         abort ();
       }
 
+  bool exact_counting = exact_counting_khash || exact_counting_unordered_set;
   HyperLogLogPlusMinus<uint64_t> hll(p, sparse); // unique k-mer count per taxon
   //HyperLogLogPlusMinus<uint64_t> hll(p, sparse, wang_mixer); // unique k-mer count per taxon
 
@@ -181,20 +192,26 @@ int main(int argc, char **argv) {
     cout << '\n';
   } 
   uint64_t ctr = 0;
+  
   unordered_set<uint64_t> exact_counter;
+  khset64_t exact_counter_khash;
 
   if (use_stdin) {
     uint64_t nr;
     while (cin >> nr) {
-      if (exact_counting) {
-	exact_counter.insert(nr);
+      if (exact_counting_unordered_set) {
+          exact_counter.insert(nr);
+      } else if (exact_counter_khash) {
+        exact_counter_khash.insert(nr);
       } else {
         add_to_hll(hll, nr, ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
       }
     }
     if (!test_mode) {
-      if (exact_counting) {
+      if (exact_counting_unordered_set) {
         cout << exact_counter.size() << "\n";
+      } else if (exact_counter_khash) {
+        cout << exact_counter_khash.size() << "\n";
       } else {
         print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
       }
@@ -208,23 +225,27 @@ int main(int argc, char **argv) {
     // Define output distribution (default range for unsigned: 0 to MAX)
     std::uniform_int_distribution<uint64_t> distr;
     for (size_t j = 0; j < n_redo; ++j) {
-
+      unordered_set<uint64_t> exact_counter1;
+      khset64_t exact_counter_khash1;
       for(size_t i = 0; i < n_rand; i++) {
-        if (exact_counting) {
-	  exact_counter.insert(distr(rng));
+        if (exact_counting_unordered_set) {
+            exact_counter1.insert(distr(rng));
+        } else if (exact_counting_khash) {
+          exact_counter_khash1.insert(distr(rng));
         } else {
           add_to_hll(hll, distr(rng), ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
-	}
+        }
       }
       if (!test_mode) {
-        if (exact_counting) {
-          cout << exact_counter.size() << "\n";
+        if (exact_counting_unordered_set) {
+          cout << exact_counter1.size() << "\n";
+        } else if (exact_counting_khash) {
+          cout << exact_counter_khash1.size() << "\n";
         } else {
           print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
         }
       }
       hll.reset();
-      exact_counter.clear();
       ctr = 0;
     }
   }

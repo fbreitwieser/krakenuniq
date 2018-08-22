@@ -1,6 +1,6 @@
 /*
  * Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
- * Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+ * Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
  *
  * This file is part of the Kraken taxonomic sequence classification system.
  *
@@ -58,6 +58,7 @@ bool Add_taxIds_for_Sequences = false;
 bool Use_uids_instead_of_taxids = false;
 bool Output_UID_map_to_STDOUT = false;
 bool Pretend = false;
+int Minimum_sequence_size = -1;
 
 string UID_map_filename;
 ofstream UID_map_file;
@@ -302,6 +303,12 @@ void process_single_file() {
         continue;
     }
 
+	if (Minimum_sequence_size > 0 && dna.seq.size() < Minimum_sequence_size) {
+      cerr << "Skipping sequence " << dna.id << " as it's too short (" << dna.seq.size() << ")" << endl;
+	  ++ seqs_skipped;
+	  continue;
+	}
+
     auto it_p = Parent_map.find(taxid);
     if (it_p == Parent_map.end()) {
       cerr << "Skipping sequence " << dna.id << " since taxonomy ID " << taxid << " is not in taxonomy database!" << endl;
@@ -439,7 +446,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:aApI:o:Sc:")) != -1) {
+  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:aApI:o:Sc:E:")) != -1) {
     switch (opt) {
       case 'f' :
         File_to_taxon_map_filename = optarg;
@@ -498,6 +505,9 @@ void parse_command_line(int argc, char **argv) {
       case 'o' :
         Output_DB_filename = optarg;
         break;
+      case 'E' :
+        Minimum_sequence_size = atoi(optarg);
+		break;
       case 'p' :
         Pretend = true;
         break;
@@ -538,6 +548,7 @@ void usage(int exit_code) {
        << "  -A               Add taxonomy IDs (starting with "<<(New_taxid_start+1)<<") for sequences to Taxonomy DB" << endl
        //<< "  -T               Do not set LCA as taxid for kmers, but the taxid of the sequence" << endl
        << "  -T               When a k-mer appears in a 'synthetic construct' sequence, force the taxID to be the 'synthetic construct' taxID, instead of the LCA." << endl
+	   << "  -E #             Exclude sequences that are shorter than the threshold." << endl
        << "  -I filename      Write UIDs into database, and output (binary) UID-to-taxid map to filename" << endl
        << "  -p               Pretend - do not write database back to disk (when working in RAM)" << endl
        << "  -v               Verbose output" << endl
