@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
  * This file is part of the KrakenUniq taxonomic sequence classification system.
  *

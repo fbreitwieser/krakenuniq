@@ -1,14 +1,14 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
- * This file is part of the KrakenHLL taxonomic sequence classification system.
+ * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
- * KrakenHLL is free software: you can redistribute it and/or modify
+ * KrakenUniq is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * KrakenHLL is distributed in the hope that it will be useful,
+ * KrakenUniq is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -22,7 +22,7 @@
 
 #include "kraken_headers.hpp"
 #include "hyperloglogplus.hpp"
-#include "khset64.h"
+#include "khset.h"
 #include <unordered_set>
 
 namespace kraken {
@@ -40,9 +40,17 @@ namespace kraken {
     ReadCounts() : n_reads(0), n_kmers(0) {
     }
 
+
+    ReadCounts(uint64_t _n_reads, uint64_t _n_kmers, const CONTAINER& _kmers) :
+            n_reads(_n_reads), n_kmers(_n_kmers), kmers(_kmers) {
+    }
+
     //ReadCounts(const ReadCounts& other) = delete;
     
-	ReadCounts(const ReadCounts& other) : n_reads(other.n_reads), n_kmers(other.n_kmers), kmers(other.kmers) {
+    ReadCounts(const ReadCounts& other) : n_reads(other.n_reads), n_kmers(other.n_kmers), kmers(other.kmers) {
+    }
+
+    ReadCounts(ReadCounts&& other) : n_reads(other.n_reads), n_kmers(other.n_kmers), kmers(std::move(other.kmers)) {
     }
 
     ReadCounts& operator=(const ReadCounts& other) {
@@ -51,7 +59,7 @@ namespace kraken {
       kmers = other.kmers;
       return *this;
     }
-	
+
 
     ReadCounts& operator=(ReadCounts&& other) {
       n_reads = other.n_reads;
@@ -71,14 +79,13 @@ namespace kraken {
       kmers += other.kmers;
       return *this;
     }
-/*
+
     ReadCounts& operator+=(ReadCounts&& other) {
       n_reads += other.n_reads;
       n_kmers += other.n_kmers;
       kmers += std::move(other.kmers);
       return *this;
     }
-*/
 
     bool operator<(const ReadCounts& other) {
       if (n_reads < other.n_reads) {
@@ -104,20 +111,22 @@ namespace kraken {
     left.insert(right.begin(), right.end());
     return left;
   }
+
+  template <typename T>
+  set<T>& operator+=(set<T>& left, const set<T>& right) {
+    left.insert(right.begin(), right.end());
+    return left;
+  }
   
   template<>
   uint64_t ReadCounts< HyperLogLogPlusMinus<uint64_t> >::uniqueKmerCount() const {
     return(kmers.cardinality());
   }
 
-  template<>
-  uint64_t ReadCounts< unordered_set<uint64_t> >::uniqueKmerCount() const {
+  template<typename T>
+  uint64_t ReadCounts< T >::uniqueKmerCount() const {
     return(kmers.size());
   }
 
-  template<>
-  uint64_t ReadCounts< khset64_t >::uniqueKmerCount() const {
-    return(kmers.size());
-  }
 }
 #endif

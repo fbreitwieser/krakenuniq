@@ -1,6 +1,6 @@
 /*
  * Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
- * Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
+ * Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
  *
  * This file is part of the Kraken taxonomic sequence classification system.
  *
@@ -35,13 +35,18 @@ int New_taxid_start = 1000000000;
 using namespace std;
 using namespace kraken;
 
+#define USE_KHSET_FOR_EXACT_COUNTING
+
 #ifdef EXACT_COUNTING
-#include "khset64.h"
-using READCOUNTS = ReadCounts< khset64_t >;
-//#include <unordered_set>
-//using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
+  #ifdef USE_KHSET_FOR_EXACT_COUNTING
+    #include "khset.h"
+    using READCOUNTS = ReadCounts< khset64_t >;
+  #else
+    #include <unordered_set>
+    using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
+  #endif
 #else
-using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
+  using READCOUNTS = ReadCounts<HyperLogLogPlusMinus<uint64_t> >;
 #endif
 
 

@@ -3,7 +3,7 @@
  * Modified work copyright 2017 Florian Breitwieser 
  *
  * The original file is part of SLAM
- * The modified file is part of KrakenHLL
+ * The modified file is part of KrakenUniq
  *
  * SLAM is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -287,7 +287,7 @@ class TaxReport {
     uint64_t _total_n_reads = 0;
     bool _show_zeros;
     void printLine(const TaxonomyEntry<TAXID>& tax, const READCOUNTS& rc, unsigned depth);
-	READCOUNTS setCladeCounts(const TaxonomyEntry<TAXID>* tax, unordered_map<const TaxonomyEntry<TAXID>*, unordered_set<const TaxonomyEntry<TAXID>*> >& _children);
+    READCOUNTS setCladeCounts(const TaxonomyEntry<TAXID>* tax, unordered_map<const TaxonomyEntry<TAXID>*, unordered_set<const TaxonomyEntry<TAXID>*> >& _children);
 
   public:
     TaxReport(std::ostream& _reportOfb, const TaxonomyDB<TAXID> & taxdb, const std::unordered_map<TAXID, READCOUNTS>&, bool _show_zeros);
@@ -902,20 +902,20 @@ READCOUNTS TaxReport<TAXID,READCOUNTS>::setCladeCounts(const TaxonomyEntry<TAXID
     if (itt == _taxCounts.end()) {
       // cerr << "This leaf node [taxid "<< tax->taxonomyID <<"] has no taxon count" << endl;
       return(READCOUNTS());
-	}
-	_cladeCounts[tax] = itt->second;
+    }
+    _cladeCounts[tax] = itt->second;
   } else {
     auto c = itc->second.begin();
 
-  	READCOUNTS rc = setCladeCounts(*c, _children);
+      READCOUNTS rc = setCladeCounts(*c, _children);
 
-	for (++c; c != itc->second.end(); ++c) {
+    for (++c; c != itc->second.end(); ++c) {
       rc += setCladeCounts(*c, _children);
-	}
-	if (itt != _taxCounts.end())
+    }
+    if (itt != _taxCounts.end())
       rc += itt->second;
 
-	_cladeCounts[tax] = rc;
+    _cladeCounts[tax] = rc;
   }
   return _cladeCounts.at(tax);
 }*/
@@ -955,10 +955,10 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB
     READCOUNTS rc = *(cit->second.front());
     for (size_t j = 1; j < cit->second.size(); ++j)
        rc += *(cit->second[j]);
-    //READCOUNTS rc = mergeReadCounts(cit->second);
+
     #pragma omp critical(update_clade_counts)
     {
-      _cladeCounts[cit->first] = std::move(rc);
+      _cladeCounts.insert( std::make_pair( cit->first, std::move(rc) ) );
     }
   }
   
@@ -1053,8 +1053,8 @@ void TaxReport<TAXID,READCOUNTS>::printReport(const TaxonomyEntry<TAXID>& tax, u
     for (size_t i =0; i < tax.children.size(); ++i) {
       auto it = _cladeCounts.find(tax.children[i]);
       if (it != _cladeCounts.end()) {
-  pos.push_back(i);
-  rc[i] = &(it->second);
+        pos.push_back(i);
+        rc[i] = &(it->second);
       }
     }
     std::sort(pos.begin(), pos.end(), [&](size_t a, size_t b) { return *(rc.at(b)) < *(rc.at(a)) ;} );

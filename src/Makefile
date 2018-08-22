@@ -33,16 +33,16 @@ grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
-count_unique: hyperloglogplus.o khset64.h
+count_unique: hyperloglogplus.o khset.h
 
 test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
 dump_db_kmers: krakendb.o quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o #taxdb.hpp report-cols.hpp readcounts.hpp
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o taxdb.hpp report-cols.hpp readcounts.hpp
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
-classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o khset64.h  #taxdb.hpp report-cols.hpp readcounts.hpp
+classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o khset.h taxdb.hpp report-cols.hpp readcounts.hpp
 	$(CXX) $(CXXFLAGS) -DEXACT_COUNTING -o classifyExact $^ $(LIBFLAGS)
 
 build_taxdb: quickfile.o #taxdb.hpp report-cols.hpp

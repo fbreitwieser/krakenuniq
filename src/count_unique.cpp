@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
  * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
@@ -18,7 +18,7 @@
  */
 
 #include "hyperloglogplus.hpp"
-#include "khset64.h"
+#include "khset.h"
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 using namespace std;
+using namespace kraken;
 
 int usage(int exit_code) {
   std::cerr << 
@@ -133,7 +134,7 @@ int main(int argc, char **argv) {
   bool show_rel_error = false;
   bool use_stdin = true;
   size_t n_rand = 1;
-  size_t n_redo = 2;
+  size_t n_redo = 1;
 
   int c;
 
@@ -199,7 +200,7 @@ int main(int argc, char **argv) {
     uint64_t nr;
     while (cin >> nr) {
       if (exact_counting_unordered_set) {
-	      exact_counter.insert(nr);
+          exact_counter.insert(nr);
       } else if (exact_counter_khash) {
         exact_counter_khash.insert(nr);
       } else {
@@ -228,7 +229,7 @@ int main(int argc, char **argv) {
       khset64_t exact_counter_khash1;
       for(size_t i = 0; i < n_rand; i++) {
         if (exact_counting_unordered_set) {
-	        exact_counter1.insert(distr(rng));
+            exact_counter1.insert(distr(rng));
         } else if (exact_counting_khash) {
           exact_counter_khash1.insert(distr(rng));
         } else {
@@ -244,10 +245,6 @@ int main(int argc, char **argv) {
           print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
         }
       }
-	  //exact_counter += exact_counter1;
-	  exact_counter_khash = std::move(exact_counter_khash1);
-      cout << exact_counter_khash.size() << "\n";
-      //cout << exact_counter.size() << "\n";
       hll.reset();
       ctr = 0;
     }
