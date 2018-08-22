@@ -1,14 +1,14 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
- * This file is part of the KrakenHLL taxonomic sequence classification system.
+ * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
- * KrakenHLL is free software: you can redistribute it and/or modify
+ * KrakenUniq is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * KrakenHLL is distributed in the hope that it will be useful,
+ * KrakenUniq is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.

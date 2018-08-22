@@ -1,6 +1,6 @@
 /*
  * Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
- * Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+ * Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
  *
  * This file is part of the Kraken taxonomic sequence classification system.
  *
@@ -18,8 +18,8 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KRAKENHLLTIL_HPP
-#define KRAKENHLLTIL_HPP
+#ifndef KRAKENUTIL_HPP
+#define KRAKENUTIL_HPP
 
 #include "kraken_headers.hpp"
 #include <unordered_map>
@@ -64,4 +64,4 @@ uint32_t lca(const std::unordered_map<uint32_t, uint32_t> &parent_map, uint32_t 
   };
 }
 
-#endif
+#endif // ndef KRAKENUTIL_HPP

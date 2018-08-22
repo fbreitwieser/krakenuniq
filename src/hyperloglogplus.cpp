@@ -1,14 +1,14 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
- * This file is part of the KrakenHLL taxonomic sequence classification system.
+ * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
- * KrakenHLL is free software: you can redistribute it and/or modify
+ * KrakenUniq is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * KrakenHLL is distributed in the hope that it will be useful,
+ * KrakenUniq is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -73,6 +73,11 @@ inline uint8_t clz(const uint64_t x, const uint8_t max = 64) {
   return __builtin_clzl(x);
 }
 
+template<typename T>
+inline uint8_t clz_p(const T x, const uint8_t p = 1) {
+  return __builtin_clz(((x<<1)|1)<<(p-1));
+}
+
 /**
  * Extract bits (from uint32_t or uint64_t) using LSB 0 numbering from hi to lo, including lo
  */
@@ -127,6 +132,7 @@ uint8_t getRank(const uint32_t hash_value, const uint8_t p) {
   // shift p values off, and count leading zeros of the remaining string {x31-p,...,x0}
   uint32_t rank_bits (hash_value << p);
   uint8_t rank_val = clz(rank_bits, 32-p) + 1;
+  //uint8_t rank_val = clz_p(hash_value, p) + 1;
   assert_leq(rank_val,32-p+1);
   return rank_val;
 }
@@ -135,6 +141,7 @@ uint8_t getRank(const uint64_t hash_value, const uint8_t p) {
   // shift p values off, and count leading zeros of the remaining string {x63-p,...,x0}
   uint64_t rank_bits (hash_value << p);
   uint8_t rank_val = clz(rank_bits, 64-p) + 1;
+  //uint8_t rank_val = clz_p(hash_value, p) + 1;
   assert_leq(rank_val,64-p+1);
   return rank_val;
 }
@@ -476,7 +483,7 @@ HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(HyperLogLogPlusMinus<HASH>&& ot
 
 
 template<>
-void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
+void HyperLogLogPlusMinus<uint64_t>::insert(uint64_t item) {
     ++ n_observed;
     // compute hash for item
     uint64_t hash_value = bit_mixer(item);
@@ -516,9 +523,9 @@ void HyperLogLogPlusMinus<uint64_t>::add(uint64_t item) {
 }
 
 template <typename T>
-void HyperLogLogPlusMinus<T>::add(vector<uint64_t> items) {
-    for(size_t i = 0; i < items.size(); ++i) {
-      this->add(items[i]);
+void HyperLogLogPlusMinus<T>::insert(const vector<uint64_t>& items) {
+    for(auto i : items) {
+      this->insert(i);
     }
 }
 
@@ -791,6 +798,11 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::heuleCardinality(bool correct_bias) con
 template<>
 uint64_t HyperLogLogPlusMinus<uint64_t>::cardinality() const {
     return ertlCardinality();
+}
+
+template<>
+uint64_t HyperLogLogPlusMinus<uint64_t>::size() const {
+    return cardinality();
 }
 
 /////////////////////////////////////////////////////////////////////

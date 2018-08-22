@@ -1,14 +1,14 @@
 /*
- * Copyright 2017, Florian Breitwieser
+ * Copyright 2017-2018, Florian Breitwieser
  *
- * This file is part of the KrakenHLL taxonomic sequence classification system.
+ * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
- * KrakenHLL is free software: you can redistribute it and/or modify
+ * KrakenUniq is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * KrakenHLL is distributed in the hope that it will be useful,
+ * KrakenUniq is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -71,8 +71,11 @@ private:
   HASH (*bit_mixer) (uint64_t);
 
   // sparse versions of p and m
-  static const uint8_t  pPrime = 25; // precision when using a sparse representation
-                                     // fixed to 25, because 25 + 6 bits for rank + 1 flag bit = 32
+  static const uint8_t  pPrime = 25; // precision when using a sparse representation 
+                                     // which encodes the rank + index in 32 bits:
+                                     //  25 bits for index + 
+                                     //   6 bits for rank + 
+                                     //   1 flag bit indicating if bits p..pPrime are 0
   static const uint32_t mPrime = 1 << pPrime; // 2^pPrime
 
 public:
@@ -88,8 +91,8 @@ public:
   void reset(); // Note: sets sparse=true
 
   // Add items or other HLL to this sketch
-  void add(uint64_t item);
-  void add(vector<uint64_t> items);
+  void insert(uint64_t item);
+  void insert(const vector<uint64_t>& items);
 
   // Merge another sketch into this one
   // TODO: assumes equal bit_mixers! but does not check that
@@ -100,6 +103,7 @@ public:
 
   // Calculate cardinality estimates
   uint64_t cardinality() const; // returns ertlCardinality()
+  uint64_t size() const; // returns ertlCardinality()
   // HLL++ estimator of Heule et al., 2015. Uses empirical bias correction factors
   uint64_t heuleCardinality(bool correct_bias = true) const; 
   // Improved estimator of Ertl, 2017. Does not rely on empirical data
