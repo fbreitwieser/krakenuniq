@@ -51,9 +51,9 @@ brew install gcc
 ./install_krakenuniq -c g++-8
 ```
 
-### Installing Jellfish v1.1.11
+### Installing Jellyfish v1.1.11
 
-Currently, KrakenUniq build depends depends on Jellyfish v1.1.11 . To install Jellfish alongside KrakenUniq, use the `-j` flag for the `install_krakenuniq.sh` script. Alternatively, you can specify the Jellyfish path to `krakenuniq` with `krakenuniq --jellyfish-bin /usr/bin/jellyfish1`.
+Currently, KrakenUniq build depends depends on Jellyfish v1.1.11. To install Jellyfish alongside KrakenUniq, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenuniq` with `krakenuniq --jellyfish-bin /usr/bin/jellyfish1`.
 
 ### Building a microbial nt database
 
