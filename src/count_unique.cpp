@@ -29,7 +29,6 @@
 #include <unistd.h>
 
 using namespace std;
-using namespace kraken;
 
 int usage(int exit_code) {
   std::cerr << 
