@@ -351,7 +351,7 @@ sub build_database {
       print STDERR "Library directory $_ does not exist!\n";
       exit(1);
     }
-  }
+    
   if (defined $taxonomy_dir && ! -d $taxonomy_dir) {
     print STDERR "Taxonomy directory $taxonomy_dir does not exist!\n";
     exit(1);
