@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 # Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
-# Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+# Portions (c) 2017, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
 #
 # This file is part of the Kraken taxonomic sequence classification system.
 #
@@ -237,7 +237,7 @@ Usage: $PROG [task option] [options]
 Task options (exactly one can be selected -- default is build):
   --download-taxonomy        Download NCBI taxonomic information
   --download-library TYPE    Download partial library (TYPE = one of $types). 
-                             Use krakenhll-download for more options.
+                             Use krakenuniq-download for more options.
   --add-to-library FILE      Add FILE to library
   --build                    Create DB from library (requires taxonomy d/l'ed and at 
                              least one file in library)
@@ -296,14 +296,14 @@ sub display_help {
 }
 
 sub display_version {
-  print "KrakenHLL version #####=VERSION=#####\n";
+  print "KrakenUniq version #####=VERSION=#####\n";
   print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
 }
 
 sub download_taxonomy {
-  exec "krakenhll-download --db $db taxonomy";
+  exec "krakenuniq-download --db $db taxonomy";
 }
 
 sub download_library {
@@ -312,7 +312,7 @@ sub download_library {
     warn "Unknown library type \"$type\"\n";
     usage();
   }
-  exec "krakenhll-download", $type;
+  exec "krakenuniq-download", $type;
 }
 
 sub add_to_library {
@@ -336,11 +336,11 @@ sub shrink_db {
 }
 
 sub standard_installation {
-  print STDERR "krakenhll-download --db $db taxonomy contaminants\n";
-  system("krakenhll-download --db $db taxonomy contaminants");
+  print STDERR "krakenuniq-download --db $db taxonomy contaminants\n";
+  system("krakenuniq-download --db $db taxonomy contaminants");
   
-  print STDERR "krakenhll-download --db $db refseq/archaea refseq/bacteria refseq/viral/Any viral-neighbors\n";
-  system("krakenhll-download --db $db refseq/archaea refseq/bacteria refseq/viral/Any viral-neighbors");
+  print STDERR "krakenuniq-download --db $db refseq/archaea refseq/bacteria refseq/viral/Any viral-neighbors\n";
+  system("krakenuniq-download --db $db refseq/archaea refseq/bacteria refseq/viral/Any viral-neighbors");
   
   build_database();
 }

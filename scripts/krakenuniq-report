@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
 # Original file Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
-# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
 #
-# This file is part of the KrakenHLL taxonomic sequence classification system.
+# This file is part of the KrakenUniq taxonomic sequence classification system.
 #
 # Kraken is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 
 # Reports a summary of Kraken's results.
 # Note that this should be only a fall-back - the resulting file will not include
-#  kmer-counts provided in the file produced by the `krakenhll --report-file` command
+#  kmer-counts provided in the file produced by the `krakenuniq --report-file` command
 
 use strict;
 use warnings;
@@ -72,7 +72,7 @@ OPTIONS:
   --taxon-list    Input files is list of taxon IDs instead of Kraken output.
   -h              This message.
   
-This script should only be used when post-processing raw KrakenHLL output, and k-mer counts and coverages are not needed. For most use-cases, krakenhll --report-file is better than krakenhll-report. \n";
+This script should only be used when post-processing raw KrakenUniq output, and k-mer counts and coverages are not needed. For most use-cases, krakenuniq --report-file is better than krakenuniq-report. \n";
   my $default_db;
   eval { $default_db = krakenlib::find_db(); };
   if (defined $default_db) {
@@ -86,7 +86,7 @@ sub display_help {
 }
 
 sub display_version {
-  print "KrakenHLL version #####=VERSION=#####\n";
+  print "KrakenUniq version #####=VERSION=#####\n";
   print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;

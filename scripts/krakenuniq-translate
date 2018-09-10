@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
 # Copyright 2013-2015, Derrick Wood <dwood@cs.jhu.edu>
-# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenHLL
+# Portions (c) 2017-2018, Florian Breitwieser <fbreitwieser@jhu.edu> as part of KrakenUniq
 #
-# This file is part of the KrakenHLL taxonomic sequence classification system.
+# This file is part of the KrakenUniq taxonomic sequence classification system.
 #
 # Kraken is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ sub display_help {
 }
 
 sub display_version {
-  print "KrakenHLL version #####=VERSION=#####\n";
+  print "KrakenUniq version #####=VERSION=#####\n";
   print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;

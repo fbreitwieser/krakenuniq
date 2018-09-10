@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# krakenhll-download.pl - based on centrifuge-download
+# krakenuniq-download.pl - based on centrifuge-download
 # (c) Florian Breitwieser, 2017-2018
 # licensed under GPL-3
 
@@ -40,7 +40,7 @@ my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
 my @ALL_ASSEMBLY_LEVELS=qw/Complete_Genome Chromosome Scaffold Contig/;
 my @SMALL_GENOMES=qw/mitochondrion plasmid plastid/;
 
-my $FILTER_NT_SCRIPT = "$FindBin::RealBin/krakenhll-filter_nt";
+my $FILTER_NT_SCRIPT = "$FindBin::RealBin/krakenuniq-filter_nt";
 
 ## Option parsing
 my $DATABASE="refseq";
@@ -1208,7 +1208,7 @@ sub download_domain(@) {
 
   my $msg  = "Found $downloaded_files files.";
   $msg .= " Skipped download of $existing_files files that already existed." if $existing_files > 0;
-  $msg .= " $download_failed downloads failed - maybe try re-running krakenhll-download." if ($download_failed > 0);
+  $msg .= " $download_failed downloads failed - maybe try re-running krakenuniq-download." if ($download_failed > 0);
   print STDERR "  $msg\n";
 }
 # vim: tabstop=8 expandtab tabstop=2 shiftwidth=2 :
