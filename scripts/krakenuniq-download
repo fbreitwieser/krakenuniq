@@ -25,8 +25,8 @@ sub download_taxonomy(@);
 sub download_contaminats(@);
 sub download_nt(@);
 sub download(@);
-sub print_header_lines(@);
-sub print_header_line_ac(@);
+sub create_map_files(@);
+sub create_map_file_ac(@);
 sub download_domain(@);
 sub download_viral_neighbors(@);
 sub download_ncbi_search(@);
@@ -59,6 +59,7 @@ my $NCBIDB="nuccore";
 my $WRITE_MAPS=1;
 my $DO_DUST=0;
 my $FILTER_UNPLACED=0;
+my $MIN_SEQ_LEN=0;
 my $SEARCH_TERM;
 my $VERBOSE=0;
 my $OVERWRITE_FILES=0;
@@ -163,6 +164,7 @@ COMMON OPTIONS
  --overwrite        Redownload and overwrite files with the same name.
  --verbose          Be verbose.
  --dust, -D         Mask low-complexity regions using dustmasker.
+ --min-seq-len X    Filter all sequences from the FASTA files that have less than X bp.
 
 WHEN USING DATABASE nucleotide or viral-neighbors:
  --search SEARCH_TERM  Download all sequences returned from a NCBI nucleotide search.
@@ -205,6 +207,7 @@ GetOptions(
   "fna=s" => \$FNA_FILES,
   "rsync|R" => \$DL_MOD_RSYNC,
   "filter-unplaced|u" => \$FILTER_UNPLACED,
+  "min-seq-len=i" => \$MIN_SEQ_LEN,
   "search=s" => \$SEARCH_TERM,
   "term=s" => \$SEARCH_TERM,
   "ac=s" => \$NUC_AC,
@@ -522,7 +525,7 @@ sub download_ncbi_acs(@) {
     system("mkdir -p $nbr_dir/$name1-tax$taxid");
     my $file = "$nbr_dir/$name1-tax$taxid/$ac.$RETTYPE";
     download($efetch_url.$ac, $file);
-    print_header_line_ac($file, $ac, $taxid);
+    create_map_file_ac($file, $ac, $taxid);
   }
   foreach (@sorted_map_file_handles) {
     close $_;
@@ -628,7 +631,7 @@ sub download_ncbi_search(@) {
           }
           my $file = "$nbr_dir/$name1-tax$taxid/$nbr_ac.$RETTYPE";
           open($FA_HANDLE, ">", $file) or die "Couln't open file";
-          print_header_line_ac($file, $nbr_ac, $taxid);
+          create_map_file_ac($file, $nbr_ac, $taxid);
         }
         print $FA_HANDLE $line;
       }
@@ -757,7 +760,44 @@ sub download_viral_neighbors(@) {
   download_ncbi_search($nbr_dir, "nuccore", $search_term, @maps);
 }
 
-sub print_header_lines(@) {
+sub filter_short_contigs(@) {
+  my ($file, $new_file, $min_length) = @_;
+  return if -s $new_file;
+  if (! -f $file) {
+    print STDERR "ERROR: $file does not exist - should not happen!?\n";
+    return;
+  }
+  open (my $F, ">", $new_file);
+  open (my $G, "<", $file);
+  my $current_header;
+  my $current_sequence_length = 0;
+  my $current_record = "";
+  my $do_print;
+  while (<$G>) {
+    if (/^>([^ ]*)/) {
+      $current_sequence_length = 0;
+      $current_record = $_;
+      $do_print = 0;
+    } elsif ($do_print) {
+      print $F $_;
+    } else {
+      $current_sequence_length += length($_) - 1;
+      if ($current_sequence_length >= $min_length) {
+        $do_print = 1;
+        print $F $current_record;
+        print $F $_;
+        $current_record = "";
+        $current_sequence_length = 0;
+      } else {
+        $current_record .= $_;
+      }
+    }
+  }
+  close($G);
+  close($F);
+}
+
+sub create_map_files(@) {
   my ($file, $taxid, $name) = @_;
   return if -s "$file.map";
   if (! -f $file) {
@@ -779,7 +819,7 @@ sub print_header_lines(@) {
 }
 
 
-sub print_header_line_ac(@) {
+sub create_map_file_ac(@) {
   my ($file, $ac, $taxid, $name) = @_;
   return if -s "$file.map";
   print STDERR "Making map file for $file\n" if ($VERBOSE);
@@ -1028,8 +1068,8 @@ sub download_contaminats(@) {
   unlink("$CONTAMINANT_DIR/emvec.dat");
  
   if ( $WRITE_MAPS ) {
-    print_header_lines("$CONTAMINANT_DIR/UniVec.fna", $CONTAMINANT_TAXID, "UniVec");
-    print_header_lines("$CONTAMINANT_DIR/EmVec.fna", $CONTAMINANT_TAXID, "EmVec");
+    create_map_files("$CONTAMINANT_DIR/UniVec.fna", $CONTAMINANT_TAXID, "UniVec");
+    create_map_files("$CONTAMINANT_DIR/EmVec.fna", $CONTAMINANT_TAXID, "EmVec");
   }
 }
 
@@ -1169,7 +1209,7 @@ sub download_domain(@) {
         unless ($pid) {
           download($full_ftp_path, "$download_dir/$fname.gz", { gunzip => 1 });
           ## Output sequenceID to taxonomy ID map
-          print_header_lines("$download_dir/$fname", $taxid, "$assembly_accession $organism_name");
+          create_map_files("$download_dir/$fname", $taxid, "$assembly_accession $organism_name");
           end_fork();
         }
       }
@@ -1185,6 +1225,19 @@ sub download_domain(@) {
         } else {
           ++$download_failed;
         }
+  }
+
+  if ($MIN_SEQ_LEN > 0) {
+  foreach my $fasta_file (@fasta_files) {
+    ( my $tmp_fa = $fasta_file ) =~ s/.fna$/.filtered$MIN_SEQ_LEN.fna/;
+      my $pid = start_fork();
+      unless ($pid) {
+        filter_short_contigs($fasta_file, $tmp_fa, $MIN_SEQ_LEN);
+        move($tmp_fa, $fasta_file);
+        end_fork();
+    }
+  }
+  wait_children();
   }
 
 
