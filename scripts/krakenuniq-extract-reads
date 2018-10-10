@@ -202,8 +202,7 @@ LINE: while($line = readline $FQ) {
                 }
             }
         }
-
-        last if $cnt >= $sum_reads;
+        #last if $cnt >= $sum_reads; ## does not do what it's supposed to do when using flag -i
     } else {
         if (!$options{a}) {
             # skip next 3 fastq lines
