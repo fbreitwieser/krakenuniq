@@ -423,7 +423,7 @@ void process_file(char *filename) {
         total_bases += total_nt;
         //if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
         if (Print_Progress) {  
-          fprintf(stderr, "\r Processed %lu sequences (%.2f%% classified)",
+          fprintf(stderr, "\r Processed %llu sequences (%.2f%% classified)",
                           total_sequences, total_classified * 100.0 / total_sequences);
         }
       }

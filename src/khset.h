@@ -47,8 +47,14 @@ using u64 = ::std::uint64_t;
 
 
 // Steal everything, take no prisoners.
+// re memset reinterpret_cast:
+//   khset is not trivial, so we cannot clear it with memset(3), 
+//   but zeroing objects like that is safe and should be find for our purposes 
 #define MOVE_DEC(t) \
-   t(t &&other) {std::memcpy(this, &other, sizeof(*this)); std::memset(&other, 0, sizeof(other));}
+   t(t &&other) { \
+       std::memcpy(this, &other, sizeof(*this)); \
+       std::memset(reinterpret_cast<void*>(&other), 0, sizeof(other));\
+   }
 
 #define COPY_DEC(t) \
     t(const t &other) {\
