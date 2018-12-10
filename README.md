@@ -10,7 +10,7 @@ False-positive identifications are a significant problem in metagenomics classif
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/krakenuniq/badges/latest_release_date.svg)](https://anaconda.org/bioconda/krakenuniq)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/krakenuniq/badges/platforms.svg)](https://anaconda.org/bioconda/krakenuniq)
 
-KrakenUniq is available in the Anaconda cloud. To install
+KrakenUniq is available in the Anaconda cloud. To install, type:
 
 ```
 conda install krakenuniq
