@@ -94,7 +94,7 @@ KrakenUniq was built on top of Kraken, and supports Kraken 1 databases natively.
  - Add a suffix `.gz` to output files to generate gzipped output files
 
 ### Differences to `kraken-build`
- - Use `krakenuniq-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
+ - Use `krakenuniq-build --taxids-for-genomes --taxids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
  - `seqid2taxid.map` mapping sequence IDs to taxonomy IDs does NOT parse or require `>gi|`, but rather the sequence ID is the header up to just before the first space
  
 ### Building a microbial nt database
