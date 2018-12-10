@@ -295,7 +295,7 @@ foreach my $DATABASE (@ARGV) {
     if (defined $SEARCH_TERM) {
       download_ncbi_search($nbr_dir, $ncbi_db, $SEARCH_TERM, get_sorted_maps($MAP_DIV));
     }
-  } elsif ($DATABASE eq 'nt') {
+  } elsif ($DATABASE eq 'nt' || $DATABASE eq 'microbial-nt') {
     download_taxonomy(get_dir($BASE_DIR,"taxonomy"));
     download_nt($BASE_DIR, get_dir($BASE_DIR,"taxonomy"), get_dir($BASE_DIR,"library"));
 
