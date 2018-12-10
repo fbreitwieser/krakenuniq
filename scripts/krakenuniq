@@ -104,7 +104,7 @@ if (! @ARGV && !$preload) {
   usage();
 }
 
-if (!defined $report_file && !$preload) {
+if (!defined $report_file && !$preload && ! @ARGV) {
   print STDERR "Need to specify a report file with --report-file! Set to 'off' to suppress report generation.
 See --help for more details.\n";
   exit 1;
