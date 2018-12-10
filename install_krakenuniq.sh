@@ -24,6 +24,7 @@ INSTALL_JELLYFISH=0
 MAKE_ARGS=
 MAKE_CLEAN="clean"
 ADD_DEBUG_INFO=0
+LINK_DIR=
 
 USAGE="Usage: $(basename $0) [OPTIONS] INSTALL_DIR
 
@@ -31,19 +32,20 @@ OPTIONS:
     -j          Install jellyfish v1.1 in INSTALL_DIR, too.
     -l BIN_DIR  Link KrakenUniq executables to BIN_DIR, e.g /usr/local/bin or ~/bin.
     -c BIN      Use compiler BIN instead of g++.
-	-g          Add debug info
+    -g          Add debug info
     -h          This help message
 
 On MacOS, if you experience the error \"clang: fatal error: unsupported option '-fopenmp'\" on OSX, try installing g++ with brew, and using the option \"-c g++-7\".
 "
 
 
-while getopts "Chjc:g" OPTION; do
+while getopts "Chjc:gl:" OPTION; do
     case $OPTION in
     c) MAKE_ARGS="CXX=\"$OPTARG\"" ;;
     C) MAKE_CLEAN="" ;;
     j) INSTALL_JELLYFISH=1 ;;
-	g) ADD_DEBUG_INFO=1 ;;
+    g) ADD_DEBUG_INFO=1 ;;
+    l) LINK_DIR="$OPTARG" ;;
     h) echo "$USAGE"; exit 0 ;;
     *) echo "Incorrect options provided. $USAGE"
        exit 1 ;;
@@ -105,16 +107,21 @@ done
 mkdir -p $KRAKEN_DIR/File
 cp -r $DIR/scripts/File/* $KRAKEN_DIR/File
 
-echo -n "
-Kraken installation complete.
+echo "Installed KrakenUniq in $KRAKEN_DIR."
 
-To make things easier for you, you may want to copy/symlink the following
-files into a directory in your PATH:
+if [[ "$LINK_DIR" != "" ]]; then
+    [[ -d "$LINK_DIR" ]] || mkdir -p $LINK_DIR
+    for file in $KRAKEN_DIR/krakenuniq*; do
+        [ -x "$file" ] && ln -sf $file $LINK_DIR/`basename $file`
+    done
+    echo "Linked KrakenUniq files to $LINK_DIR."
+else
+    echo "You may want to link KrakenUniq scripts to /usr/bin or another directory for executables, or add the install directory to the PATH environment variable. Main executables: "
 
-ln -s"
-for file in $KRAKEN_DIR/krakenuniq*
-do
-  [ -x "$file" ] && echo -n " $file"
-done
-echo " DEST_DIR"
+    for file in $KRAKEN_DIR/krakenuniq*; do
+        [ -x "$file" ] && echo $file 
+    done
+fi
+
+echo "KrakenUniq installation complete."
 exit 0
