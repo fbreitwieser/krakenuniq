@@ -33,13 +33,15 @@ brew install gcc
 
 ## Database building
 
-There are two requirements for building databases:
+Note that KrakenUniq natively supports Kraken 1 databases (however not Kraken 2). 
+
+For building a custom database, there are three requirements:
 
 1. Sequence files (FASTA format)
 2. Mapping files (tab separated format, `sequence header<tab>taxID`
 3. NCBI taxonomy files (though a custom taoxnomies may be used, too)
 
-All necessary files may be downloaded using `krakenuniq-download`. Please find some examples below on how to download different sequence sets:
+`krakenuniq-download` supports a variety of data sources to download the taxonomy, sequence and mapping files. Please find examples below on how to download different sequence sets:
 
 ```
 ## All complete bacterial and archaeal genomes genomes in RefSeq using 10 threads, and masking low-complexity sequences in the genomes
@@ -71,7 +73,21 @@ To run classification on a pair of FASTQ files, use `krakenuniq`.
 krakenuniq --db DBDIR --threads 10 --report-file REPORTFILE.tsv > READCLASSIFICATION.tsv
 ```
 
+It can be advantegeous to preload the database prior to the first run. KrakenUniq uses mmap to map the database files into memory, which reads the file on demand. `krakenuniq --preload` reads the full database into memory, so that subsequent runs can benefit from the mapped pages. You do not need to specify preload before every run, but only after restarting the machine or when using a new database.
+
+```
+krakenuniq --db DBDIR --preload --threads 10
+krakenuniq --db DBDIR --threads 10 --report-file REPORTFILE.tsv > READCLASSIFICATION.tsv
+...
+```
+
+
 ## FAQ
+
+### KrakenUniq vs Kraken vs Kraken 2
+
+KrakenUniq was built on top of Kraken, and supports Kraken 1 databases natively. Kraken 2 was rebuilt from scratch, and has a different database format. Currently there is no version of KrakenUniq that supports Kraken 2, but we may support Kraken 2 in the future to provide the feature of unique k-mer counts to this classification engine, too.
+
 ### Differences to `kraken`
  - Use `krakenuniq --report-file FILENAME ...` to write the kraken report to `FILENAME`.
  - Use `krakenuniq --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenuniq-build --generate-taxonomy-ids-for-sequences` since the taxDB between the databases has to be absolutely the same.
