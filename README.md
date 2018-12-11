@@ -1,7 +1,7 @@
-KrakenUniq (formerly KrakenHLL): confident and fast metagenomics classification using unique k-mer counts
+KrakenUniq: confident and fast metagenomics classification using unique k-mer counts
 ===============================================
 
-False-positive identifications are a significant problem in metagenomics classification. KrakenUniq is a novel metagenomics classifier that combines the fast k-mer-based classification of [Kraken](https://github.com/DerrickWood/kraken) with an efficient algorithm for assessing the coverage of unique k-mers found in each species in a dataset. On various test datasets, KrakenUniq gives better recall and precision than other methods and effectively classifies and distinguishes pathogens with low abundance from false positives in infectious disease samples. By using the probabilistic cardinality estimator HyperLogLog, KrakenUniq runs as fast as Kraken and requires little additional memory. 
+False-positive identifications are a significant problem in metagenomics classification. KrakenUniq (formerly KrakenHLL) is a novel metagenomics classifier that combines the fast k-mer-based classification of [Kraken](https://github.com/DerrickWood/kraken) with an efficient algorithm for assessing the coverage of unique k-mers found in each species in a dataset. On various test datasets, KrakenUniq gives better recall and precision than other methods and effectively classifies and distinguishes pathogens with low abundance from false positives in infectious disease samples. By using the probabilistic cardinality estimator HyperLogLog, KrakenUniq runs as fast as Kraken and requires little additional memory. 
 
 **If you use KrakenUniq in your research, please cite our publication:** [KrakenUniq: confident and fast metagenomics classification using unique k-mer counts. Breitwieser FP, Baker DN, Salzberg SL. Genome Biology, Dec 2018. https://doi.org/10.1186/s13059-018-1568-0](https://doi.org/10.1186/s13059-018-1568-0)
 
@@ -90,11 +90,11 @@ KrakenUniq was built on top of Kraken, and supports Kraken 1 databases natively.
 
 ### Differences to `kraken`
  - Use `krakenuniq --report-file FILENAME ...` to write the kraken report to `FILENAME`.
- - Use `krakenuniq --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenuniq-build --generate-taxonomy-ids-for-sequences` since the taxDB between the databases has to be absolutely the same.
+ - Use `krakenuniq --db DB1 --db DB2 --db DB3 ...` to first attempt, for each k-mer, to assign it based on DB1, then DB2, then DB3. You can use this to prefer identifications based on DB1 (e.g. human and contaminant sequences), then DB2 (e.g. completed bacterial genomes), then DB3, etc. Note that this option is incompatible with `krakenuniq-build --taxids-for-genomes --taxids-for-sequences` since the taxDB between the databases has to be absolutely the same.
  - Add a suffix `.gz` to output files to generate gzipped output files
 
 ### Differences to `kraken-build`
- - Use `krakenuniq-build --generate-taxonomy-ids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header. An example for the result using this is in the ouput above - one read has been assigned specifically to `KC207814.1 Human herpesvirus 4 strain Mutu, complete genome`.
+ - Use `krakenuniq-build --taxids-for-genomes --taxids-for-sequences ...` to add pseudo-taxonomy IDs for each sequence header and genome assembly (when using `krakenuniq-download`). 
  - `seqid2taxid.map` mapping sequence IDs to taxonomy IDs does NOT parse or require `>gi|`, but rather the sequence ID is the header up to just before the first space
  
 ### Building a microbial nt database
