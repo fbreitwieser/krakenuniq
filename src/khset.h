@@ -79,9 +79,9 @@ struct khset32_t: khash_t(set) {
     MOVE_DEC(khset32_t)
     // For each
     __FE__
-    operator khash_t(set) &() {return *reinterpret_cast<khash_t(set) *>(this);}
+    //operator khash_t(set) &() {return *reinterpret_cast<khash_t(set) *>(this);}
     operator khash_t(set) *() {return reinterpret_cast<khash_t(set) *>(this);}
-    operator const khash_t(set) &() const {return *reinterpret_cast<const khash_t(set) *>(this);}
+    //operator const khash_t(set) &() const {return *reinterpret_cast<const khash_t(set) *>(this);}
     operator const khash_t(set) *() const {return reinterpret_cast<const khash_t(set) *>(this);}
     khash_t(set) *operator->() {return static_cast<khash_t(set) *>(*this);}
     const khash_t(set) *operator->() const {return static_cast<const khash_t(set) *>(*this);}
@@ -106,9 +106,9 @@ struct khset64_t: khash_t(set64) {
     MOVE_DEC(khset64_t)
     // For each
     __FE__
-    operator khash_t(set64) &() {return *reinterpret_cast<khash_t(set64) *>(this);}
+    //operator khash_t(set64) &() {return *reinterpret_cast<khash_t(set64) *>(this);}
     operator khash_t(set64) *() {return reinterpret_cast<khash_t(set64) *>(this);}
-    operator const khash_t(set64) &() const {return *reinterpret_cast<const khash_t(set64) *>(this);}
+    //operator const khash_t(set64) &() const {return *reinterpret_cast<const khash_t(set64) *>(this);}
     operator const khash_t(set64) *() const {return reinterpret_cast<const khash_t(set64) *>(this);}
     khash_t(set64) *operator->() {return static_cast<khash_t(set64) *>(*this);}
     const khash_t(set64) *operator->() const {return static_cast<const khash_t(set64) *>(*this);}

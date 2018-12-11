@@ -105,7 +105,9 @@ static void bin_and_sort_data(KrakenDB &kdb, char *data, KrakenDBIndex &idx) {
   input_file.close();
 
   // Sort all bins
+#ifdef _OPENMP
   #pragma omp parallel for schedule(dynamic)
+#endif
   for (uint64_t i = 0; i < entries; i++) {
     qsort(data + offsets[i] * pair_size,
           offsets[i+1] - offsets[i], pair_size,

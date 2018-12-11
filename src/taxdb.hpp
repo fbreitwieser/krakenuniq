@@ -947,7 +947,10 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB
 
   //cerr << " Nr children: " << _children.size() << endl;
 
+
+#ifdef _OPENMP
   #pragma omp parallel for schedule(dynamic, 50)
+#endif
   for (size_t i = 0; i < _children.size(); ++i) {
 
     auto cit = _children.begin();
@@ -956,7 +959,9 @@ TaxReport<TAXID,READCOUNTS>::TaxReport(std::ostream& reportOfb, const TaxonomyDB
     for (size_t j = 1; j < cit->second.size(); ++j)
        rc += *(cit->second[j]);
 
+#ifdef _OPENMP
     #pragma omp critical(update_clade_counts)
+#endif
     {
       _cladeCounts.insert( std::make_pair( cit->first, std::move(rc) ) );
     }

@@ -2,6 +2,15 @@ CXX = g++
 FOPENMP?=-fopenmp
 NDEBUG=-D NDEBUG
 
+is_fopenmp_supported := $(shell touch foo.cpp && $(CXX) -fopenmp -c foo.cpp -o foo.o &> /dev/null && printf 'yes' || printf 'no'; rm -f foo.c foo.o)
+
+$(info Compiling with multithreading support: $(is_fopenmp_supported))
+ifeq ($(is_fopenmp_supported), no)
+$(info To compile with OpenMP support, set CXX to a compiler that supports OpenMP, such as g++ or LLVM clang on OSX.)
+FOPENMP=
+endif
+
+
 CXXFLAGS = -Wall -Wextra -Wfatal-errors -pipe -O2 -std=c++11 $(FOPENMP) -I./gzstream $(NDEBUG) ${CPPFLAGS} 
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
 PROGS1 = classify classifyExact db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb 
@@ -33,16 +42,16 @@ grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
-count_unique: hyperloglogplus.o khset.h
+count_unique: hyperloglogplus.o 
 
 test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
 dump_db_kmers: krakendb.o quickfile.o
 
-classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o taxdb.hpp report-cols.hpp readcounts.hpp
+classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o
 	$(CXX) $(CXXFLAGS) -o classify $^ $(LIBFLAGS)
 
-classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o khset.h taxdb.hpp report-cols.hpp readcounts.hpp
+classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o
 	$(CXX) $(CXXFLAGS) -DEXACT_COUNTING -o classifyExact $^ $(LIBFLAGS)
 
 build_taxdb: quickfile.o #taxdb.hpp report-cols.hpp

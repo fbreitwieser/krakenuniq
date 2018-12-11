@@ -58,7 +58,7 @@ bool Add_taxIds_for_Sequences = false;
 bool Use_uids_instead_of_taxids = false;
 bool Output_UID_map_to_STDOUT = false;
 bool Pretend = false;
-int Minimum_sequence_size = -1;
+uint32_t Minimum_sequence_size = 0;
 
 string UID_map_filename;
 ofstream UID_map_file;
@@ -336,7 +336,9 @@ void process_single_file() {
       if (Parent_map.find(taxid) == Parent_map.end() || taxdb.entries.find(taxid) == taxdb.entries.end()) {
         cerr << "Ignoring sequence for taxID " << taxid << " - not in taxDB\n";
       } else {
+#ifdef _OPENMP
         #pragma omp parallel for schedule(dynamic)
+#endif
         for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
           set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1, is_contaminant_taxid);
          ++seqs_processed;
@@ -387,7 +389,9 @@ void process_file(string filename, uint32_t taxid) {
   // single-fasta files.
   dna = reader.next_sequence();
 
+#ifdef _OPENMP
   #pragma omp parallel for schedule(dynamic)
+#endif
   for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
     set_lcas(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
 }
@@ -420,7 +424,9 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_
 
     // TODO: Should I use pragma omp critical here?
     if (Use_uids_instead_of_taxids) {
+#ifdef _OPENMP
       #pragma omp critical(new_uid)
+#endif
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
     } else {
       if (!Force_contaminant_taxid) {

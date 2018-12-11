@@ -33,7 +33,9 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <set>
 #include <sstream>
 #include <stdint.h>

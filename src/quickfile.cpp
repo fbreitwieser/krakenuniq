@@ -85,13 +85,17 @@ void QuickFile::load_file() {
   size_t page_size = getpagesize();
   char buf[thread_ct][page_size];
 
+#ifdef _OPENMP
   #pragma omp parallel
+#endif
   {
     #ifdef _OPENMP
     thread = omp_get_thread_num();
     #endif
 
+#ifdef _OPENMP
     #pragma omp for schedule(dynamic)
+#endif
     for (size_t pos = 0; pos < filesize; pos += page_size) {
       size_t this_page_size = filesize - pos;
       if (this_page_size > page_size)

@@ -149,7 +149,10 @@ void process_single_file() {
     }
 
     if (taxid) {
+
+#ifdef _OPENMP
       #pragma omp parallel for schedule(dynamic)
+#endif
       for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
         get_kmers(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
 
@@ -199,7 +202,9 @@ void process_file(string filename, uint32_t taxid) {
   // single-fasta files.
   dna = reader.next_sequence();
 
+#ifdef _OPENMP
   #pragma omp parallel for schedule(dynamic)
+#endif
   for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN)
     get_kmers(taxid, dna.seq, i, i + SKIP_LEN + Database.get_k() - 1);
 }

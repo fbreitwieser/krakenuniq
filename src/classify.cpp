@@ -373,7 +373,9 @@ void process_file(char *filename) {
   else
     reader = new FastaReader(file_str);
 
+#ifdef _OPENMP
   #pragma omp parallel
+#endif
   {
     vector<DNASequence> work_unit;
     ostringstream kraken_output_ss, classified_output_ss, unclassified_output_ss;
@@ -381,7 +383,10 @@ void process_file(char *filename) {
     while (reader->is_valid()) {
       work_unit.clear();
       size_t total_nt = 0;
+
+#ifdef _OPENMP
       #pragma omp critical(get_input)
+#endif
       {
         while (total_nt < Work_unit_size) {
           dna = reader->next_sequence();
@@ -405,8 +410,10 @@ void process_file(char *filename) {
                            classified_output_ss, unclassified_output_ss,
                            my_taxon_counts);
       }
-
+ 
+#ifdef _OPENMP
       #pragma omp critical(write_output)
+#endif
       {
         total_classified += my_total_classified;
         for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end(); ++it) {
