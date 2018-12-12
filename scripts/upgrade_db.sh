@@ -42,7 +42,7 @@ DATABASE_DIR="$KRAKEN_DB_NAME"
 
 if [ ! -d "$DATABASE_DIR" ]
 then
-  echo "Can't find Kraken DB directory \"$KRAKEN_DB_NAME\""
+  echo "Can't find KrakenUniq DB directory \"$KRAKEN_DB_NAME\""
   exit 1
 fi
 cd "$DATABASE_DIR"

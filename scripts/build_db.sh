@@ -27,7 +27,6 @@ set -e  # Stop on error
 set -o pipefail  # Stop on failures in non-final pipeline commands
 
 function report_time_elapsed() {
-  set -x
   curr_time=$(date "+%s.%N")
   perl -e '$time = $ARGV[1] - $ARGV[0];' \
        -e '$sec = int($time); $nsec = $time - $sec;' \
@@ -40,6 +39,13 @@ function report_time_elapsed() {
 }
 
 export VERBOSE=1
+
+LOG_FILE=database-build.log
+exe () {
+  echo -e "$(date "+%Y-%m-%d %H:%M:%S")\t$@" >> $LOG_FILE
+  $@
+}
+                             
 
 function cmd () {
   export start_time1=$(date "+%s.%N")
@@ -61,7 +67,7 @@ FTP_SERVER="ftp://$NCBI_SERVER"
 
 if [ ! -d "$DATABASE_DIR" ]
 then
-  echo "Can't find Kraken DB directory \"$KRAKEN_DB_NAME\""
+  echo "Can't find KrakenUniq DB directory \"$KRAKEN_DB_NAME\""
   exit 1
 fi
 cd "$DATABASE_DIR"
@@ -98,8 +104,13 @@ file_sizes() {
     cat library-files.txt | tr '\n' '\0' | xargs -0 stat -c '%s\n'
   fi
 }
+
 cat_library() {
   cat library-files.txt | tr '\n' '\0' | xargs -0 cat
+}
+
+cat_libraryp() {
+  find $FIND_OPTS $LIBRARY_DIR/{$@,} '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' ')' | tr '\n' '\0' | xargs -0 cat
 }
 
 N_FILES=`cat library-files.txt | wc -l`
@@ -107,7 +118,7 @@ if [[ "$N_FILES" -eq 0 ]]; then
   echo "ERROR: No fna, fa, or ffn files found in $LIBRARY_DIR!";
   exit 1
 fi
-echo "Found $N_FILES sequence files (*.{fna,fa,ffn}) in the library directory."
+echo "Found $N_FILES sequence files (*.{fna,fa,ffn,fasta,fsa}) in the library directory."
 
 
 if [ -e "database.jdb" ] || [ -e "database0.kdb" ]
@@ -126,7 +137,7 @@ else
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
-  $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
+  exe eval $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
     -o database <( cat_library )
 
   # Merge only if necessary
@@ -194,7 +205,7 @@ then
 else
   echo "Sorting k-mer set (step 3 of 6)..."
   start_time1=$(date "+%s.%N")
-  db_sort -z $MEMFLAG -t $KRAKEN_THREAD_CT -n $KRAKEN_MINIMIZER_LEN \
+  exe eval db_sort -z $MEMFLAG -t $KRAKEN_THREAD_CT -n $KRAKEN_MINIMIZER_LEN \
     -d database.jdb -o $SORTED_DB_NAME.tmp \
     -i database.idx
 
@@ -210,7 +221,7 @@ then
 else
   echo "Creating seqID to taxID map (step 4 of 6).."
   start_time1=$(date "+%s.%N")
-  find -L $LIBRARY_DIR/ -name '*.map' -exec cat {} \; > seqid2taxid.map
+  exe eval find -L $LIBRARY_DIR/ -name '*.map' -exec cat {} \; > seqid2taxid.map
   line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
   echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
@@ -227,11 +238,11 @@ else
     echo "$TAXONOMY_DIR/names.dmp or $TAXONOMY_DIR/nodes.dmp does not exist - downloading it ..."
     [ -d $TAXONOMY_DIR ] || mkdir $TAXONOMY_DIR
     cd $TAXONOMY_DIR
-    wget $FTP_SERVER/pub/taxonomy/taxdump.tar.gz
-    tar zxf taxdump.tar.gz
+    exe eval wget $FTP_SERVER/pub/taxonomy/taxdump.tar.gz
+    exe eval tar zxf taxdump.tar.gz
     cd ..
   fi
-  build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
+  exe eval build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
   mv taxDB.tmp taxDB
   echo "taxDB construction finished. [$(report_time_elapsed $start_time1)]"
 fi
@@ -241,7 +252,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   then
     echo "Skipping step 6, LCAs already set."
   else
-    echo "Building standard Kraken LCA database (step 6 of 6)..."
+    echo "Building  KrakenUniq LCA database (step 6 of 6)..."
     PARAM=""
     if [[ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ]]; then
   	echo " Adding taxonomy IDs for sequences"
@@ -253,18 +264,48 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     fi
 	if [[ "$KRAKEN_MIN_CONTIG_SIZE" != "" ]]; then
 	  echo "Excluding sequences smaller than $KRAKEN_MIN_CONTIG_SIZE"
-	  PARAM="$PARAM -E $KRAKEN_MIN_CONTIG_SIZE"
+	  PARAM1="-E $KRAKEN_MIN_CONTIG_SIZE"
+    else PARAM1=""
 	fi
     start_time1=$(date "+%s.%N")
-    set -x
-      set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
-      -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c database.kdb.counts \
-      -F <( cat_library ) -T > seqid2taxid-plus.map
-    set +x
+
+    if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
+        cp taxDB taxDB.orig
+    fi
+
+	[[ -z ${KRAKEN_LCA_ORDER+XXX} ]] && DC="-c database.kdb.counts" || DC=""
+    exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+        -b taxDB $PARAM $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map $DC \
+        -F <( cat_library ) -T > seqid2taxid-plus.map
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
       mv seqid2taxid.map seqid2taxid.map.orig
       mv seqid2taxid-plus.map seqid2taxid.map
+    else
+      rm seqid2taxid-plus.map
     fi
+	if [[ ! -z ${KRAKEN_LCA_ORDER+XXX} ]]; then
+      echo "  Re-setting LCA's hierarchically"
+	  IFS=';' read -ra MYDIRS <<< "$KRAKEN_LCA_ORDER"
+      let COUNTER=1
+      let TOTAL=${#MYDIRS[@]}
+
+	  for DDIR in "${MYDIRS[@]}"; do
+        echo " Setting LCAs for $DDIR (substep 6.$COUNTER of 6.$TOTAL) ..."
+	    [[ $COUNTER -eq $TOTAL ]] && DC="-c database.kdb.counts" || DC=""
+		  ## First reset all taxids that appear in the set to zero (flag -R)
+        exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+          -b taxDB $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map \
+          -F <( cat_libraryp $DDIR ) -TR
+
+		  ## Then just re-set them
+        exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+          -b taxDB $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map $DC \
+          -F <( cat_libraryp $DDIR ) -T
+
+        COUNTER=$((COUNTER+1))
+	  done
+
+	fi
 
     echo "LCA database created. [$(report_time_elapsed $start_time1)]"
   fi
@@ -272,7 +313,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   REPNAME=database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    exe eval krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 
@@ -305,7 +346,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <(cat_library) > $REPNAME.kraken.tsv
+    exe eval krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 

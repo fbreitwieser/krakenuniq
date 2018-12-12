@@ -47,6 +47,7 @@ string DB_filename, Index_filename,
   File_to_taxon_map_filename,
   ID_to_taxon_map_filename, Multi_fasta_filename;
 bool Force_contaminant_taxid = false;
+bool Reset_taxid = false;
 uint32_t New_taxid_start = 1000000000;
 
 bool Allow_extra_kmers = false;
@@ -263,7 +264,7 @@ unordered_map<string,uint32_t> read_seqid_to_taxid_map(string ID_to_taxon_map_fi
 }
 
 void process_single_file() {
-  cerr << "Processing FASTA files" << endl;
+  //cerr << "Processing FASTA files" << endl;
  
   ID_to_taxon_map = read_seqid_to_taxid_map(ID_to_taxon_map_filename, taxdb, Parent_map, Add_taxIds_for_Assembly, Add_taxIds_for_Sequences);
 
@@ -429,18 +430,22 @@ void set_lcas(uint32_t taxid, string &seq, size_t start, size_t finish, bool is_
 #endif
       *val_ptr = uid_mapping(Taxids_to_UID_map, UID_to_taxids_vec, taxid, *val_ptr, current_uid, UID_map_file);
     } else {
-      if (!Force_contaminant_taxid) {
-        *val_ptr = lca(Parent_map, taxid, *val_ptr);
-      } else {
-        if (*val_ptr == TID_CONTAMINANT1 || *val_ptr == TID_CONTAMINANT2) {
-          // keep value
-        } else if (is_contaminant_taxid) {
-          // When Force_contaminant_taxid is set, do not compute lca, but assign the taxid
-          // of the (last) sequence to k-mers
-          *val_ptr = taxid;
-        } else {
+	  if (Reset_taxid) {
+	    *val_ptr = 0;
+	  } else {
+        if (!Force_contaminant_taxid) {
           *val_ptr = lca(Parent_map, taxid, *val_ptr);
-        }
+        } else {
+          if (*val_ptr == TID_CONTAMINANT1 || *val_ptr == TID_CONTAMINANT2) {
+            // keep value
+          } else if (is_contaminant_taxid) {
+            // When Force_contaminant_taxid is set, do not compute lca, but assign the taxid
+            // of the (last) sequence to k-mers
+            *val_ptr = taxid;
+          } else {
+            *val_ptr = lca(Parent_map, taxid, *val_ptr);
+          }
+		}
       }
     }
   }
@@ -452,7 +457,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTvb:aApI:o:Sc:E:")) != -1) {
+  while ((opt = getopt(argc, argv, "f:d:i:t:n:m:F:xMTRvb:aApI:o:Sc:E:")) != -1) {
     switch (opt) {
       case 'f' :
         File_to_taxon_map_filename = optarg;
@@ -487,6 +492,9 @@ void parse_command_line(int argc, char **argv) {
       case 'T' :
         Force_contaminant_taxid = true;
         break;
+	  case 'R' :
+		Reset_taxid = true;
+		break;
       case 'v' :
         verbose = true;
         break;

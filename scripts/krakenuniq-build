@@ -23,6 +23,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Cwd 'abs_path';
 use File::Basename;
 use File::Copy;
 use File::Path qw/make_path/;
@@ -58,6 +59,7 @@ my (
   $work_on_disk,
   $shrink_block_offset,
   $min_contig_size,
+  @lca_order,
 
   $dl_taxonomy,
   $dl_library,
@@ -136,6 +138,7 @@ GetOptions(
   "taxids-for-genomes" => \$add_taxonomy_ids_for_genome,
   "taxids-for-sequences" => \$add_taxonomy_ids_for_seq,
   "min-contig-size=i" => \$min_contig_size,
+  "lca-order=s" => \@lca_order,
 
   "lca-database!" => \$build_lca_database,
   "uid-database!" => \$build_uid_database,
@@ -185,6 +188,10 @@ if ($hash_size !~ /^(\d+[kKmMgG]?)?$/) {
 }
 if ($max_db_size !~ /^$/ && $max_db_size <= 0) {
   die "Can't have negative max database size.\n";
+}
+
+if (@library_dirs && defined $taxonomy_dir && !-d $db) {
+    system("mkdir -p $db");
 }
 
 $ENV{"JELLYFISH_BIN"} = $jellyfish_bin;
@@ -271,8 +278,6 @@ Options:
   --shrink-block-offset NUM  When shrinking, select the k-mer that is NUM
                              positions from the end of a block of k-mers
                              (default: 1)
-  --lca-database             Build a LCA database (default yes)
-  --no-lca-database          Do not build a LCA database
   --work-on-disk             Perform most operations on disk rather than in
                              RAM (will slow down build in most cases)
   --taxids-for-genomes       Add taxonomy IDs (starting with 1 billion) for genomes.
@@ -282,11 +287,23 @@ Options:
                              Can be useful to resolve classifications with multiple genomes
                              for one taxonomy ID.
   --min-contig-size NUM      Minimum contig size for inclusion in database.
+                             Use with draft genomes to reduce contamination, e.g. with values between 1000 and 10000.
   --library-dir DIR          Use DIR for reference sequences instead of DBDIR/library.
   --taxonomy-dir DIR         Use DIR for taxonomy instead of DBDIR/taxonomy.
 
 Experimental:
   --uid-database             Build a UID database (default no)
+  --lca-database             Build a LCA database (default yes)
+  --no-lca-database          Do not build a LCA database
+  --lca-order DIR1           Impose a hierarchical order for setting LCAs.
+  --lca-order DIR2           The directories must be specified relative to the libary directory
+  ...                        (DBDIR/library). When setting the LCAs, k-mers from sequences in
+                             DIR1 will be set first, and only unset k-mers will be set from
+                             DIR2, etc, and final from the whole library.
+							 Use this option when including low-confidence draft genomes,
+                             e.g use --lca-order Complete_Genome --lca-order Chromosome to
+                             prioritize more complete assemblies.
+                             Keep in mind that this option takes considerably longer.
 EOF
   exit $exit_code;
 }
@@ -346,16 +363,22 @@ sub standard_installation {
 }
 
 sub build_database {
-  foreach (@library_dirs) {
-    if (!-d $_) {
-      print STDERR "Library directory $_ does not exist!\n";
+  for (my $i = 0; $i < scalar @library_dirs; ++$i) {
+    if (!-d $library_dirs[$i]) {
+      print STDERR "Library directory $library_dirs[$i] does not exist!\n";
       exit(1);
+    } else {
+      $library_dirs[$i] = abs_path($library_dirs[$i]);
     }
   }
     
-  if (defined $taxonomy_dir && ! -d $taxonomy_dir) {
-    print STDERR "Taxonomy directory $taxonomy_dir does not exist!\n";
-    exit(1);
+  if (defined $taxonomy_dir) {
+    if (! -d $taxonomy_dir) {
+      print STDERR "Taxonomy directory $taxonomy_dir does not exist!\n";
+      exit(1);
+    } else {
+      $taxonomy_dir = abs_path($taxonomy_dir);
+    }
   }
 
   $ENV{"KRAKEN_REBUILD_DATABASE"} = (defined $rebuild? 1 : 0);
@@ -366,6 +389,7 @@ sub build_database {
   $ENV{"KRAKEN_LIBRARY_DIRS"} = "@library_dirs";
   $ENV{"KRAKEN_TAXONOMY_DIR"} = $taxonomy_dir;
   $ENV{"KRAKEN_MIN_CONTIG_SIZE"} = $min_contig_size;
+  $ENV{"KRAKEN_LCA_ORDER"} = join(";", reverse @lca_order);
   my $opt = ($verbose? "-x" : "");
   exec "build_db.sh";
 }

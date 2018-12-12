@@ -107,9 +107,9 @@ struct db_status {
   int64_t current_max_pos;
 };
 
-uint64_t total_classified = 0;
-uint64_t total_sequences = 0;
-uint64_t total_bases = 0;
+unsigned long long total_classified = 0;
+unsigned long long total_sequences = 0;
+unsigned long long total_bases = 0;
 uint32_t ambig_taxon = -1;
 
 inline bool ends_with(std::string const & value, std::string const & ending)
