@@ -33,17 +33,18 @@ brew install gcc
 
 ## Database building
 
-Note that KrakenUniq natively supports Kraken 1 databases (however not Kraken 2). 
-
-For building a custom database, there are three requirements:
+Note that KrakenUniq natively supports Kraken 1 databases (however not Kraken 2). If you have existing Kraken databases, you may run KrakenUniq directly on them, though for support of taxon nodes for genomes and sequences (see below) you will need to rebuild them with KrakenUniq. For building a custom database, there are three requirements:
 
 1. Sequence files (FASTA format)
 2. Mapping files (tab separated format, `sequence header<tab>taxID`
 3. NCBI taxonomy files (though a custom taoxnomies may be used, too)
 
-`krakenuniq-download` supports a variety of data sources to download the taxonomy, sequence and mapping files. Please find examples below on how to download different sequence sets:
+While you may supply this information yourself, `krakenuniq-download` supports a variety of data sources to download the taxonomy, sequence and mapping files. Please find examples below on how to download different sequence sets:
 
 ```
+## Download the taxonomy
+krakenuniq-download --db DBDIR taxonomy
+
 ## All complete bacterial and archaeal genomes genomes in RefSeq using 10 threads, and masking low-complexity sequences in the genomes
 krakenuniq-download --db DBDIR --threads 10 --dust refseq/bacteria refseq/archaea
 
@@ -63,7 +64,7 @@ krakenuniq-build --db DBDIR --kmer-len 31 --threads 10 --taxids-for-genomes --ta
 
 ```
 
-For more information on taxids for genomes and sequences, look at the [manual](MANUAL.md).
+For more information on taxids for genomes and sequences, look at the [manual](MANUAL.md). The building step may take up to a couple of days on large sequence sets such as nt.
 
 ## Classification
 
@@ -83,6 +84,10 @@ krakenuniq --db DBDIR --threads 10 --report-file REPORTFILE.tsv > READCLASSIFICA
 
 
 ## FAQ
+
+### Memory requirements
+
+KrakenUniq requires a lot of RAM - ideally 128GB - 512GB. For more memory efficient classification consider using [centrifuge](https://github.com/infphilo/centrifuge).
 
 ### KrakenUniq vs Kraken vs Kraken 2
 
