@@ -25,6 +25,8 @@ sub download_taxonomy(@);
 sub download_contaminats(@);
 sub download_nt(@);
 sub download(@);
+sub dustmasked_file(@);
+sub dustmasked_file_exists(@);
 sub create_map_files(@);
 sub create_map_file_ac(@);
 sub download_domain(@);
@@ -143,7 +145,7 @@ ARGUMENTS
  <pattern> can be one of
      'contaminants'     Contaminant sequences from UniVec and EmVec.
      'taxonomy'         NCBI taxonomy mappings from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
-     'nucleotide'       Download nucleotide sequences using a query specified using --term.
+     'nucleotide'       Download nucleotide sequences using a query specified using --search or --ac.
      'microbial-nt'     Download microbial sequences from nt database.
      'viral-neighbors'  Download viral strain sequences from the NCBI Viral Genome Resource.
                         (Search: \"$vir_nbr_search_term\").
@@ -152,7 +154,7 @@ ARGUMENTS
      'refseq/DOMAIN/ASS_LEVEL'
      'refseq/DOMAIN/ASS_LEVEL/COLUMN=value1(/COLUMN=value2)*' 
         Possible values for DOMAIN: @ALL_GENOMES.
-        Possible values for ASS_LEVEL: Any, Complete_Genome, Chromosome, Scaffold, Contig.
+        Possible values for ASS_LEVEL: Any, Complete_Genome, Chromosome, Scaffold and Contig. 
         Possible values for COLUMN: Any column in the NCBI assembly_summary.txt, e.g. species_taxid or assembly_accession.
         Example: 'refseq/vertebrate_mammalian/Any/species_taxid=9606' <- download all human assemblies
 
@@ -288,7 +290,7 @@ foreach my $DATABASE (@ARGV) {
       if ($DATABASE eq 'assembly') {
         download_ncbi_search($nbr_dir, $ncbi_db, $NUC_AC."[Assembly Accession]")
       } else {
-        download_ncbi_acs($nbr_dir, $ncbi_db, $NUC_AC, get_sorted_maps($MAP_DIV));
+        download_ncbi_search($nbr_dir, $ncbi_db, $NUC_AC."[Accession]")
       }
     } 
     
@@ -334,7 +336,7 @@ sub download(@) {
       return 1;
     }
   }
-  print STDERR "$file ";
+  #print STDERR "$file ";
   if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
     print STDERR ": downloading ...";
   }
@@ -636,6 +638,8 @@ sub download_ncbi_search(@) {
         print $FA_HANDLE $line;
       }
       #end_fork();
+      close ($F);
+      unlink($part_file);
       close($FA_HANDLE);
     }
     $retstart += $curr_retmax;
@@ -647,6 +651,25 @@ sub download_ncbi_search(@) {
     close $_;
   }
 #  $pm->wait_all_children();
+}
+
+sub dustmask {
+  my ($fasta_file, $dustmasked_file, $do_unlink, $verbose) = @_;
+  return unless $DO_DUST;
+  return if -s $dustmasked_file;
+  return unless -s $fasta_file;
+  if (!-s $dustmasked_file) {
+    my $cmd = "dustmasker -infmt fasta -in $fasta_file -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > $dustmasked_file.tmp && mv $dustmasked_file.tmp $dustmasked_file";
+    if ($verbose) {
+      system_l("Masking low-complexity sequences", $cmd);
+    } else {
+      system($cmd);
+    }
+  }
+  if ($do_unlink) {
+    unlink($fasta_file);
+  }
+  check_file($dustmasked_file) if $verbose;
 }
 
 sub download_maps(@) {
@@ -846,8 +869,7 @@ sub download_nt(@) {
 
   foreach my $division (split(/,/, $TAXA_LIST)) {
     my $microbial_nt_file = "$LIB_DIR/nt-$division.fna";
-    my $dusted_file = "$LIB_DIR/nt-$division-dustmasked.fna";
-    if ((!$DO_DUST && !-s $microbial_nt_file) || ($DO_DUST && !-s $dusted_file)) {
+    if (!-s $microbial_nt_file && !dustmasked_file_exists($microbial_nt_file)) {
       if (!$do_filter) {
         $ac_index_for_nt = get_nt_ac_index($nt_file);
         $child_map = read_child_map("$TAX_DIR/nodes.dmp");
@@ -872,19 +894,12 @@ sub download_nt(@) {
   open (my $NT, "<", $nt_file) or die $!;
   foreach my $division (split(/,/, $TAXA_LIST)) {
     my $microbial_nt_file = "$LIB_DIR/nt-$division.fna";
-    my $dusted_file = "$LIB_DIR/nt-$division-dustmasked.fna";
-    if ((!$DO_DUST && !-s $microbial_nt_file) || ($DO_DUST && !-s $dusted_file)) {
+    if (!-s $microbial_nt_file && !dustmasked_file_exists($microbial_nt_file)) {
       write_filtered_nt($NT, $division_taxa{$division}, $taxid_to_acs, $ac_index_for_nt, $microbial_nt_file);
 
     }
     check_file($microbial_nt_file) if -s $microbial_nt_file;
-    if ($DO_DUST) {
-      if (!-s $dusted_file) {
-        my $cmd = "dustmasker -infmt fasta -in $microbial_nt_file -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > $dusted_file.tmp && mv $dusted_file.tmp $dusted_file && mv $microbial_nt_file $BASE_DIR";
-        system_l("Masking low-complexity sequences", $cmd);
-      }
-      check_file($dusted_file);
-    }
+    dustmask($microbial_nt_file, dustmasked_file($microbial_nt_file), 0, 1) if $DO_DUST;
   }
   close $NT;
 }
@@ -1087,6 +1102,17 @@ sub download_taxonomy(@) {
   check_file("$dir/names.dmp");
 }
 
+sub dustmasked_file(@) {
+  my ($fasta_file) = @_;
+  ( my $dustmasked_file = $fasta_file ) =~ s/.fna$/-dustmasked.fna/;
+  return $dustmasked_file;
+}
+
+sub dustmasked_file_exists(@) {
+  my $dustmasked_file = dustmasked_file(@_);
+  return $DO_DUST && -s $dustmasked_file;
+}
+
 sub download_domain(@) {
   my ($DATABASE, $domain_dir, $domain, $_assembly_level, @additional_filters) = @_;
   $_assembly_level =~ s/ /_/g;
@@ -1199,9 +1225,9 @@ sub download_domain(@) {
       my $full_ftp_path = "$ftp_path/${bname}_${ext}.fna.gz";
       my $bfname = $bname1."_".$ext;
       my $fname = $bfname.".fna";
-      my $fullfname1 = $DO_DUST? "$download_dir/${bfname}_dustmasked.fna" : "$download_dir/$fname";
+      my $fullfname = "$download_dir/$fname";
 
-      if (!$OVERWRITE_FILES && -s $fullfname1) {
+      if (!$OVERWRITE_FILES && (-s $fullfname || dustmasked_file_exists($fullfname) )) {
         print STDERR "$download_dir/$fname exists - not downloading.. \n" if $VERBOSE;
         ++$existing_files;
       } else {
@@ -1220,7 +1246,7 @@ sub download_domain(@) {
   ## if ($FILTER_UNPLACED) { die("Not implemented"); }
   wait_children();
   foreach my $fasta_file (@fasta_files) {
-        if (-s $fasta_file) {
+        if (-s $fasta_file || dustmasked_file($fasta_file)) {
           ++$downloaded_files;
         } else {
           ++$download_failed;
@@ -1243,15 +1269,14 @@ sub download_domain(@) {
 
   if ($DO_DUST) {
   foreach my $fasta_file (@fasta_files) {
-    ( my $fullfname1 = $fasta_file ) =~ s/.fna$/_dustmasked.fna/;
-    if (!$OVERWRITE_FILES && -s $fullfname1) {
-      print STDERR "$fullfname1 exists - not dusting.. \n" if $VERBOSE;
+    my $dustmasked_file = dustmasked_file($fasta_file);
+    if (!$OVERWRITE_FILES && -s $dustmasked_file) {
+      print STDERR "$dustmasked_file exists - not dusting.. \n" if $VERBOSE;
     } else {
       ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
       my $pid = start_fork();
       unless ($pid) {
-        system("dustmasker -infmt fasta -in '$fasta_file' -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > '$fullfname1'");
-        unlink("$fasta_file");
+        dustmask($fasta_file, $dustmasked_file, 1, 0);
         end_fork();
       }
     }
