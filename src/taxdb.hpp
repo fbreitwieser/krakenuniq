@@ -785,7 +785,7 @@ std::string TaxonomyDB<TAXID>::getMetaPhlAnLineage(TAXID taxonomyID) const {
   std::string lineage;
   while (true) {
     // 131567 = Cellular organisms
-    if (taxonomyID != 131567) {
+    //if (taxonomyID != 131567) {
       std::string rank = getRank(taxonomyID);
       if (rank == "species") {
   lineage.insert(0, "|s__");
@@ -806,9 +806,13 @@ std::string TaxonomyDB<TAXID>::getMetaPhlAnLineage(TAXID taxonomyID) const {
   lineage.insert(0, "|p__");
   lineage.insert(4, getScientificName(taxonomyID));
       } else if (rank == "superkingdom") {
-  lineage.insert(0, "k__");
-  lineage.insert(3, getScientificName(taxonomyID));
-      }
+  lineage.insert(0, "|k__");
+  lineage.insert(4, getScientificName(taxonomyID));
+      } else {
+  lineage.insert(0, "|-__");
+  lineage.insert(4, getScientificName(taxonomyID));
+
+	 // }
     }
     taxonomyID = getParentTaxID(taxonomyID);
     if (taxonomyID == 0) {

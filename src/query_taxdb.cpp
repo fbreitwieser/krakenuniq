@@ -27,74 +27,52 @@
 
 using namespace std;
 
+bool do_print_LCA = false;
+bool do_print_Rank = false;
+bool do_print_Lineage = true;
 string return_rank;
 
-void process_taxID(char mode, uint32_t taxID);
-void process_taxIDs(char mode, vector<uint32_t> taxIDs);
+void process_taxID(uint32_t taxID);
+void process_taxIDs(const vector<uint32_t>& taxIDs);
+
+
+void print_LCA(uint32_t taxID);
+void print_Rank(uint32_t taxID);
+void print_Lineage(uint32_t taxID);
+
 size_t parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 
-TaxonomyDB<uint32_t, uint32_t> taxdb;
+TaxonomyDB<uint32_t> taxdb;
 
 int main(int argc, char **argv) {
   size_t optind = parse_command_line(argc, argv);
-
-  string line;
   uint32_t taxID;
-  char mode = *argv[optind++];
-	for (;optind < argc; ++optind) {
-	  if (strcmp(argv[optind],"-") == 0) {
-	    // read STDIN
-	    if (mode == 'l') {
-	    while (getline(std::cin, line)) {
-	      stringstream ss(line);
-	      vector<uint32_t> taxIDs;
-	      while (ss >> taxID) {
-	        taxIDs.push_back(taxID);
-	      }
-	      process_taxIDs(mode,taxIDs);
-	    }
-	    }
-	    while (std::cin >> taxID) {
-	      process_taxID(mode,taxID);
-	    }
-	  } else {
-	    taxID = atol(argv[optind]);
-	    process_taxID(mode,taxID);
-	  }
-	}
 
-	exit(1);
-}
-void process_taxIDs(char mode, vector<uint32_t> taxIDs) {
-  switch (mode) {
-
-  case 'r':
-      if (!return_rank.empty()) {
-        cout << taxdb.getTaxIDAtRank(taxIDs[0], return_rank) << '\n';
-      }
-      break;
-  case 'l':
-    cout << taxdb.getEntry(taxdb.getLowestCommonAncestor(taxIDs)).rank << endl;
-    break;
-  default:
-    usage();
-    break;
+  for (;optind < argc; ++optind) {
+    taxID = atoll(argv[optind]);
+    process_taxID(taxID);
   }
+
+  std::string line;
+  while (!getline(std::cin, line).eof()) {
+    stringstream ss(line);
+    vector<uint32_t> taxIDs;
+	while (ss >> taxID) {
+      process_taxID(taxID);
+     //taxIDs.push_back(taxID);
+	}
+    //process_taxIDs(taxIDs);
+  }
+  exit(0);
 }
 
-
-void process_taxID(char mode, uint32_t taxID) {
-  switch (mode) {
-  case 'r':
-    if (!return_rank.empty()) {
-      cout << taxdb.getTaxIDAtRank(taxID, return_rank) << '\n';
-    }
-    break;
-  case 'l':
-  default:
-    usage();
-    break;
+void process_taxID(uint32_t taxID) {
+  if (do_print_Lineage) {
+      cout << taxID << '\t' << taxdb.getMetaPhlAnLineage(taxID) << endl;
+  } else {
+      //cout << taxdb.getTaxIDAtRank(taxID, return_rank) << '\n';
+    //cout << taxdb.getEntry(taxdb.getLowestCommonAncestor(taxIDs)).rank << endl;
   }
 }
 
@@ -105,19 +83,26 @@ size_t parse_command_line(int argc, char **argv) {
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
 
-  while ((opt = getopt(argc, argv, "r:m:")) != -1) {
+  while ((opt = getopt(argc, argv, "r:lL")) != -1) {
     switch (opt) {
       case 'r':
+		do_print_Rank = true;
         return_rank = optarg;
         break;
+	  case 'l':
+		do_print_LCA = true;
+		break;
+	  case 'L':
+		do_print_Lineage = true;
+	    break; 
       default:
         usage();
         break;
     }
   }
 
-  if (argv[optind] == NULL || argv[optind + 1] == NULL) {
-    printf("Mandatory argument(s) missing\n");
+  if (argv[optind] == NULL) {
+    printf("Mandatory argument taxDB missing\n");
     exit(1);
   }
 
@@ -126,11 +111,12 @@ size_t parse_command_line(int argc, char **argv) {
 }
 
 void usage(int exit_code) {
-  cerr << "Usage: query_taxdb [options] taxDB mode [taxIDs]" << endl
+  cerr << "Usage: query_taxdb [options] taxDB [taxIDs]" << endl
        << endl
        << "Options: (*mandatory)" << endl
-       << "  -m mode      Mode: l for LCA, r for rank" << endl
-       << "  -r rank      Output parent rank of taxIDs" << endl
+       << "  -l           Show LCA of taxIDs" << endl
+       << "  -r RANK      Map taxIDs to RANK" << endl
+	   << "  -L           Print lineage of taxIDs" << endl
        << "  -h           Print this message" << endl
        << endl;
   exit(exit_code);
