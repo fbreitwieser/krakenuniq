@@ -416,17 +416,17 @@ void createPointers(
     TAXID taxonomyID = entry_it->first;
     auto parent_it = parentMap.find(taxonomyID);
     if (parent_it == parentMap.end()) {
-      cerr << "Cannot find parent for " << taxonomyID << endl;
+      //cerr << "Cannot find parent for " << taxonomyID << endl;
     } else {
       TAXID parentTaxonomyID = parent_it->second;
       if (taxonomyID != parentTaxonomyID) {
-  auto parent_ptr = entries.find(parentTaxonomyID);
-  if (parent_ptr != entries.end()) {
-    entry_it->second.parent = &parent_ptr->second;
-    parent_ptr->second.children.push_back(&entry_it->second);
-  } else {
-    cerr << "Could not find parent with taxonomy ID " << parentTaxonomyID << " for taxonomy ID " << taxonomyID << endl;
-  }
+        auto parent_ptr = entries.find(parentTaxonomyID);
+        if (parent_ptr != entries.end()) {
+          entry_it->second.parent = &parent_ptr->second;
+          parent_ptr->second.children.push_back(&entry_it->second);
+       } else {
+         cerr << "Could not find parent with taxonomy ID " << parentTaxonomyID << " for taxonomy ID " << taxonomyID << endl;
+       }
       }
     }
   }
@@ -599,7 +599,8 @@ TaxonomyDB<TAXID>::readTaxonomyIndex_(const std::string inFileName, bool hasGeno
   entries.insert({0, {0, NULL, "no rank", "unclassified" }});
   //entries.insert({-1, {-1, 0, "no rank", "uncategorized" }});
   createPointers(entries, parentMap);
-  log_msg(". Done, read " + patch::to_string(entries.size()) + " taxa.\n");
+  log_msg(". Done.\n");
+  //log_msg(". Done, read " + patch::to_string(entries.size()) + " taxa.\n");
   return(entries);
 }
 
