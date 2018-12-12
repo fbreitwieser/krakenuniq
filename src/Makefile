@@ -13,7 +13,7 @@ endif
 
 CXXFLAGS = -Wall -Wextra -Wfatal-errors -pipe -O2 -std=c++11 $(FOPENMP) -I./gzstream $(NDEBUG) ${CPPFLAGS} 
 #CXXFLAGS = -Wall -std=c++11 $(FOPENMP) -O3 -Wfatal-errors
-PROGS1 = classify classifyExact db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb 
+PROGS1 = classify classifyExact db_sort set_lcas db_shrink build_taxdb read_uid_mapping count_unique dump_taxdb query_taxdb
 TEST_PROGS = grade_classification test_hll_on_db dump_db_kmers
 #PROGS = $(PROGS1) $(TEST_PROGS)
 PROGS = $(PROGS1)
@@ -53,6 +53,8 @@ classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mappi
 
 classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o
 	$(CXX) $(CXXFLAGS) -DEXACT_COUNTING -o classifyExact $^ $(LIBFLAGS)
+
+query_taxdb: taxdb.hpp
 
 build_taxdb: quickfile.o #taxdb.hpp report-cols.hpp
 
