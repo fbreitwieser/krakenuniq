@@ -467,8 +467,8 @@ HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (const HyperLo
 template<typename HASH>
 HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(const HyperLogLogPlusMinus<HASH>& other):
       p(other.p), m(other.m), 
-      M(other.M), n_observed(other.n_observed), sparse(other.sparse), 
-      sparseList(other.sparseList), bit_mixer() {
+      M(other.M), n_observed(other.n_observed), sparse(other.sparse), bit_mixer(),
+      sparseList(other.sparseList) {
 }
 
 

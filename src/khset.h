@@ -93,6 +93,10 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
                 func(this->keys[ki]);\
     }
 
+#if __GCC__
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#pragma GCC diagnostic push
+#endif
 
 // Steal everything, take no prisoners.
 #define KH_MOVE_DEC(t) \
@@ -156,7 +160,8 @@ struct khset##nbits##_t: EmptyKhSet, khash_t(name) {\
     }\
     khiter_t get(u##nbits x) const {return kh_get(name, this, x);}\
     void erase(u##nbits val) {\
-        if(auto it = get(val); it != capacity())\
+        auto it = get(val);\
+        if(it != capacity())\
             kh_del(name, this, it);\
     }\
     template<typename ItType, typename ItType2>\
@@ -206,7 +211,7 @@ struct khset_cstr_t: EmptyKhSet, khash_t(cs) {
         return kh_get(cs, this, s);
     }
     void del(const char *s) {
-        if(auto it = get(s); it != capacity()) std::free(const_cast<char *>(this->keys[it]));
+        auto it = get(s); if(it != capacity()) std::free(const_cast<char *>(this->keys[it]));
     }
     khiter_t insert(const char *s) {return this->insert(s, std::strlen(s));}
     khiter_t insert(const char *s, size_t l) {
@@ -326,6 +331,10 @@ template<typename T> T&operator+=(T &a, const T &b) {
 
 #undef KH_MOVE_DEC
 #undef KH_COPY_DEC
+
+#if __GCC__
+#pragma GCC diagnostic pop
+#endif
 
 } // namespace kh
 
