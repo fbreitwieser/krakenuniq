@@ -93,7 +93,7 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
                 func(this->keys[ki]);\
     }
 
-#if __GCC__
+#ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #pragma GCC diagnostic push
 #endif
@@ -279,7 +279,7 @@ struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
             if(kh_exist(this, ki))\
                 func(this->keys[ki]);\
     }\
-    void destroy_at(khint_t ki) {throw std::runtime_error("NotImplemented");}\
+    void destroy_at(khint_t ki) {(void)ki; throw std::runtime_error("NotImplemented");}\
     void del(khint_t ki) {\
         destroy_at(ki);\
         return kh_del_##name(this, ki);\

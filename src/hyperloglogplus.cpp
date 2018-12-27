@@ -449,7 +449,7 @@ HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (HyperLogLogPl
   M = std::move(other.M);
   n_observed = other.n_observed;
   sparse = other.sparse;
-  //sparseList = std::move(other.sparseList);
+  sparseList = std::move(other.sparseList);
   return *this;
 }
 
