@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
   uint64_t ctr = 0;
   
   unordered_set<uint64_t> exact_counter;
-  khset64_t exact_counter_khash;
+  kh::khset64_t exact_counter_khash;
 
   if (use_stdin) {
     uint64_t nr;
@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
     std::uniform_int_distribution<uint64_t> distr;
     for (size_t j = 0; j < n_redo; ++j) {
       unordered_set<uint64_t> exact_counter1;
-      khset64_t exact_counter_khash1;
+      kh::khset64_t exact_counter_khash1;
       for(size_t i = 0; i < n_rand; i++) {
         if (exact_counting_unordered_set) {
             exact_counter1.insert(distr(rng));

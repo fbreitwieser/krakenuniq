@@ -40,7 +40,7 @@ using namespace kraken;
 #ifdef EXACT_COUNTING
   #ifdef USE_KHSET_FOR_EXACT_COUNTING
     #include "khset.h"
-    using READCOUNTS = ReadCounts< khset64_t >;
+    using READCOUNTS = ReadCounts< kh::khset64_t >;
   #else
     #include <unordered_set>
     using READCOUNTS = ReadCounts< unordered_set<uint64_t> >;
