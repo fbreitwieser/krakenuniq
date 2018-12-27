@@ -425,8 +425,8 @@ double tau(double x) {
 // HyperLogLogPlusMinus class methods
 
 template<>
-HyperLogLogPlusMinus<uint64_t>::HyperLogLogPlusMinus(uint8_t precision, bool sparse, uint64_t  (*bit_mixer) (uint64_t)):
-      p(precision), m(1<<precision), sparse(sparse), bit_mixer(bit_mixer) {
+HyperLogLogPlusMinus<uint64_t>::HyperLogLogPlusMinus(uint8_t precision, bool sparse):
+      p(precision), m(1<<precision), sparse(sparse), bit_mixer() {
     if (precision > 18 || precision < 4) {
           throw std::invalid_argument("precision (number of register = 2^precision) must be between 4 and 18");
     }
@@ -447,7 +447,6 @@ HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (HyperLogLogPl
   n_observed = other.n_observed;
   sparse = other.sparse;
   sparseList = std::move(other.sparseList);
-  bit_mixer = other.bit_mixer;
   return *this;
 }
 
@@ -459,7 +458,6 @@ HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (const HyperLo
   n_observed = other.n_observed;
   sparse = other.sparse;
   sparseList = other.sparseList;
-  bit_mixer = other.bit_mixer;
   return *this;
 }
 
@@ -467,8 +465,7 @@ template<typename HASH>
 HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(const HyperLogLogPlusMinus<HASH>& other):
       p(other.p), m(other.m), 
       M(other.M), n_observed(other.n_observed), sparse(other.sparse), 
-      sparseList(other.sparseList), 
-      bit_mixer(other.bit_mixer) {
+      sparseList(other.sparseList), bit_mixer() {
 }
 
 
@@ -477,8 +474,7 @@ HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(HyperLogLogPlusMinus<HASH>&& ot
       p(other.p), m(other.m), 
       M(std::move(other.M)), 
       n_observed(other.n_observed), sparse(other.sparse), 
-      sparseList(std::move(other.sparseList)), 
-      bit_mixer(other.bit_mixer) {
+      sparseList(std::move(other.sparseList)), bit_mixer() {
 }
 
 

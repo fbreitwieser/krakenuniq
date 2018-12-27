@@ -57,6 +57,12 @@ typedef unordered_set<uint32_t> SparseListType;
  * HyperLogLogPlusMinus class for counting the number of unique 64-bit values in stream
  * Note that only HASH=uint64_t is implemented.
  */
+
+
+struct Murmur3Finalizer {
+    uint64_t operator()(uint64_t v) const {return murmurhash3_finalizer(v);}
+};
+
 template<typename HASH>
 class HyperLogLogPlusMinus {
 
@@ -68,7 +74,7 @@ private:
 
   bool sparse;          // sparse representation of the data?
   SparseListType sparseList;
-  HASH (*bit_mixer) (uint64_t);
+  const Murmur3Finalizer bit_mixer;
 
   // sparse versions of p and m
   static const uint8_t  pPrime = 25; // precision when using a sparse representation 
@@ -82,7 +88,7 @@ public:
   bool use_n_observed = true; // return min(estimate, n_observed) instead of estimate
 
   // Construct HLL with precision bits
-  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true, HASH (*bit_mixer) (uint64_t) = murmurhash3_finalizer);
+  HyperLogLogPlusMinus(uint8_t precision=12, bool sparse=true);
   HyperLogLogPlusMinus(const HyperLogLogPlusMinus<HASH>& other);
   HyperLogLogPlusMinus(HyperLogLogPlusMinus<HASH>&& other);
   HyperLogLogPlusMinus<HASH>& operator= (HyperLogLogPlusMinus<HASH>&& other);
