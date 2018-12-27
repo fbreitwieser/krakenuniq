@@ -1,4 +1,23 @@
-#pragma once
+/*
+ * Copyright (c) 2018 Daniel N Baker, <dnb@jhu.edu>
+ *
+ * The file is part of KrakenUniq
+ *
+ * KrakenUniq is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * KrakenUniq is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with KrakenUniq.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#ifndef KHSET_H__
+#define KHSET_H__
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
@@ -309,3 +328,5 @@ template<typename T> T&operator+=(T &a, const T &b) {
 #undef KH_COPY_DEC
 
 } // namespace kh
+
+#endif /* #ifndef KHSET_H__ */
