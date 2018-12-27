@@ -27,6 +27,7 @@
 
 #include<vector>
 #include<unordered_set>
+#include "khset.h"
 using namespace std;
 
 //#define HLL_DEBUG
@@ -44,7 +45,11 @@ uint64_t murmurhash3_finalizer (uint64_t key);
 
 // Heule et al. encode the sparse list with variable length encoding
 //   see section 5.3.2. This implementation just uses a sorted vector or unordered_set.
+#if USE_SLOW_UNORDERED_SET
 typedef unordered_set<uint32_t> SparseListType;
+#else
+using SparseListType = kh::khset32_t;
+#endif
 // Other possible SparseList types:
 // // typedef vector<uint32_t> SparseListType;
 // The sorted vector implementation is pretty inefficient currently, as the vector
@@ -73,8 +78,8 @@ private:
   uint64_t n_observed = 0;
 
   bool sparse;          // sparse representation of the data?
-  SparseListType sparseList;
   const Murmur3Finalizer bit_mixer;
+  SparseListType sparseList;
 
   // sparse versions of p and m
   static const uint8_t  pPrime = 25; // precision when using a sparse representation 
@@ -124,5 +129,6 @@ private:
   void addToRegisters(const SparseListType &sparseList);
 
 };
+
 
 #endif /* HYPERLOGLOGPLUS_H_ */
