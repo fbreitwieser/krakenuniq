@@ -61,7 +61,7 @@ script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
-JELLYFISH_BIN=`$script_dir/check_for_jellyfish.sh`
+[[ "$JELLYFISH_BIN" == "" ]] && JELLYFISH_BIN=`$script_dir/check_for_jellyfish.sh`
 NCBI_SERVER="ftp.ncbi.nih.gov"
 FTP_SERVER="ftp://$NCBI_SERVER"
 
@@ -221,7 +221,7 @@ then
 else
   echo "Creating seqID to taxID map (step 4 of 6).."
   start_time1=$(date "+%s.%N")
-  exe eval find -L $LIBRARY_DIR/ -name '*.map' -exec cat {} \; > seqid2taxid.map
+  find -L $LIBRARY_DIR/ -name '*.map' -exec cat {} \; > seqid2taxid.map
   line_ct=$(wc -l seqid2taxid.map | awk '{print $1}')
 
   echo "$line_ct sequences mapped to taxa. [$(report_time_elapsed $start_time1)]"
@@ -242,7 +242,7 @@ else
     exe eval tar zxf taxdump.tar.gz
     cd ..
   fi
-  exe eval build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
+  build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
   mv taxDB.tmp taxDB
   echo "taxDB construction finished. [$(report_time_elapsed $start_time1)]"
 fi
@@ -273,7 +273,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
         cp taxDB taxDB.orig
     fi
 
-	[[ -z ${KRAKEN_LCA_ORDER+XXX} ]] && DC="-c database.kdb.counts" || DC=""
+	[[ -z "${KRAKEN_LCA_ORDER}" ]] && DC="-c database.kdb.counts" || DC=""
     exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
         -b taxDB $PARAM $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map $DC \
         -F <( cat_library ) -T > seqid2taxid-plus.map
@@ -283,7 +283,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     else
       rm seqid2taxid-plus.map
     fi
-	if [[ ! -z ${KRAKEN_LCA_ORDER+XXX} ]]; then
+	if [[ ! -z "${KRAKEN_LCA_ORDER}" ]]; then
       echo "  Re-setting LCA's hierarchically"
 	  IFS=';' read -ra MYDIRS <<< "$KRAKEN_LCA_ORDER"
       let COUNTER=1
@@ -313,7 +313,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   REPNAME=database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
-    exe eval krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 
@@ -346,7 +346,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    exe eval krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
   fi
 fi
 

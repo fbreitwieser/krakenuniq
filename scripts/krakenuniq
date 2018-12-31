@@ -184,9 +184,6 @@ my $now = time();
 my $date = strftime('%Y-%m-%dT%H:%M:%SZ', gmtime($now));
 my $wd = getcwd;
 my $db_size = -s $kdb_files[0];
-if (defined $report_file) {
-    system("printf '# KrakenUniq v#####=VERSION=##### DATE: $date DB_SIZE: $db_size WD: $wd\n# CL: ' > '$report_file' && tr '\\0' ' ' < /proc/$$/cmdline | sed 's/\$/\\n/' >> '$report_file'") == 0 or die "Couldn't write report header.\n";
-}
 
 # set flags for classifier
 my @flags;
@@ -275,6 +272,12 @@ if (@pipe_argv) {
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
 print STDERR "$cmd @flags @ARGV\n";
+if (defined $report_file) {
+    my $mycmd = qx/ps -o args= $$/;
+    open(my $RF, ">", $report_file) or die "Could not open report file for writing";
+    print $RF "# KrakenUniq v#####=VERSION=##### DATE:$date DB:@db_prefix DB_SIZE:$db_size WD:$wd\n# CL:$mycmd\n";
+    close($RF)
+}
 exec $cmd, @flags, @ARGV;
 die "$PROG: exec error: $!\n";
 
