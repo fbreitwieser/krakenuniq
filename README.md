@@ -49,7 +49,7 @@ krakenuniq-download --db DBDIR taxonomy
 krakenuniq-download --db DBDIR --threads 10 --dust refseq/bacteria refseq/archaea
 
 ## Contaminant sequences from UniVec and EmVec, plus the human reference genome
-krakenuniq-download --db DBDIR refseq/vertegrate_mammalian/Chromosome/species_taxid=9606
+krakenuniq-download --db DBDIR refseq/vertebrate_mammalian/Chromosome/species_taxid=9606
 
 ## All viral genomes from RefSeq plus viral 'neighbors' in NCBI Nucleotide
 krakenuniq-download --db DBDIR refseq/viral/Any viral-neighbors
