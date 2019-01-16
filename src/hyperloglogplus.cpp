@@ -62,6 +62,10 @@ static int clz_manual(uint64_t x)
 #define __builtin_clz(x) __lzcnt(x)
 #define __builtin_clzl(x) __lzcnt64(x)
 #endif
+template<typename Func> void for_each(kh::khset32_t &set, const Func &func) {set.for_each(func);}
+template<typename Func> void for_each(const kh::khset32_t &set, const Func &func) {set.for_each(func);}
+template<typename Func> void for_each(std::unordered_set<uint32_t> &set, const Func &func) {for(auto &x: set) func(x);}
+template<typename Func> void for_each(const std::unordered_set<uint32_t> &set, const Func &func) {for(const auto &x: set) func(x);}
 
 inline uint8_t clz(const uint32_t x, const uint8_t max = 32) {
   if (x == 0) { return max; }
@@ -353,14 +357,14 @@ vector<int> registerHistogram(const vector<uint8_t>& M, uint8_t q) {
     return C;
 }
 
+
 vector<int> sparseRegisterHistogram(const SparseListType& sparseList, uint8_t pPrime, uint8_t p, uint8_t q){
     vector<int> C(q+2, 0);
     size_t m = 1 << pPrime;
-    for (const auto& encoded_hash_value : sparseList) {
-      uint8_t rank_val = getEncodedRank(encoded_hash_value, pPrime, p);
-      ++C[rank_val]; 
-      --m;
-    }
+    for_each(sparseList, [&](uint32_t v) {
+        ++C[getEncodedRank(v, pPrime, p)];
+        --m;
+    });
     C[0] = m;
     return C;
 }
@@ -425,14 +429,13 @@ double tau(double x) {
 // HyperLogLogPlusMinus class methods
 
 template<>
-HyperLogLogPlusMinus<uint64_t>::HyperLogLogPlusMinus(uint8_t precision, bool sparse, uint64_t  (*bit_mixer) (uint64_t)):
-      p(precision), m(1<<precision), sparse(sparse), bit_mixer(bit_mixer) {
+HyperLogLogPlusMinus<uint64_t>::HyperLogLogPlusMinus(uint8_t precision, bool sparse):
+      p(precision), m(1<<precision), sparse(sparse), bit_mixer(), sparseList(SparseListType()) {
     if (precision > 18 || precision < 4) {
           throw std::invalid_argument("precision (number of register = 2^precision) must be between 4 and 18");
     }
 
     if (sparse) {
-      this->sparseList = SparseListType(); // TODO: if SparseListType is changed, initialize with appropriate size
       this->sparseList.reserve(m/4);
     } else {
       this->M = vector<uint8_t>(m);
@@ -447,7 +450,6 @@ HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (HyperLogLogPl
   n_observed = other.n_observed;
   sparse = other.sparse;
   sparseList = std::move(other.sparseList);
-  bit_mixer = other.bit_mixer;
   return *this;
 }
 
@@ -459,16 +461,14 @@ HyperLogLogPlusMinus<HASH>& HyperLogLogPlusMinus<HASH>::operator= (const HyperLo
   n_observed = other.n_observed;
   sparse = other.sparse;
   sparseList = other.sparseList;
-  bit_mixer = other.bit_mixer;
   return *this;
 }
 
 template<typename HASH>
 HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(const HyperLogLogPlusMinus<HASH>& other):
       p(other.p), m(other.m), 
-      M(other.M), n_observed(other.n_observed), sparse(other.sparse), 
-      sparseList(other.sparseList), 
-      bit_mixer(other.bit_mixer) {
+      M(other.M), n_observed(other.n_observed), sparse(other.sparse), bit_mixer(),
+      sparseList(other.sparseList) {
 }
 
 
@@ -477,8 +477,9 @@ HyperLogLogPlusMinus<HASH>::HyperLogLogPlusMinus(HyperLogLogPlusMinus<HASH>&& ot
       p(other.p), m(other.m), 
       M(std::move(other.M)), 
       n_observed(other.n_observed), sparse(other.sparse), 
-      sparseList(std::move(other.sparseList)), 
-      bit_mixer(other.bit_mixer) {
+      bit_mixer(),
+      sparseList(std::move(other.sparseList))
+{
 }
 
 
@@ -555,6 +556,7 @@ void HyperLogLogPlusMinus<T>::switchToNormalRepresentation() {
 #endif
 }
 
+
 // add sparseList to the registers of M
 template<typename T>
 void HyperLogLogPlusMinus<T>::addToRegisters(const SparseListType &sparseList) {
@@ -565,15 +567,14 @@ void HyperLogLogPlusMinus<T>::addToRegisters(const SparseListType &sparseList) {
     if (sparseList.size() == 0) {
       return;
     }
-    for (auto encoded_hash_value_ptr = sparseList.begin(); encoded_hash_value_ptr != sparseList.end(); ++encoded_hash_value_ptr) {
-
-      size_t idx = getIndex(*encoded_hash_value_ptr, p);
+    for_each(sparseList, [this](uint32_t v) {
+      size_t idx = getIndex(v, p);
       assert_lt(idx,M.size());
-      uint8_t rank_val = getEncodedRank(*encoded_hash_value_ptr, pPrime, p);
+      uint8_t rank_val = getEncodedRank(v, pPrime, p);
       if (rank_val > this->M[idx]) {
         this->M[idx] = rank_val;
       }
-    }
+    });
 }
 
 
@@ -601,7 +602,8 @@ void HyperLogLogPlusMinus<T>::merge(HyperLogLogPlusMinus<T>&& other) {
       if (this->sparse && other.sparse) {
         // this->merge(static_cast<const HyperLogLogPlusMinus<T>&>(other));
         // consider using addHashToSparseList(this->sparseList, val, pPrime) and checking for sizes
-        this->sparseList.insert(other.sparseList.begin(), other.sparseList.end());
+        //this->sparseList.insert(other.sparseList.begin(), other.sparseList.end());
+        for_each(other.sparseList, [this](uint32_t v) {sparseList.insert(v);});
       } else if (other.sparse) {
         // other is sparse, but this is not
         addToRegisters(other.sparseList);
@@ -642,7 +644,8 @@ void HyperLogLogPlusMinus<T>::merge(const HyperLogLogPlusMinus<T>& other) {
       n_observed += other.n_observed;
       if (this->sparse && other.sparse) {
         // consider using addHashToSparseList(this->sparseList, val, pPrime) and checking for sizes
-        this->sparseList.insert(other.sparseList.begin(), other.sparseList.end());
+        //this->sparseList.insert(other.sparseList.begin(), other.sparseList.end());
+        for_each(other.sparseList, [this](uint32_t v) {sparseList.insert(v);});
       } else if (other.sparse) {
         // other is sparse, but this is not
         addToRegisters(other.sparseList);
@@ -685,14 +688,14 @@ uint64_t HyperLogLogPlusMinus<uint64_t>::flajoletCardinality(bool use_sparse_pre
       } else{
         // For testing purposes. Put sparse list into a standard register
         M = vector<uint8_t>(m, 0);
-        for (const auto& val : sparseList) {
+        for_each(sparseList, [&](uint32_t val) {
           size_t idx = getIndex(val, p);
           assert_lt(idx,M.size());
           uint8_t rank_val = getEncodedRank(val, pPrime, p);
           if (rank_val > M[idx]) {
             M[idx] = rank_val;
           }
-        }
+        }); // for_each
       }
     }
     double est = calculateRawEstimate(M);
