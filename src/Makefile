@@ -54,7 +54,7 @@ classify: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mappi
 classifyExact: classify.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o gzstream.o hyperloglogplus.o
 	$(CXX) $(CXXFLAGS) -DEXACT_COUNTING -o classifyExact $^ $(LIBFLAGS)
 
-query_taxdb: taxdb.hpp
+query_taxdb: #taxdb.hpp
 
 build_taxdb: quickfile.o #taxdb.hpp report-cols.hpp
 
