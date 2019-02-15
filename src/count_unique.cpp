@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018, Florian Breitwieser
+ * Copyright 2018, Florian P Breitwieser
  *
  * This file is part of the KrakenUniq taxonomic sequence classification system.
  *
@@ -17,237 +17,117 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "kraken_headers.hpp"
+#include "krakenutil.hpp"
+#include "seqreader.hpp"
 #include "hyperloglogplus.hpp"
-#include "khset.h"
-#include <iostream>
-#include <fstream>
-#include <random>
-#include <limits>
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
+
+
+#define SKIP_LEN 50000
 
 using namespace std;
+using namespace kraken;
 
-int usage(int exit_code) {
-  std::cerr << 
-"count_unique: Get cardinality of 64-bit input stream\n"
-"\n"
-"Usage: count_unique OPTIONS\n"
-"\n"
-"OPTIONS:\n"
-"  -p PRECISION   Precision in range of 10 to 18 (required)\n"
-"  -r INT         Create INT random numbers, instead of counting from STDIN\n"
-"  -s             Use sparse representation for smaller cardinalities\n"
-"  -t             Test mode - print cardinalities regularily\n"
-"  -y             Show relative error along with cardinality estimates\n"
-"  -e             Use improved cardinality estimator by Otmar Ertl, too\n"
-"  -U             Use exact cardinality counting implemented w/ unordered_set (not working w/ test mode)\n"
-"  -K             Use exact cardinality counting implemented w/ khash (not working w/ test mode)\n";
-    return exit_code;
-  }
+void parse_command_line(int argc, char **argv);
+void usage(int exit_code=EX_USAGE);
+uint64_t count_unique(int, bool);
 
-double rel_error(uint64_t est, uint64_t truth) {
-  if (est >= truth) 
-    return double(est - truth)/double(truth);
-  else
-    return -double(truth - est)/double(truth);
-}
-
-void print_card(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t ctr, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) { 
- 
-    uint64_t esth, este, estf;
-
-    if (heule_too) {
-      esth = hll.heuleCardinality();
-      cout << ctr << '\t' << esth;
-    }
-    if (flajolet_too) {
-      estf = hll.flajoletCardinality(false);
-      cout << '\t' << estf;
-    }
-    if (ertl_too) {
-      este = hll.ertlCardinality();
-      cout << '\t' << este;
-    }
-  
-  if (show_rel_error) {
-    double esth_err, este_err;
-    if (heule_too) {
-      esth_err = rel_error(esth, ctr);
-      cout << '\t' << esth_err;
-    }
-    if (flajolet_too) {
-      cout << '\t' << rel_error(estf, ctr);
-    }
-    if (ertl_too) {
-      este_err = rel_error(este, ctr);
-      cout << '\t' << este_err;
-    }
-    if (ertl_too && heule_too) {
-      if (abs(este_err) == abs(esth_err)) {
-        cout << "\tequal";
-      } else if (abs(este_err) < abs(esth_err)) {
-        cout << "\tErtl won!";
-      } else {
-        cout << "\tHeule won!";
-      }
-    }
-  }
-  cout << '\n';
-}
-
-
-void add_to_hll(HyperLogLogPlusMinus<uint64_t>& hll, uint64_t nr, uint64_t& ctr, bool test_mode, bool show_rel_error, bool heule_too, bool flajolet_too, bool ertl_too) {
-  hll.insert(nr);
-  ++ctr;
-  if (test_mode) {
-    // prints numbers at powers of 10 and 10 points in-between
-    uint64_t last_dec = pow(10,floor(log10(ctr)));
-    if (floor(log10(ctr)) == log10(ctr) || 
-        (ctr > 100 && (ctr*10) % last_dec == 0)) {
-      print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
-    }
-  }
-}
-
-
-  template <typename T>
-  unordered_set<T>& operator+=(unordered_set<T>& left, const unordered_set<T>& right) {
-    left.insert(right.begin(), right.end());
-    return left;
-  }
-
+int Num_threads = 1;
+int k = 31;
+int hll_precision = 14;
 
 int main(int argc, char **argv) {
+  #ifdef _OPENMP
+  omp_set_num_threads(1);
+  #endif
 
-  size_t p = 10;
-  bool sparse = false;
-  bool test_mode = false;
-  bool heule_too = true;
-  bool ertl_too = false;
-  bool exact_counting_unordered_set = false;
-  bool exact_counting_khash = false;
-  bool flajolet_too = false;
-  bool show_rel_error = false;
-  bool use_stdin = true;
-  size_t n_rand = 1;
-  size_t n_redo = 1;
+  parse_command_line(argc, argv);
 
-  int c;
+  KmerScanner::set_k(k);
+  cout << count_unique(hll_precision, true) << endl;
 
-  while ((c = getopt (argc, argv, "shtep:r:yx:fUK")) != -1)
-    switch (c) {
-      case 's': sparse = true; break;
-      case 't': test_mode = true; break;
-      case 'e': ertl_too = true; break;
-      case 'U': exact_counting_unordered_set = true; break;
-      case 'K': exact_counting_khash = true; break;
-      case 'f': flajolet_too = true; break;
-      case 'y': show_rel_error = true; break;
-      case 'p': p = stoi(optarg); break;
-      case 'r': use_stdin = false; 
-                n_rand = stoll(optarg); 
-                break;
-      case 'x': n_redo = stoi(optarg); break;
-      case 'h': return usage(0); break;
-      case '?':
-        if (optopt == 'p' || optopt == 'r')
-          fprintf (stderr, "Option -%c requires an argument.\n", optopt);
-        else if (isprint (optopt))
-          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-        else
-          fprintf (stderr,
-                   "Unknown option character `\\x%x'.\n",
-                   optopt);
-        return 1;
-      default:
-        abort ();
-      }
-
-  bool exact_counting = exact_counting_khash || exact_counting_unordered_set;
-  HyperLogLogPlusMinus<uint64_t> hll(p, sparse); // unique k-mer count per taxon
-  //HyperLogLogPlusMinus<uint64_t> hll(p, sparse, wang_mixer); // unique k-mer count per taxon
-
-  if (test_mode && ! exact_counting) {
-    cout << "observed\testimate_heule";
-    if (flajolet_too) {
-      cout << "\testimate_flajolet";
-    }
-    if (ertl_too)
-      cout << "\testimate_ertl";
-    if (show_rel_error) {
-      cout << "\trel_error_heule";
-      if (flajolet_too)
-        cout << "\trel_error_flajolet";
-
-      if (ertl_too)
-        cout << "\trel_error_ertl";
-
-      cout << "\twho_won";
-
-    }
-    cout << '\n';
-  } 
-  uint64_t ctr = 0;
-  
-  unordered_set<uint64_t> exact_counter;
-  kh::khset64_t exact_counter_khash;
-
-  if (use_stdin) {
-    uint64_t nr;
-    while (cin >> nr) {
-      if (exact_counting_unordered_set) {
-          exact_counter.insert(nr);
-      } else if (exact_counter_khash) {
-        exact_counter_khash.insert(nr);
-      } else {
-        add_to_hll(hll, nr, ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
-      }
-    }
-    if (!test_mode) {
-      if (exact_counting_unordered_set) {
-        cout << exact_counter.size() << "\n";
-      } else if (exact_counter_khash) {
-        cout << exact_counter_khash.size() << "\n";
-      } else {
-        print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
-      }
-    }
-  } else {
-    // get random seed from random_device RNG
-    std::random_device rd;
-    // use 64-bit Mersenne Twister 19937 as RNG, seed with rd()
-    std::mt19937_64 rng(rd()); 
-    
-    // Define output distribution (default range for unsigned: 0 to MAX)
-    std::uniform_int_distribution<uint64_t> distr;
-    for (size_t j = 0; j < n_redo; ++j) {
-      unordered_set<uint64_t> exact_counter1;
-      kh::khset64_t exact_counter_khash1;
-      for(size_t i = 0; i < n_rand; i++) {
-        if (exact_counting_unordered_set) {
-            exact_counter1.insert(distr(rng));
-        } else if (exact_counting_khash) {
-          exact_counter_khash1.insert(distr(rng));
-        } else {
-          add_to_hll(hll, distr(rng), ctr, test_mode, show_rel_error, heule_too, flajolet_too, ertl_too);
-        }
-      }
-      if (!test_mode) {
-        if (exact_counting_unordered_set) {
-          cout << exact_counter1.size() << "\n";
-        } else if (exact_counting_khash) {
-          cout << exact_counter_khash1.size() << "\n";
-        } else {
-          print_card(hll, ctr, show_rel_error, heule_too, flajolet_too, ertl_too);
-        }
-      }
-      hll.reset();
-      ctr = 0;
-    }
-  }
-  
+  return 0;
 }
 
+uint64_t count_unique(int p, bool sparse) {
+  FastaReader reader("/dev/fd/0");
+  DNASequence dna;
+  HyperLogLogPlusMinus<uint64_t> counter(p, false);
+  
+  while (true) {
+    dna = reader.next_sequence();
+    if (! reader.is_valid())
+      break;
+
+#ifdef _OPENMP
+    #pragma omp parallel for schedule(dynamic)
+#endif
+    for (size_t i = 0; i < dna.seq.size(); i += SKIP_LEN) {
+      HyperLogLogPlusMinus<uint64_t> mycounter(p, false);
+      KmerScanner scanner(dna.seq, i, i + SKIP_LEN + k - 1);
+      uint64_t *kmer_ptr;
+
+      while ((kmer_ptr = scanner.next_kmer()) != NULL) {
+        if (scanner.ambig_kmer())
+          continue;
+        mycounter.insert(*kmer_ptr);
+      }
+#ifdef _OPENMP
+      #pragma omp critical(set_access)
+#endif
+      counter += mycounter;
+    }
+  }
+  return (uint64_t) counter.cardinality();
+}
+
+void parse_command_line(int argc, char **argv) {
+  int opt;
+  long long sig;
+
+  if (argc > 1 && strcmp(argv[1], "-h") == 0)
+    usage(0);
+  while ((opt = getopt(argc, argv, "t:k:m:p:")) != -1) {
+    switch (opt) {
+      case 't' :
+        sig = atoll(optarg);
+        if (sig <= 0)
+          errx(EX_USAGE, "can't use nonpositive thread count");
+        #ifdef _OPENMP
+        if (sig > omp_get_num_procs())
+          errx(EX_USAGE, "thread count exceeds number of processors");
+        Num_threads = sig;
+        omp_set_num_threads(Num_threads);
+        #endif
+        break;
+      case 'k' :
+        sig = atoll(optarg);
+        if (sig <= 0)
+          errx(EX_USAGE, "k can't be <= 0");
+        if (sig > 31)
+          errx(EX_USAGE, "k can't be > 31");
+        k = sig;
+        break;
+      case 'p' :
+        hll_precision = atoi(optarg);
+        break;
+      default:
+        usage();
+        break;
+    }
+  }
+
+  if (k == 0)
+    usage(EX_USAGE);
+}
+
+void usage(int exit_code) {
+  cerr << "Usage: count-unique [options]" << endl
+       << "  Estimate the number of k-mer in stdin using HLL." << endl
+       << "Options: " << endl
+       << "  -k #          Length of k-mers ["<<k<<"]" << endl
+       << "  -t #          Number of threads ["<<Num_threads<<"]" << endl
+       << "  -p INT        HLL precision ["<<hll_precision<<"]" << endl
+       << "  -h            Print this message" << endl;
+  exit(exit_code);
+}

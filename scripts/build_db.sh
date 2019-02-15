@@ -97,14 +97,6 @@ if [ ! -s "library-files.txt" ]; then
     find $FIND_OPTS $LIBRARY_DIR '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' ')' > library-files.txt
 fi
 
-file_sizes() {
-  if [[ `uname` == "Darwin" ]]; then
-    cat library-files.txt | tr '\n' '\0' | xargs -0 stat -f '%z'
-  else
-    cat library-files.txt | tr '\n' '\0' | xargs -0 stat -c '%s\n'
-  fi
-}
-
 cat_library() {
   cat library-files.txt | tr '\n' '\0' | xargs -0 cat
 }
@@ -130,10 +122,9 @@ else
 
   echo "Using $JELLYFISH_BIN"
   [[ "$JELLYFISH_BIN" != "" ]] || exit 1
-  # Estimate hash size as 1.15 * chars in library FASTA files
   if [ -z "$KRAKEN_HASH_SIZE" ]
   then
-    KRAKEN_HASH_SIZE=$( file_sizes  | perl -nle '$sum += $_; END {print int(1.15 * $sum)}')
+    KRAKEN_HASH_SIZE=$( cat_library | count_unique -t $KRAKEN_THREAD_CT -k $KRAKEN_KMER_LEN)
     echo "Hash size not specified, using '$KRAKEN_HASH_SIZE'"
   fi
 
@@ -189,7 +180,7 @@ else
       record_len=$(( key_len + val_len ))
       new_ct=$(echo "$max_kdb_size / $record_len" | bc)
       echo "Shrinking DB to use only $new_ct of the $key_ct k-mers"
-      db_shrink -d database.jdb -o database.jdb.small -n $new_ct
+      exe eval db_shrink -d database.jdb -o database.jdb.small -n $new_ct
       mv database.jdb database.jdb.big.tmp
       mv database.jdb.small database.jdb
       mv database.jdb.big.tmp database.jdb.big
@@ -274,7 +265,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     fi
 
 	[[ -z "${KRAKEN_LCA_ORDER}" ]] && DC="-c database.kdb.counts" || DC=""
-    exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+    set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
         -b taxDB $PARAM $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map $DC \
         -F <( cat_library ) -T > seqid2taxid-plus.map
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then

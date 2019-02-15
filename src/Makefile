@@ -42,7 +42,9 @@ grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
-count_unique: hyperloglogplus.o 
+count_unique: hyperloglogplus.o seqreader.o krakenutil.o
+
+test_count_unique: hyperloglogplus.o 
 
 test_hll_on_db: krakendb.o hyperloglogplus.o quickfile.o
 
