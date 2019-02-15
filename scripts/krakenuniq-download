@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 # krakenuniq-download.pl - based on centrifuge-download
-# (c) Florian Breitwieser, 2017-2018
+# (c) Florian Breitwieser, 2017-2019
 # licensed under GPL-3
 
 use strict;
@@ -10,6 +10,7 @@ use File::Basename;
 use File::Fetch;
 use File::Copy;
 use File::Path qw/make_path remove_tree/;
+use File::Temp qw/tempfile/;
 use IO::Uncompress::Gunzip qw/gunzip $GunzipError/;
 use autodie;
 use Term::ANSIColor;
@@ -18,6 +19,7 @@ use LWP::Simple;
 #use LWP::UserAgent;
 use List::Util qw/min/;
 use FindBin;
+use Time::HiRes qw/usleep/;
 use lib "$FindBin::RealBin";
 use File::SortedSeek qw/alphabetic/;
 
@@ -352,7 +354,7 @@ sub download(@) {
     #if (!$response->is_success) {
     #  my $status_line = $response->status_line;
     #  print STDERR "\nFAIL: Error using LWP for downloading $url ($status_line) - tying curl.\n";
-      system("curl -g '$url' -o $file") == 0 or die "Error fetching $url. Is curl installed?\n";
+      system("curl -g '$url' -o '$file'") == 0 or die "Error fetching $url. Is curl installed?\n";
     #} else {
     #  print STDERR "SUCCESS\n" if $VERBOSE;
     #}
@@ -429,6 +431,33 @@ sub end_fork() {
 
 sub link_to_taxonomy(@) {
   my ($db1, $id_list) = @_;
+  my $url = sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=%s&db=taxonomy&id=%s",
+                    $db1, $id_list);
+  my (undef, $temp_f) = tempfile();
+  sleep(1);
+  print STDERR "$url\n";
+  download($url, $temp_f);
+  open (my $F, "<", $temp_f) or die $!;
+  my $in_link = 0;
+  my $taxid;
+  while (<$F>) {
+    if (!$in_link) {
+      next unless /<Link>/;
+      $in_link = 1;
+    } else {
+      if (/<Id>([0-9]*)/) {
+        $taxid = $1;
+        last;
+      }
+    }
+  }
+  close($F);
+  print STDERR "$id_list: $taxid [$temp_f]\n";
+  return $taxid;
+}
+
+sub link_to_taxonomy_old(@) {
+  my ($db1, $id_list) = @_;
   my $db2 = 'taxonomy';     # &db
   my $linkname = 'link_to_tax';
 
@@ -492,13 +521,12 @@ sub get_taxid(@) {
   }
   
   if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
-    link_to_taxonomy($ncbi_database, $nbr_ac);
-		exit 1;
-    #($taxid) = split /\t/, $res;
+    $taxid = link_to_taxonomy($ncbi_database, $nbr_ac);
   }
   
   if (!defined $taxid) {
     print STDERR "\nNo taxid mapping for sequence $nbr_ac!\n";
+    die;
   }
   return $taxid;
 }
@@ -601,20 +629,7 @@ sub download_ncbi_search(@) {
           }
           $nbr_ac =~ s/[. ].*//;
      
-          my $taxid;
-          foreach (@sorted_map_file_handles) {
-            my $tell = alphabetic(*$_, $nbr_ac);
-            next unless defined $tell;
-            $taxid = <$_>;
-            $taxid =~ s/.*\t//;
-            chomp $taxid;
-          }
-  
-          if (!defined $taxid || !defined $taxid_name_map{$taxid}) {
-            my $res = `curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=$ncbi_database&id=$nbr_ac&rettype=fasta&retmode=xml" | head -n 12  | egrep '<TSeq_taxid>|<TSeq_orgname>'  | sed -e 's#</.*>##' -e 's#.*<.*>##' | paste -sd\$'\\t'`;
-            chomp $res;
-            ($taxid) = split /\t/, $res;
-          }
+          my $taxid = get_taxid($ncbi_database, $nbr_ac, @sorted_map_file_handles);
   
           my $name = $taxid_name_map{$taxid};
           if (!defined $taxid || !defined $name) {
@@ -635,12 +650,12 @@ sub download_ncbi_search(@) {
           open($FA_HANDLE, ">", $file) or die "Couln't open file";
           create_map_file_ac($file, $nbr_ac, $taxid);
         }
-        print $FA_HANDLE $line;
+        print $FA_HANDLE $line if $fa_handle_open;
       }
       #end_fork();
       close ($F);
       unlink($part_file);
-      close($FA_HANDLE);
+      close($FA_HANDLE) if $fa_handle_open;
     }
     $retstart += $curr_retmax;
     print STDERR " done \n";
