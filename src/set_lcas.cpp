@@ -285,11 +285,31 @@ void process_single_file() {
     }
 
     // Get the taxid. If the header specifies kraken:taxid, use that
-    uint32_t taxid;
+    uint32_t taxid = 0;
     auto it = ID_to_taxon_map.find(dna.id);
     if (it != ID_to_taxon_map.end()) {
       taxid = it->second;
-    } else if (dna.id.size() >= prefix.size() && dna.id.substr(0,prefix.size()) == prefix) {
+    } else {
+      // Check if it can be mapped by removing .\d suffix
+      size_t pos = dna.id.find_last_of('.');
+      bool is_num_suffix = pos != string::npos;
+      if (is_num_suffix) {
+        for (size_t i = pos + 1; i < dna.id.size(); ++i) {
+          if (!isdigit(dna.id[i])) {
+            is_num_suffix = false;
+            break;
+          }
+        }
+      }
+      if (is_num_suffix) {
+        it = ID_to_taxon_map.find(dna.id.substr(0, pos));
+        if (it != ID_to_taxon_map.end()) {
+          taxid = it->second;
+        }
+      }
+    }
+    
+    if (taxid == 0 && dna.id.size() >= prefix.size() && dna.id.substr(0,prefix.size()) == prefix) {
       // if the AC is not in the map, check if the fasta entry starts with '>kraken:taxid'
         taxid = std::stol(dna.id.substr(prefix.size()));
         if (taxid == 0) {
@@ -298,7 +318,9 @@ void process_single_file() {
         const auto strBegin = dna.header_line.find_first_not_of("\t ");
         if (strBegin != std::string::npos)
             dna.header_line = dna.header_line.substr(strBegin);
-    } else {
+    } 
+    
+    if (taxid == 0) {
         cerr << "Error! Didn't find taxonomy ID mapping for sequence " <<  dna.id << "!!" << endl;
         ++seqs_skipped;
         continue;

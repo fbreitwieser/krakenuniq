@@ -239,7 +239,7 @@ else
 fi
 
 if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
-  if [ -s "database.kdb" ]
+  if [ -s "database.kdb" ] && [ "$KRAKEN_RESET_TAXIDS" != "1" ]
   then
     echo "Skipping step 6, LCAs already set."
   else

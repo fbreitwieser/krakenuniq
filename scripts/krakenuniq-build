@@ -66,6 +66,7 @@ my (
   $add_to_library,
   $build,
   $rebuild,
+  $reset_taxids,
   $shrink,
   $standard,
   $upgrade,
@@ -139,6 +140,7 @@ GetOptions(
   "taxids-for-sequences" => \$add_taxonomy_ids_for_seq,
   "min-contig-size=i" => \$min_contig_size,
   "lca-order=s" => \@lca_order,
+  "reset-taxids" => \$reset_taxids,
 
   "lca-database!" => \$build_lca_database,
   "uid-database!" => \$build_uid_database,
@@ -218,7 +220,7 @@ elsif (defined($shrink)) {
 elsif ($standard) {
   standard_installation();
 }
-elsif ($build || $rebuild) {
+elsif ($build || $rebuild ||$reset_taxids) {
   build_database();
 }
 elsif ($clean) {
@@ -382,6 +384,7 @@ sub build_database {
   }
 
   $ENV{"KRAKEN_REBUILD_DATABASE"} = (defined $rebuild? 1 : 0);
+  $ENV{"KRAKEN_RESET_TAXIDS"} = (defined $reset_taxids? 1 : 0);
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_SEQ"} = $add_taxonomy_ids_for_seq;
   $ENV{"KRAKEN_ADD_TAXIDS_FOR_GENOME"} = $add_taxonomy_ids_for_genome;
   $ENV{"KRAKEN_UID_DATABASE"} = $build_uid_database;
