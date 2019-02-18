@@ -330,7 +330,7 @@ sub download(@) {
     ($res_file = $file) =~ s/.gz$//;
   }
 
-  my $VERBOSE = $VERBOSE || (defined $opts  && defined $opts->{'verbose'});
+  my $VERBOSE = $VERBOSE || (defined $opts  && defined $opts->{'verbose'} && $opts->{'verbose'});
 
   if (!$OVERWRITE_FILES && -s $res_file) {
     if ($VERBOSE) {
@@ -1111,7 +1111,7 @@ sub download_taxonomy(@) {
   -d $dir || make_path $dir;
 
   if (!-s "$dir/taxdump.tar.gz") {
-    download("$FTP/pub/taxonomy/taxdump.tar.gz", "$dir/taxdump.tar.gz");
+    download("$FTP/pub/taxonomy/taxdump.tar.gz", "$dir/taxdump.tar.gz", { verbose => 1});
     system_l("Storing taxonomy timestamp", "date > $dir/timestamp");
   }
   system_l("Extracting nodes file","tar -C $dir -zxvf $dir/taxdump.tar.gz nodes.dmp > /dev/null") unless -s "$dir/nodes.dmp";
@@ -1286,20 +1286,20 @@ sub download_domain(@) {
 
 
   if ($DO_DUST) {
-  foreach my $fasta_file (@fasta_files) {
-    my $dustmasked_file = dustmasked_file($fasta_file);
-    if (!$OVERWRITE_FILES && -s $dustmasked_file) {
-      print STDERR "$dustmasked_file exists - not dusting.. \n" if $VERBOSE;
-    } else {
-      ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
-      my $pid = start_fork();
-      unless ($pid) {
-        dustmask($fasta_file, $dustmasked_file, {unlink=>1, verbose=>$VERBOSE});
-        end_fork();
+    foreach my $fasta_file (@fasta_files) {
+      my $dustmasked_file = dustmasked_file($fasta_file);
+      if (!$OVERWRITE_FILES && -s $dustmasked_file) {
+        print STDERR "$dustmasked_file exists - not dusting.. \n" if $VERBOSE;
+      } else {
+        ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
+        my $pid = start_fork();
+        unless ($pid) {
+          dustmask($fasta_file, $dustmasked_file, {unlink=>1, verbose=>$VERBOSE});
+          end_fork();
+        }
       }
     }
-  }
-  wait_children();
+    wait_children();
   }
 
   my $msg  = "Found $downloaded_files files.";
