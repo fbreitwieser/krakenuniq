@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 uint64_t count_unique(int p, bool sparse) {
   FastaReader reader("/dev/fd/0");
   DNASequence dna;
-  HyperLogLogPlusMinus<uint64_t> counter(p, false);
+  HyperLogLogPlusMinus<uint64_t> counter(p, sparse);
   
   while (true) {
     dna = reader.next_sequence();
