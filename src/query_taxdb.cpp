@@ -78,7 +78,6 @@ void process_taxID(uint32_t taxID) {
 
 size_t parse_command_line(int argc, char **argv) {
   int opt;
-  long long sig;
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
