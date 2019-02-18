@@ -14,6 +14,11 @@ KrakenUniq has in principle the same usage and system requirements as Kraken, as
 [Wood and Salzberg, Genome Biology 2014]:               http://genomebiology.com/2014/15/3/R46
 [Kraken manual]:              http://ccb.jhu.edu/software/kraken/MANUAL.html
 
+Comparison to Kraken1, Kraken2, Centrifuge and others
+=====================================================
+Kraken2 is a new development that enables using smaller databases than Kraken 1 or KrakenUniq. However, Kraken2 does not collect information on the unique k-mer coverage that KrakenUniq calculates. You will not get better classifications with Kraken2, the improvements are just on the database size and speed. In that way Kraken2 competes with Centrifuge, and you should try both to see which one works better on your data if a small database size is important to you.
+
+KrakenUniq, is the only metagenomics classifier that gives you k-mer coverage information. For example, you may see that Mycobacterium tuberculosis (Mtb) has 10k reads with either Centrifuge or Kraken2. But are those reads all mapping to the same position within one Mtb strain? Neither Centrifuge nor Kraken or Kraken2 give you the answer; you'd have to extract all the matching reads and re-align them against a selected genome. KrakenUniq's unique k-mer count, on the other hands, reports the number of Mtb k-mers that were hit by any of the reads, and thus whether that classification is good or not.
 
 
 Switching from Kraken to KrakenUniq
@@ -28,6 +33,7 @@ The output file of KrakenUniq is identical to Kraken. The report file has a coup
 - dup: average number of times each unique k-mer has been seen
 - cov: coverage of the k-mers of the clade in the database
 
+Note that KrakenUniq does not work with Kraken2 databases.
 
 Hierarchical read classification with multiple databases
 ========================================================
