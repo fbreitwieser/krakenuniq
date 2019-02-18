@@ -93,10 +93,10 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
                 func(this->keys[ki]);\
     }
 
-#ifdef __GNUC__
-#pragma GCC diagnostic ignored "-Wclass-memaccess"
-#pragma GCC diagnostic push
-#endif
+//#ifdef __GNUC__
+//#pragma GCC diagnostic ignored "-Wclass-memaccess"
+//#pragma GCC diagnostic push
+//#endif
 
 // Steal everything, take no prisoners.
 #define KH_MOVE_DEC(t) \
@@ -144,9 +144,9 @@ struct khset##nbits##_t: EmptyKhSet, khash_t(name) {\
     /* For each*/ \
     __FE__\
     using key_type = typename std::decay<decltype(*keys)>::type;\
-    operator khash_t(name) &() {return *reinterpret_cast<khash_t(name) *>(this);}\
+    /*operator khash_t(name) &() {return *reinterpret_cast<khash_t(name) *>(this);}*/\
     operator khash_t(name) *() {return reinterpret_cast<khash_t(name) *>(this);}\
-    operator const khash_t(name) &() const {return *reinterpret_cast<const khash_t(name) *>(this);}\
+    /*operator const khash_t(name) &() const {return *reinterpret_cast<const khash_t(name) *>(this);}*/\
     operator const khash_t(name) *() const {return reinterpret_cast<const khash_t(name) *>(this);}\
     khash_t(name) *operator->() {return static_cast<khash_t(name) *>(*this);}\
     const khash_t(name) *operator->() const {return static_cast<const khash_t(name) *>(*this);}\
@@ -189,9 +189,9 @@ struct khset_cstr_t: EmptyKhSet, khash_t(cs) {
     KH_MOVE_DEC(khset_cstr_t)
     /* For each*/
     __FE__
-    operator khash_t(cs) &() {return *reinterpret_cast<khash_t(cs) *>(this);}
+    //operator khash_t(cs) &() {return *reinterpret_cast<khash_t(cs) *>(this);}
     operator khash_t(cs) *() {return reinterpret_cast<khash_t(cs) *>(this);}
-    operator const khash_t(cs) &() const {return *reinterpret_cast<const khash_t(cs) *>(this);}
+    //operator const khash_t(cs) &() const {return *reinterpret_cast<const khash_t(cs) *>(this);}
     operator const khash_t(cs) *() const {return reinterpret_cast<const khash_t(cs) *>(this);}
     khash_t(cs) *operator->() {return static_cast<khash_t(cs) *>(*this);}
     const khash_t(cs) *operator->() const {return static_cast<const khash_t(cs) *>(*this);}
@@ -304,9 +304,9 @@ struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
         vals[ret] = val;\
     }\
     \
-    operator khash_t(name) &() {return *reinterpret_cast<khash_t(name) *>(this);}\
+    /*operator khash_t(name) &() {return *reinterpret_cast<khash_t(name) *>(this);}*/\
     operator khash_t(name) *() {return reinterpret_cast<khash_t(name) *>(this);}\
-    operator const khash_t(name) &() const {return *reinterpret_cast<const khash_t(name) *>(this);}\
+    /*operator const khash_t(name) &() const {return *reinterpret_cast<const khash_t(name) *>(this);}*/\
     operator const khash_t(name) *() const {return reinterpret_cast<const khash_t(name) *>(this);}\
     khash_t(name) *operator->() {return static_cast<khash_t(name) *>(*this);}\
     const khash_t(name) *operator->() const {return static_cast<const khash_t(name) *>(*this);}\
@@ -326,8 +326,8 @@ DECLARE_KHMAP_64(64, ::std::uint64_t)
 template<typename T>
 size_t capacity(const T &a) {return a.capacity();} // Can be specialized later.
 
-template<typename T> T&operator+=(T &a, const T &b) {
-}
+//template<typename T> T&operator+=(T &a, const T &b) {
+//}
 
 #undef KH_MOVE_DEC
 #undef KH_COPY_DEC
