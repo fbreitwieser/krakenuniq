@@ -91,7 +91,7 @@ KrakenUniq requires a lot of RAM - ideally 128GB - 512GB. For more memory effici
 
 ### KrakenUniq vs Kraken vs Kraken 2
 
-KrakenUniq was built on top of Kraken, and supports Kraken 1 databases natively. Kraken 2 was rebuilt from scratch, and has a different database format. Currently there is no version of KrakenUniq that supports Kraken 2, but we may support Kraken 2 in the future to provide the feature of unique k-mer counts to this classification engine, too.
+KrakenUniq was built on top of Kraken, and supports Kraken 1 databases natively. Kraken 2 is a new development that has a different database format, which is not supported by KrakenUniq.
 
 ### Differences to `kraken`
  - Use `krakenuniq --report-file FILENAME ...` to write the kraken report to `FILENAME`.
