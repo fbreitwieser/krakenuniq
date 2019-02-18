@@ -72,12 +72,13 @@ my $DL_MOD_RSYNC;
 my $n_children = 0;
 my $NUC_AC;
 my $EXCLUDE_ENVIRONMENTAL_TAXIDS = 0;
+my $NT_FNA_FILE=undef;
 my %taxid_name_map;
 my @pids;
 
 
 # Taxa list modified from https://raw.githubusercontent.com/bioinformatics-centre/kaiju/master/util/taxonlist.tsv
-my %taxa_lists = (
+my %division_to_taxids = (
   bacteria => [
     2,    #	Bacteria
   ],
@@ -133,8 +134,8 @@ my %taxa_lists = (
   ]
 );
 
-my @taxa_lists = sort keys %taxa_lists;
-my $TAXA_LIST = "bacteria,archaea,viral,fungi,protozoa";
+my $available_divisions = join(", ", sort keys %division_to_taxids);
+my $TAXIDS_OR_DIVISIONS = "bacteria,archaea,viral,fungi,protozoa";
 
 my $downloaded_viral_refseq=0;
 my $FNA_FILES="genomic";
@@ -149,6 +150,7 @@ ARGUMENTS
      'taxonomy'         NCBI taxonomy mappings from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
      'nucleotide'       Download nucleotide sequences using a query specified using --search or --ac.
      'microbial-nt'     Download microbial sequences from nt database.
+     'nt'               Download sequences from nt database, specified via --taxa, specified via --taxa.
      'viral-neighbors'  Download viral strain sequences from the NCBI Viral Genome Resource.
                         (Search: \"$vir_nbr_search_term\").
      'genbank/DOMAIN'   Download all complete genomes for DOMAIN from GenBank.
@@ -170,7 +172,7 @@ COMMON OPTIONS
  --dust, -D         Mask low-complexity regions using dustmasker.
  --min-seq-len X    Filter all sequences from the FASTA files that have less than X bp.
 
-WHEN USING DATABASE nucleotide or viral-neighbors:
+WHEN USING DATABASE nucleotide OR viral-neighbors:
  --search SEARCH_TERM  Download all sequences returned from a NCBI nucleotide search.
                        When used with viral-neighbors, it subsets the viral genomes by the search.
                        E.g. \"txid1570291[Organism]\" for Ebola virus sequences (taxonomy ID 1570291).
@@ -185,10 +187,11 @@ WHEN USING DATABASE nucleotide or viral-neighbors:
                        gbwithparts, fasta_cds_na, fasta_cds_aa. Note that only gb and fasta files are split, while the other formats stay in chunks.
                        The resulting files will have the rettype as extension.
 
-WHEN USING DATABASE nt:
- --taxa TAXLIST     Provide list of taxa that are kept in the database. Comma separated, supply either taxIDs or
-                    one of the following division names: @taxa_lists
-                    Default: \"$TAXA_LIST\"
+WHEN USING DATABASE nt OR microbial-nt:
+ --taxa TAXLIST     Provide a list of taxa that are kept in the nt database. Comma separated, supply either 
+                    taxIDs in the format taxIDXXXX, where XXXX is the NCBI taxonomy ID, or one of the 
+                    following division names: $available_divisions.
+                    Default: \"$TAXIDS_OR_DIVISIONS\"
  --exclude-environmental-taxa
                     Exclude taxa that are named 'environmental samples'.
 
@@ -216,7 +219,8 @@ GetOptions(
   "term=s" => \$SEARCH_TERM,
   "ac=s" => \$NUC_AC,
   "mapping-file=s" => \$MAP_DIV,
-  "taxa=s" => \$TAXA_LIST,
+  "taxa=s" => \$TAXIDS_OR_DIVISIONS,
+  "nt-fna=s" => \$NT_FNA_FILE,
   "exclude-environmental-taxa" => \$EXCLUDE_ENVIRONMENTAL_TAXIDS,
   "dust|D" => \$DO_DUST,
   "change-header|l" => \$CHANGE_HEADER,
@@ -319,83 +323,67 @@ foreach my $DATABASE (@ARGV) {
 
 sub download(@) {
   my ($url, $file, $opts) = @_;
-  my $gunzipped_filename;
 
-  if (defined $opts && defined $opts->{'gunzip'}) {
-    ($gunzipped_filename = $file) =~ s/.gz$//; 
+  my $res_file = $file;
+  my $do_gunzip = defined $opts && defined $opts->{'gunzip'};
+  if ($do_gunzip) {
+    ($res_file = $file) =~ s/.gz$//;
   }
 
-  if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-  }
+  my $VERBOSE = $VERBOSE || (defined $opts  && defined $opts->{'verbose'});
 
-  if (!$OVERWRITE_FILES) {
-    my $res_file = defined $gunzipped_filename? $gunzipped_filename : $file;
-    if (-s $res_file) {
-      print STDERR "Not fetching $url - file $res_file exists.\n" if $VERBOSE;
-      if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-        check_file($res_file);
-      }
-      return 1;
+  if (!$OVERWRITE_FILES && -s $res_file) {
+    if ($VERBOSE) {
+      print STDERR "Not fetching $url - file $res_file exists.\n";
+      check_file($res_file);
     }
-  }
-  #print STDERR "$file ";
-  if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-    print STDERR ": downloading ...";
+    return -s $res_file;
   }
 
-  if ($url =~ /^http/) {
-    print STDERR "Fetching $url to $file ..." if $VERBOSE;
-    if (!-d dirname($file)) {
-      make_path(dirname($file));
-    }
+  make_path(dirname($file)) unless -d dirname($file);
+
+  if (!-s $file) {
+    # download file from URL
     $url =~ s/\[/%5B/g;
     $url =~ s/\]/%5D/g;
-    #my $response = $ua->get($url, ':content_file' => $file);
-    #if (!$response->is_success) {
-    #  my $status_line = $response->status_line;
-    #  print STDERR "\nFAIL: Error using LWP for downloading $url ($status_line) - tying curl.\n";
-      system("curl -g '$url' -o '$file'") == 0 or die "Error fetching $url. Is curl installed?\n";
-    #} else {
-    #  print STDERR "SUCCESS\n" if $VERBOSE;
-    #}
-  } else {
     if ( $DL_MOD_RSYNC && $url =~ /^ftp/ ) {
-     $url =~ s/^ftp/rsync/;
+      $url =~ s/^ftp/rsync/;
+      print STDERR "Fetching $url to $file ..." if $VERBOSE;
+      my $ff = File::Fetch->new(uri=>"$url");
+      my $where = $ff->fetch(to=> dirname($file));
+      if (!defined $where) {
+        print STDERR "Error downloading $url.\n";
+        print STDERR $ff->error if $VERBOSE;
+         return undef;
+      }
+      move($where, $file);
+    } else {
+      if ($VERBOSE) {
+        system_l("Downloading $file", "curl -g '$url' -o '$file'", {newline=>1}) == 0 or die "Error fetching $url. Is curl installed?\n";
+      } else {
+        system("curl -g '$url' -o '$file'") == 0 or die "Error fetching $url. Is curl installed?\n";
+      }
     }
-    print STDERR "Fetching $url to $file ..." if $VERBOSE;
+  }
+  check_file($file) if $VERBOSE;
 
-    my $ff = File::Fetch->new(uri=>"$url");
-    my $where = $ff->fetch(to=> dirname($file));
-    if (!defined $where) {
-       print STDERR "Error downloading $url.\n";
-       print STDERR $ff->error if $VERBOSE;
-       return undef;
+  if ($do_gunzip) {
+    # system gunzip is 5x faster than IO::Uncompress::Gunzip
+    if (defined $opts->{'dont-unlink-gz-file'}) {
+      system_v("gunzip -c $file > $res_file", $VERBOSE); 
+    } else {
+      system_v("gunzip $file", $VERBOSE); 
     }
-    move($where, $file);
+    check_file($res_file) if $VERBOSE;
   }
 
-  if (defined $gunzipped_filename && $gunzipped_filename ne $file) {
-    if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-      print STDERR " gunzipping ...";
-    }
-    print STDERR " GUNZIPPING" if $VERBOSE;
-    gunzip $file => $gunzipped_filename or die "gunzip failed: $GunzipError";
-    if (! defined $opts->{'dont-unlink-gz-file'}) {
-      unlink $file;
-    }
-    $file = $gunzipped_filename;
-  }
-  if (-s $file || (defined $gunzipped_filename && -s $gunzipped_filename)) {
+  if (-s $res_file) {
     print STDERR " SUCCESS\n" if $VERBOSE;
-    if (defined $opts && defined $opts->{'verbose'} && !$VERBOSE) {
-      print STDERR " done.\n";
-    }
   } else {
-    print STDERR "failed.\n";
+    print STDERR " FAILED.\n";
   }
 
-  #my $where = $ff->fetch(to=> dirname($file)) or die "\n$ff->error for $url!";
-  return -s $file;
+  return -s $res_file;
 }
 
 sub start_fork() {
@@ -669,10 +657,14 @@ sub download_ncbi_search(@) {
 }
 
 sub dustmask {
-  my ($fasta_file, $dustmasked_file, $do_unlink, $verbose) = @_;
+  my ($fasta_file, $dustmasked_file, $args) = @_;
   return unless $DO_DUST;
   return if -s $dustmasked_file;
   return unless -s $fasta_file;
+
+  my $do_unlink = $args->{'unlink'} // 1;
+  my $verbose = $args->{'verbose'} // 0;
+
   if (!-s $dustmasked_file) {
     my $cmd = "dustmasker -infmt fasta -in $fasta_file -level 20 -outfmt fasta | sed '/^>/! s/[^AGCT]/N/g' > $dustmasked_file.tmp && mv $dustmasked_file.tmp $dustmasked_file";
     if ($verbose) {
@@ -762,14 +754,25 @@ sub elapsed_time {
 }
 
 sub system_l {
-  my ($msg, $cmd) = @_;
+  my ($msg, $cmd, $opts) = @_;
+  my $nl = (defined $opts && $opts->{'newline'})? "\n" : "";
   print STDERR $msg if defined $msg;
   my $t0 = time;
-  print STDERR " [",colored($cmd, "yellow"),"] ...";
+  print STDERR " [",colored($cmd, "yellow"),"] ...$nl";
   system($cmd) == 0 or die $?;
 
 
   print STDERR " done (took ",(elapsed_time($t0)),")\n";
+  return 0;
+}
+
+sub system_v {
+  my ($cmd, $verbose) = @_;
+  my $t0 = time;
+  print STDERR "",colored($cmd, "yellow")," ..." if $verbose;
+  system($cmd) == 0 or die $?;
+  print STDERR " done (took ",(elapsed_time($t0)),")\n" if $verbose;
+  return 0;
 }
 
 sub initialize_name_map() {
@@ -879,11 +882,11 @@ sub download_nt(@) {
 
   my ($ac_index_for_nt, $child_map, $env_taxIDs, $division_taxIDs, $taxid_to_acs);
   my $do_filter = 0;
-  my %division_taxa;
+  my %selected_taxa;
   my %all_taxa;
 
-  foreach my $division (split(/,/, $TAXA_LIST)) {
-    my $microbial_nt_file = "$LIB_DIR/nt-$division.fna";
+  foreach my $taxid_or_division (split(/,/, $TAXIDS_OR_DIVISIONS)) {
+    my $microbial_nt_file = "$LIB_DIR/nt-$taxid_or_division.fna";
     if (!-s $microbial_nt_file && !dustmasked_file_exists($microbial_nt_file)) {
       if (!$do_filter) {
         $ac_index_for_nt = get_nt_ac_index($nt_file);
@@ -891,8 +894,8 @@ sub download_nt(@) {
         $env_taxIDs = get_environmental_samples_taxids("$TAX_DIR/names.dmp") if $EXCLUDE_ENVIRONMENTAL_TAXIDS;
       }
       $do_filter = 1;
-      my $accepted_taxa = get_accepted_taxa($division, $child_map, $env_taxIDs);
-      $division_taxa{$division} = $accepted_taxa;
+      my $accepted_taxa = get_accepted_taxa($taxid_or_division, $child_map, $env_taxIDs);
+      $selected_taxa{$taxid_or_division} = $accepted_taxa;
       $all_taxa{$_} = 1 foreach (keys %$accepted_taxa);
     }
   }
@@ -907,28 +910,28 @@ sub download_nt(@) {
   #print "\nTAXID_TO_ACS\n"; foreach ((keys %$taxid_to_acs)[0..5]) { print "$_ => $taxid_to_acs->{$_}\n"; }; 
 
   open (my $NT, "<", $nt_file) or die $!;
-  foreach my $division (split(/,/, $TAXA_LIST)) {
-    my $microbial_nt_file = "$LIB_DIR/nt-$division.fna";
+  foreach my $taxid_or_division (split(/,/, $TAXIDS_OR_DIVISIONS)) {
+    my $microbial_nt_file = "$LIB_DIR/nt-$taxid_or_division.fna";
     if (!-s $microbial_nt_file && !dustmasked_file_exists($microbial_nt_file)) {
-      write_filtered_nt($NT, $division_taxa{$division}, $taxid_to_acs, $ac_index_for_nt, $microbial_nt_file);
+      write_filtered_nt($NT, $selected_taxa{$taxid_or_division}, $taxid_to_acs, $ac_index_for_nt, $microbial_nt_file);
 
     }
     check_file($microbial_nt_file) if -s $microbial_nt_file;
-    dustmask($microbial_nt_file, dustmasked_file($microbial_nt_file), 0, 1) if $DO_DUST;
+    dustmask($microbial_nt_file, dustmasked_file($microbial_nt_file), {unlink=>1, verbose=>1}) if $DO_DUST;
   }
   close $NT;
 }
 
 sub get_accepted_taxa {
-  my ($division, $child_map, $env_taxIDs) = @_;
+  my ($taxid_or_division, $child_map, $env_taxIDs) = @_;
 
   my @taxIDs;
-  if ($division =~ /^taxID([0-9]*)$/) {
+  if ($taxid_or_division =~ /^taxID([0-9]*)$/i) {
     @taxIDs = ($1);
-  } elsif (defined $taxa_lists{$division})  {
-    @taxIDs = @{$taxa_lists{$division}};
+  } elsif (defined $division_to_taxids{$taxid_or_division})  {
+    @taxIDs = @{$division_to_taxids{$taxid_or_division}};
   } else {
-    die "Don't know nt division '$division'. Chose one of ".(join(" ", sort keys %taxa_lists))." or a specific taxID ('taxID12345')\n";
+    die "Don't know nt division '$taxid_or_division'. Chose one of ".(join(" ", sort keys %division_to_taxids))." or a specific taxID ('taxID12345')\n";
   }
   my %accepted_taxa;
   foreach my $taxID (@taxIDs) {
@@ -1111,9 +1114,9 @@ sub download_taxonomy(@) {
     download("$FTP/pub/taxonomy/taxdump.tar.gz", "$dir/taxdump.tar.gz");
     system_l("Storing taxonomy timestamp", "date > $dir/timestamp");
   }
-  system_l("Extracting nodes file","tar -C $dir -zxvf $dir/taxdump.tar.gz nodes.dmp 1>&2") unless -s "$dir/nodes.dmp";
+  system_l("Extracting nodes file","tar -C $dir -zxvf $dir/taxdump.tar.gz nodes.dmp > /dev/null") unless -s "$dir/nodes.dmp";
   check_file("$dir/nodes.dmp");
-  system_l("Extracting names file","tar -C $dir -zxvf $dir/taxdump.tar.gz names.dmp 1>&2") unless -s "$dir/names.dmp";
+  system_l("Extracting names file","tar -C $dir -zxvf $dir/taxdump.tar.gz names.dmp > /dev/null") unless -s "$dir/names.dmp";
   check_file("$dir/names.dmp");
 }
 
@@ -1291,7 +1294,7 @@ sub download_domain(@) {
       ## TODO: Consider hard-masking only low-complexity stretches with 10 or more bps
       my $pid = start_fork();
       unless ($pid) {
-        dustmask($fasta_file, $dustmasked_file, 1, 0);
+        dustmask($fasta_file, $dustmasked_file, {unlink=>1, verbose=>$VERBOSE});
         end_fork();
       }
     }
