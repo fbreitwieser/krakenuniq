@@ -762,7 +762,7 @@ sub system_l {
   system($cmd) == 0 or die $?;
 
 
-  print STDERR " done (took ",(elapsed_time($t0)),")\n";
+  print STDERR " done (",(elapsed_time($t0)),")\n";
   return 0;
 }
 
@@ -771,7 +771,7 @@ sub system_v {
   my $t0 = time;
   print STDERR "",colored($cmd, "yellow")," ..." if $verbose;
   system($cmd) == 0 or die $?;
-  print STDERR " done (took ",(elapsed_time($t0)),")\n" if $verbose;
+  print STDERR " done (",(elapsed_time($t0)),")\n" if $verbose;
   return 0;
 }
 
