@@ -361,7 +361,7 @@ sub download(@) {
       if ($VERBOSE) {
         system_l("Downloading $file", "curl -g '$url' -o '$file'", {newline=>1}) == 0 or die "Error fetching $url. Is curl installed?\n";
       } else {
-        system("curl -g '$url' -o '$file'") == 0 or die "Error fetching $url. Is curl installed?\n";
+        system("curl -sg '$url' -o '$file'") == 0 or die "Error fetching $url. Is curl installed?\n";
       }
     }
   }
