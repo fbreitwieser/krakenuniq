@@ -71,6 +71,7 @@ vector<string> Index_filenames;
 vector<string> Onefile_DB_filenames;
 bool Lock_DB = false;
 bool Quick_mode = false;
+bool Ordered_mode = false;
 bool Fastq_input = false;
 bool Print_classified = false;
 bool Print_unclassified = false;
@@ -352,70 +353,132 @@ void process_file(char *filename, managed_ostream &kraken_output,
     reader = new FastqReader(file_str);
   else
     reader = new FastaReader(file_str);
-
-#ifdef _OPENMP
-  #pragma omp parallel
-#endif
-  {
+  if (Ordered_mode) {
     vector<DNASequence> work_unit;
-    ostringstream kraken_output_ss, classified_output_ss, unclassified_output_ss;
 
     while (reader->is_valid()) {
       work_unit.clear();
       size_t total_nt = 0;
 
-#ifdef _OPENMP
-      #pragma omp critical(get_input)
-#endif
-      {
-        while (total_nt < Work_unit_size) {
-          dna = reader->next_sequence();
-          if (! reader->is_valid())
-            break;
-          work_unit.push_back(dna);
-          total_nt += dna.seq.size();
-        }
+      while (total_nt < Work_unit_size) {
+        dna = reader->next_sequence();
+        if (!reader->is_valid())
+          break;
+        work_unit.push_back(dna);
+        total_nt += dna.seq.size();
       }
       if (total_nt == 0)
         break;
-      
-      unordered_map<uint32_t, READCOUNTS> my_taxon_counts;
-      uint64_t my_total_classified = 0;
-      kraken_output_ss.str("");
-      classified_output_ss.str("");
-      unclassified_output_ss.str("");
-      for (size_t j = 0; j < work_unit.size(); j++) {
-        my_total_classified += 
-            classify_sequence( work_unit[j], kraken_output_ss,
-                           classified_output_ss, unclassified_output_ss,
-                           my_taxon_counts);
-      }
- 
-#ifdef _OPENMP
-      #pragma omp critical(write_output)
-#endif
+      #pragma omp parallel
       {
-        total_classified += my_total_classified;
-        for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end(); ++it) {
-          taxon_counts[it->first] += std::move(it->second);
-        }
+        #ifdef _OPENMP
+        #pragma omp for ordered schedule(static)
+        #endif
+        for (size_t j = 0; j < work_unit.size(); j++) {
+          ostringstream kraken_output_ss, classified_output_ss,
+            unclassified_output_ss;
+          unordered_map<uint32_t, READCOUNTS> my_taxon_counts;
+          uint64_t my_total_classified = 0;
+          kraken_output_ss.str("");
+          classified_output_ss.str("");
+          unclassified_output_ss.str("");
+          my_total_classified += classify_sequence(
+                                                   work_unit[j], kraken_output_ss, classified_output_ss,
+                                                   unclassified_output_ss, my_taxon_counts);
+          #ifdef _OPENMP
+          #pragma omp ordered
+          #endif
+          {
+            total_classified += my_total_classified;
+            for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end();
+                 ++it) {
+              taxon_counts[it->first] += std::move(it->second);
+            }
 
-        if (Print_kraken)
-          (*kraken_output) << kraken_output_ss.str();
-        if (Print_classified)
-          (*classified_output) << classified_output_ss.str();
-        if (Print_unclassified)
-          (*unclassified_output) << unclassified_output_ss.str();
-        total_sequences += work_unit.size();
-        total_bases += total_nt;
-        //if (Print_Progress && total_sequences % 100000 < work_unit.size()) 
-        if (Print_Progress) {  
-          fprintf(stderr, "\r Processed %llu sequences (%.2f%% classified)",
-                          total_sequences, total_classified * 100.0 / total_sequences);
+            if (Print_kraken)
+              (*kraken_output) << kraken_output_ss.str();
+            if (Print_classified)
+              (*classified_output) << classified_output_ss.str();
+            if (Print_unclassified)
+              (*unclassified_output) << unclassified_output_ss.str();
+          }
         }
+      }
+      total_sequences += work_unit.size();
+      total_bases += total_nt;
+      // if (Print_Progress && total_sequences % 100000 < work_unit.size())
+      if (Print_Progress) {
+        fprintf(stderr, "\r Processed %llu sequences (%.2f%% classified)",
+                total_sequences, total_classified * 100.0 / total_sequences);
       }
     }
-  }  // end parallel section
+  } else {
+    #ifdef _OPENMP
+    #pragma omp parallel
+    #endif
+    {
+      vector<DNASequence> work_unit;
+      ostringstream kraken_output_ss, classified_output_ss,
+        unclassified_output_ss;
+
+      while (reader->is_valid()) {
+        work_unit.clear();
+        size_t total_nt = 0;
+
+        #ifdef _OPENMP
+        #pragma omp critical(get_input)
+        #endif
+        {
+          while (total_nt < Work_unit_size) {
+            dna = reader->next_sequence();
+            if (!reader->is_valid())
+              break;
+            work_unit.push_back(dna);
+            total_nt += dna.seq.size();
+          }
+        }
+        if (total_nt == 0)
+          break;
+
+        unordered_map<uint32_t, READCOUNTS> my_taxon_counts;
+        uint64_t my_total_classified = 0;
+        kraken_output_ss.str("");
+        classified_output_ss.str("");
+        unclassified_output_ss.str("");
+        for (size_t j = 0; j < work_unit.size(); j++) {
+          my_total_classified += classify_sequence(
+                                                   work_unit[j], kraken_output_ss, classified_output_ss,
+                                                   unclassified_output_ss, my_taxon_counts);
+        }
+
+        #ifdef _OPENMP
+        #pragma omp critical(write_output)
+        #endif
+        {
+          total_classified += my_total_classified;
+          for (auto it = my_taxon_counts.begin(); it != my_taxon_counts.end();
+               ++it) {
+            taxon_counts[it->first] += std::move(it->second);
+          }
+
+          if (Print_kraken)
+            (*kraken_output) << kraken_output_ss.str();
+          if (Print_classified)
+            (*classified_output) << classified_output_ss.str();
+          if (Print_unclassified)
+            (*unclassified_output) << unclassified_output_ss.str();
+          total_sequences += work_unit.size();
+          total_bases += total_nt;
+          // if (Print_Progress && total_sequences % 100000 < work_unit.size())
+          if (Print_Progress) {
+            fprintf(stderr, "\r Processed %llu sequences (%.2f%% classified)",
+                    total_sequences,
+                    total_classified * 100.0 / total_sequences);
+          }
+        }
+      }
+    } // end parallel section
+  }
 
   delete reader;
 }
@@ -657,7 +720,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:D:t:u:n:m:o:qfcC:U:Ma:r:sI:p:")) !=
+  while ((opt = getopt(argc, argv, "d:i:D:t:u:n:m:o:qOfcC:U:Ma:r:sI:p:")) !=
          -1) {
     switch (opt) {
       case 'd':
@@ -741,6 +804,9 @@ void parse_command_line(int argc, char **argv) {
       default:
         usage();
         break;
+    case 'O':
+      Ordered_mode = true;
+      break;
     }
   }
 
@@ -776,6 +842,7 @@ void usage(int exit_code) {
        << endl
        << "  -t #             Number of threads" << endl
        << "  -u #             Thread work unit size (in bp)" << endl
+       << "  -O               Order output matching input" << endl
        << "  -q               Quick operation" << endl
        << "  -m #             Minimum hit count (ignored w/o -q)" << endl
        << "  -C filename      Print classified sequences" << endl
