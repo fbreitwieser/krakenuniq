@@ -56,15 +56,17 @@ my $fastq_input = 0;
 my @db_prefix;
 my $threads;
 my $preload = 0;
+my $lock_memory = 0;
 my $gunzip = 0;
 my $bunzip2 = 0;
 my $paired = 0;
 my $check_names = 0;
 my $only_classified_output = 0;
-my $unclassified_out;
-my $classified_out;
-my $outfile;
-my $report_file;
+my @unclassified_outfiles;
+my @classified_outfiles;
+my @outfiles;
+my @report_outfiles;
+my @catdb_files;
 my $print_sequence = 0;
 my $uid_mapping = 0;
 my $hll_precision = 12;
@@ -77,13 +79,14 @@ GetOptions(
   "threads=i" => \$threads,
   "fasta-input" => \$fasta_input,
   "fastq-input" => \$fastq_input,
+  "lock-memory" => \$lock_memory,
   "quick" => \$quick,
   "min-hits=i" => \$min_hits,
-  "unclassified-out=s" => \$unclassified_out,
-  "classified-out=s" => \$classified_out,
+  "unclassified-out=s" => \@unclassified_outfiles,
+  "classified-out=s" => \@classified_outfiles,
+  "o|output=s" => \@outfiles,
+  "report-files=s" => \@report_outfiles,
   "print-sequence=s" => \$print_sequence,
-  "o|output=s" => \$outfile,
-  "report-file=s" => \$report_file,
   "preload" => \$preload,
   "paired" => \$paired,
   "hll-precision=i", \$hll_precision,
@@ -104,8 +107,8 @@ if (! @ARGV && !$preload) {
   usage();
 }
 
-if (!defined $report_file && !$preload && ! @ARGV) {
-  print STDERR "Need to specify a report file with --report-file! Set to 'off' to suppress report generation.
+if (!@report_outfiles && !$preload && ! @ARGV) {
+  print STDERR "Need to specify report file(s) with --report-files! Set to 'off' to suppress report generation.
 See --help for more details.\n";
   exit 1;
 }
@@ -117,7 +120,15 @@ See --help for more details.\n";
   exit 1;
 }
 
+
+my @all_db_prefix = @db_prefix;
+@db_prefix = ();
+for (@all_db_prefix) {
+    if (! -d $_) { push @catdb_files, $_}
+    else { push @db_prefix, $_}
+}
 eval { @db_prefix = map { krakenlib::find_db($_) } @db_prefix };
+
 if ($@) {
   die "$PROG: $@";
 }
@@ -147,8 +158,9 @@ if ($min_hits > 1 && ! $quick) {
   die "$PROG: --min_hits requires --quick to be specified\n";
 }
 
-if ($paired && @ARGV != 2) {
-  die "$PROG: --paired requires exactly two filenames\n";
+
+if ($paired && scalar @ARGV % 2 ) {
+    die "$PROG: --paired requires 2x filenames\n";
 }
 
 my $compressed = $gunzip || $bunzip2;
@@ -170,14 +182,23 @@ if ($auto_detect) {
   auto_detect_file_format();
 }
 
+foreach my $report_file (@report_outfiles) {
+    if (defined $report_file && !-d dirname($report_file)) {
+        print STDERR "Creating directory for $report_file.\n";
+        make_path(dirname($report_file));
+    }
 
-if (defined $report_file && !-d dirname($report_file)) {
-  print STDERR "Creating directory for $report_file.\n";
-  make_path(dirname($report_file));
+    if (defined $report_file && -s $report_file) {
+        print STDERR "Warning: Overwriting $report_file.\n";
+    }
 }
 
-if (defined $report_file && -s $report_file) {
-  print STDERR "Warning: Overwriting $report_file.\n";
+my $taxdb;
+if (scalar(@db_prefix) > 0) {
+    $taxdb = $db_prefix[0]."/taxDB";
+} else {
+    my ($filename, $dirs, $suffix) = fileparse($catdb_files[0]);
+    $taxdb = $dirs."/taxDB";
 }
 
 my $now = time();
@@ -191,27 +212,45 @@ push @flags, map { ("-d", $_) } @kdb_files;
 push @flags, map { ("-i", $_) } @idx_files;
 push @flags, "-t", $threads if $threads > 1;
 push @flags, "-q" if $quick;
+push @flags, "-l" if $lock_memory;
 push @flags, "-m", $min_hits if $min_hits > 1;
 push @flags, "-f" if $fastq_input && ! $paired;  # merger always outputs FASTA
-push @flags, "-U", $unclassified_out if defined $unclassified_out;
-push @flags, "-C", $classified_out if defined $classified_out;
-push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-c", if $only_classified_output;
 push @flags, "-M" if $preload;
-push @flags, "-r", $report_file if defined $report_file;
-push @flags, "-a", $db_prefix[0]."/taxDB";
+push @flags, "-a", $taxdb;
 push @flags, "-s" if $print_sequence;
 push @flags, "-p", $hll_precision;
 if ($uid_mapping) {
   my $uid_mapping_file = "$db_prefix[0]/uid_to_taxid.map";
   if (!-f $uid_mapping_file) {
     print STDERR "Missing required file $uid_mapping_file for UID mapping.\n";
-    exit(1); 
+    exit(1);
   }
-  push @flags, "-I", $uid_mapping_file; 
+  push @flags, "-I", $uid_mapping_file;
 } else {
 
 }
+if (@outfiles) {
+    foreach my $outfile (@outfiles) {
+        push @flags, "-o", $outfile;
+    }
+}
+if (@classified_outfiles) {
+    foreach my $outfile (@classified_outfiles) {
+        push @flags, "-C", $outfile;
+    }
+}
+if (@unclassified_outfiles) {
+    foreach my $outfile (@unclassified_outfiles) {
+        push @flags, "-U", $outfile;
+    }
+}
+if (@report_outfiles) {
+    foreach my $outfile (@report_outfiles) {
+        push @flags, "-r", $outfile;
+    }
+}
+
 
 if (! -f $db_prefix[0]."/taxDB") {
   print STDERR "Taxonomy database not at ".$db_prefix[0]."/taxDB - creating it ...";
@@ -223,62 +262,55 @@ if (! -f $db_prefix[0]."/taxDB") {
   system $cmd;
 }
 
-# handle piping for decompression/merging
-my @pipe_argv;
-if ($paired) {
-  my @merge_flags;
-  push @merge_flags, "--fa" if $fasta_input;
-  push @merge_flags, "--fq" if $fastq_input;
-  push @merge_flags, "--gz" if $gunzip;
-  push @merge_flags, "--bz2" if $bunzip2;
-  push @merge_flags, "--check-names" if $check_names;
-  @pipe_argv = ($READ_MERGER, @merge_flags, @ARGV);
-}
-elsif ($compressed) {
-  if ($gunzip) {
-    @pipe_argv = ("gzip", "-dc", @ARGV);
-  }
-  elsif ($bunzip2) {
-    @pipe_argv = ("bzip2", "-dc", @ARGV);
-  }
-  else {
-    die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
-  }
-}
 
-# if args exist, set up the pipe/fork/exec 
-if (@pipe_argv) {
-  pipe RD, WR;
-  my $pid = fork();
-  if ($pid < 0) {
-    die "$PROG: fork error: $!\n";
-  }
-  if ($pid) {
-    open STDIN, "<&RD"
-      or die "$PROG: can't dup stdin to read end of pipe: $!\n";
-    close RD;
-    close WR;
-    @ARGV = ("/dev/fd/0");  # make classifier read from pipe
-  }
-  else {
-    open STDOUT, ">&WR"
-      or die "$PROG: can't dup stdout to write end of pipe: $!\n";
-    close RD;
-    close WR;
-    exec @pipe_argv
-      or die "$PROG: can't exec $pipe_argv[0]: $!\n";
-  }
+# handle piping for decompression/merging
+my @pipe_argvv;
+foreach (my $i = 0; $i < @ARGV; $i++) {
+    my @pipe_argv;
+    my $use_pipe = 0;
+    if ($paired) {
+        $use_pipe = 1;
+
+        my @merge_flags;
+        push @merge_flags, "--fa" if $fasta_input;
+        push @merge_flags, "--fq" if $fastq_input;
+        push @merge_flags, "--gz" if $gunzip;
+        push @merge_flags, "--bz2" if $bunzip2;
+        push @merge_flags, "--check-names" if $check_names;
+        @pipe_argv = ("read_merger.pl", @merge_flags, @ARGV[$i, $i+1]);
+        $i++;
+    }
+    elsif ($compressed) {
+        $use_pipe = 1;
+
+        if ($gunzip) {
+            @pipe_argv = ("gzip", "-dc", $ARGV[$i]);
+        }
+        elsif ($bunzip2) {
+            @pipe_argv = ("bzip2", "-dc", $ARGV[$i]);
+        }
+        else {
+            die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
+        }
+    } else {
+        @pipe_argv = $ARGV[$i];
+    }
+    if ($use_pipe) {
+        @pipe_argv = ( "<(", @pipe_argv, ")" );
+    }
+    push @pipe_argvv, @pipe_argv;
 }
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
 print STDERR "$cmd @flags @ARGV\n";
-if (defined $report_file) {
+foreach my $report_file (@report_outfiles) {
     my $mycmd = qx/ps -o args= $$/;
     open(my $RF, ">", $report_file) or die "Could not open report file for writing";
     print $RF "# KrakenUniq v#####=VERSION=##### DATE:$date DB:@db_prefix DB_SIZE:$db_size WD:$wd\n# CL:$mycmd\n";
     close($RF)
 }
-exec $cmd, @flags, @ARGV;
+
+exec join(" ", ("exec /bin/bash -c \"exec", $cmd, @flags, @pipe_argvv, "\""));
 die "$PROG: exec error: $!\n";
 
 sub usage {
@@ -319,7 +351,7 @@ Options:
 Experimental:
   --uid-mapping           Map using UID database
 
-If none of the *-input or *-compressed flags are specified, and the 
+If none of the *-input or *-compressed flags are specified, and the
 file is a regular file, automatic format detection is attempted.
 EOF
   exit $exit_code;

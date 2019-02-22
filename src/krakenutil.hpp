@@ -28,12 +28,27 @@ namespace kraken {
   // Build a map of node to parent from an NCBI taxonomy nodes.dmp file
   std::unordered_map<uint32_t, uint32_t> build_parent_map(std::string filename);
 
-  // Return lowest common ancestor of a and b
-  // LCA(0,x) = LCA(x,0) = x
-  // Default ancestor is 1 (root of tree)
-uint32_t lca(const std::unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b);
+    // Return lowest common ancestor of a and b
+    // LCA(0,x) = LCA(x,0) = x
+    // Default ancestor is 1 (root of tree)
+  uint32_t lca(const std::unordered_map<uint32_t, uint32_t> &parent_map, uint32_t a, uint32_t b);
+  inline bool ends_with(std::string const &value, std::string const &ending);
 
+  class managed_ostream {
+  public:
+    managed_ostream &operator=(const managed_ostream &) = delete;
+    managed_ostream(const managed_ostream &) = delete;
 
+    managed_ostream();
+    managed_ostream(std::ostream *managed_ostream);
+    managed_ostream(const std::string &file, bool use = true, bool append = false);
+    ~managed_ostream();
+    std::ostream &operator*();
+    std::ostream *operator->();
+
+  private:
+    std::ostream *s;
+  };
 
   // Resolve classification tree
   uint32_t resolve_tree(const std::unordered_map<uint32_t, uint32_t> &hit_counts,
