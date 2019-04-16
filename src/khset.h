@@ -103,7 +103,12 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
 
 // Steal everything, take no prisoners.
 #define KH_MOVE_DEC(t) \
-   t(t &&other) {std::memcpy(this, &other, sizeof(*this)); std::memset(&other, 0, sizeof(other));}
+   t(t &&other) {\
+        std::swap_ranges(reinterpret_cast<uint8_t *>(this), reinterpret_cast<uint8_t *>(this) + sizeof(*this), reinterpret_cast<uint8_t *>(std::addressof(other)));\
+        other.keys = nullptr;\
+        other.vals = nullptr;\
+        other.flags = nullptr;\
+    }
 
 #define KH_COPY_DEC(t) \
     t(const t &other) {\
@@ -117,7 +122,7 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
             flags = static_cast<u32 *>(std::malloc(memsz));\
             if(!flags) throw std::bad_alloc();\
             std::memcpy(flags, other.flags, memsz);\
-            CONST_IF(::kh::is_map<std::decay_t<decltype(*this)>>::value)\
+            CONST_IF(::kh::is_map<typename std::decay<decltype(*this)>::type>::value)\
                 std::memcpy(vals, other.vals, other.capacity() * sizeof(*vals));\
         } else std::memset(this, 0, sizeof(*this));\
     }
@@ -140,7 +145,8 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
     t &operator=(t &&other) {\
         if(flags) std::free(flags);\
         if(keys) std::free(keys);\
-        std::memcpy(this, &other, sizeof(*this)); std::memset(&other, 0, sizeof(other));\
+        other.keys = nullptr;\
+        other.flags = nullptr;\
         return *this;\
     }
 
@@ -172,11 +178,11 @@ struct khset##nbits##_t: EmptyKhSet, khash_t(name) {\
     operator const khash_t(name) *() const {return reinterpret_cast<const khash_t(name) *>(this);}\
     khash_t(name) *operator->() {return static_cast<khash_t(name) *>(*this);}\
     const khash_t(name) *operator->() const {return static_cast<const khash_t(name) *>(*this);}\
-    auto insert(u##nbits val) {\
+    khiter_t insert(u##nbits val) {\
         int khr;\
         return kh_put(name, this, val, &khr);\
     }\
-    auto get(u##nbits x) const {return kh_get(name, this, x);}\
+    khiter_t get(u##nbits x) const {return kh_get(name, this, x);}\
     void erase(u##nbits val) {\
         auto it = get(val); if(it != capacity())\
             kh_del(name, this, it);\
@@ -216,7 +222,7 @@ struct khset##nbits##_t: EmptyKhSet, khash_t(name) {\
     size_t capacity() const {return this->n_buckets;}\
     void reserve(size_t sz) {if(kh_resize(name, this, sz) < 0) throw std::bad_alloc();}\
 }; \
-void swap(khset##nbits##_t &a, khset##nbits##_t &b) {\
+static inline void swap(khset##nbits##_t &a, khset##nbits##_t &b) {\
     a.swap(b);\
 }
 
@@ -239,7 +245,7 @@ struct khset_cstr_t: EmptyKhSet, khash_t(cs) {
     operator const khash_t(cs) *() const {return reinterpret_cast<const khash_t(cs) *>(this);}
     khash_t(cs) *operator->() {return static_cast<khash_t(cs) *>(*this);}
     const khash_t(cs) *operator->() const {return static_cast<const khash_t(cs) *>(*this);}
-    auto insert_move(const char *s) {
+    khiter_t insert_move(const char *s) {
         // Takes ownership
         int khr;
         auto ret = kh_put(cs, this, s, &khr);
@@ -251,12 +257,16 @@ struct khset_cstr_t: EmptyKhSet, khash_t(cs) {
         }
         return ret;
     }
-    auto get(const char *s) const {
+    khiter_t get(const char *s) const {
         return kh_get(cs, this, s);
     }
-    auto del(const char *s) {
+    int del(const char *s) {
         auto it = get(s);
-        if(it != capacity()) std::free(const_cast<char *>(this->keys[it]));
+        if(it != capacity()) {
+            std::free(const_cast<char *>(this->keys[it]));
+            return 0;
+        }
+        return 1;
     }
     khiter_t insert(const char *s) {return this->insert(s, std::strlen(s));}
     khiter_t insert(const char *s, size_t l) {
@@ -296,13 +306,13 @@ Note:
 \
 init_statement(name, VType)\
 struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
-    using value_type = std::decay_t<decltype(*vals)>;\
-    using key_type = std::decay_t<decltype(*keys)>;\
+    using value_type = typename std::decay<decltype(*vals)>::type;\
+    using key_type = typename std::decay<decltype(*keys)>::type;\
     khmap_##name##_t() {std::memset(this, 0, sizeof(*this));}\
     ~khmap_##name##_t() {\
         CONST_IF(!std::is_trivially_destructible<value_type>::value) {\
             /* call destructors if necessary */\
-            this->for_each_val([](auto &v) {v.~value_type();});\
+            this->for_each_val([](value_type &v) {v.~value_type();});\
         }\
         std::free(this->flags); std::free(this->keys); std::free(this->vals);\
     }\
@@ -324,7 +334,12 @@ struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
             if(kh_exist(this, ki))\
                 func(this->keys[ki]);\
     }\
-    void destroy_at(khint_t ki) {throw std::runtime_error("NotImplemented");}\
+    void destroy_at(khint_t ki) { \
+        if(kh_exist(this, ki)) {\
+            keys[ki].~key_type();\
+            vals[ki].~value_type();\
+        }\
+    }\
     void del(khint_t ki) {\
         /* Still chunky but func-y */ \
         destroy_at(ki);\
@@ -387,8 +402,9 @@ template<typename T>
 size_t capacity(const T &a) {return a.capacity();} // Can be specialized later.
 
 template<typename T> T&operator+=(T &a, const T &b) {
-   b.for_each([&](auto k){a.insert(k);});
-   return a;
+    using key_type = typename T::key_type;
+    b.for_each([&](key_type k){a.insert(k);});
+    return a;
 }
 
 #undef KH_MOVE_DEC
