@@ -18,6 +18,7 @@
 
 #ifndef KHSET_H__
 #define KHSET_H__
+#pragma once
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
@@ -27,7 +28,22 @@
 #include <set>
 #include <unordered_set>
 #include "klib/khash.h"
+#include "zlib.h"
 
+#if __cplusplus >= 201703L
+#define CXX17_ONLY(x) x
+#else
+#define CXX17_ONLY(x)
+#endif
+
+
+#ifndef CONST_IF
+#  if __cplusplus >= 201703L
+#    define CONST_IF(x) if constexpr(x)
+#  else
+#    define CONST_IF(x) if(x)
+#  endif
+#endif
 
 namespace kh {
 
@@ -50,20 +66,11 @@ struct EmptyKhBase {};
 struct EmptyKhSet: public EmptyKhBase {};
 struct EmptyKhMap: public EmptyKhBase {};
 
-#if __cplusplus >= 201703L
-#define CXX17_ONLY(x) x
-#define CONST_IF(x) if constexpr(x)
-#else
-#define CXX17_ONLY(x)
-#define CONST_IF(x) if(x)
-#endif
-
 #define IS_KH_DEC(kh, type) \
 template<typename T>\
 struct is_##kh {\
     static constexpr bool value = std::is_base_of<type, T>::value;\
-};\
-CXX17_ONLY(template<typename T> inline constexpr bool is_##kh##_v = is_##kh<T>::value);
+};
 
 IS_KH_DEC(kh, EmptyKhBase)
 IS_KH_DEC(set, EmptyKhSet)
@@ -96,20 +103,7 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
 
 // Steal everything, take no prisoners.
 #define KH_MOVE_DEC(t) \
-   t(t &&other) {std::memcpy(static_cast<void *>(this), &other, sizeof(*this)); std::memset(static_cast<void *>(&other), 0, sizeof(other));}
-
-
-#define KH_ASSIGN_DEC(t, name) \
-   t &operator=(const t &other) {\
-        reserve(other.capacity());\
-        ((khash_t(name) *)this)->size = ((khash_t(name) *)&other)->size;\
-        this->n_occupied = other.n_occupied;    \
-        this->n_buckets = other.n_buckets;    \
-        std::memcpy(flags, other.flags, __ac_fsize(other.capacity() * sizeof(uint32_t)));\
-        std::memcpy(keys, other.keys, other.capacity() * sizeof(uint32_t) * sizeof(*keys));\
-        if(other.vals) std::memcpy(vals, other.vals, other.capacity() * sizeof(uint32_t) * sizeof(*vals));\
-        return *this;\
-    }
+   t(t &&other) {std::memcpy(this, &other, sizeof(*this)); std::memset(&other, 0, sizeof(other));}
 
 #define KH_COPY_DEC(t) \
     t(const t &other) {\
@@ -123,52 +117,108 @@ struct is_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> {static cons
             flags = static_cast<u32 *>(std::malloc(memsz));\
             if(!flags) throw std::bad_alloc();\
             std::memcpy(flags, other.flags, memsz);\
-            CONST_IF(::kh::is_map<typename std::decay<decltype(*this)>::type>::value)\
+            CONST_IF(::kh::is_map<std::decay_t<decltype(*this)>>::value)\
                 std::memcpy(vals, other.vals, other.capacity() * sizeof(*vals));\
         } else std::memset(this, 0, sizeof(*this));\
     }
 
+#define KH_ASSIGN_DEC(t) \
+    t &operator=(const t &other) {\
+        if(std::addressof(other) == this) return *this;\
+        auto memsz = other.capacity() * sizeof(*keys);\
+        auto tmpkeys = keys;\
+        auto tmpflags = flags;\
+        std::memcpy(this, &other, sizeof(*this));\
+        keys = tmpkeys;\
+        flags = tmpflags;\
+        keys = static_cast<decltype(keys)>(std::realloc(keys, memsz));\
+        std::memcpy(keys, other.keys, sizeof(*keys) * other.n_buckets);\
+        flags = static_cast<decltype(flags)>(std::realloc(flags, __ac_fsize(other.capacity() * sizeof(uint32_t))));\
+        std::memcpy(flags, other.flags, sizeof(*flags) * other.n_buckets);\
+        return *this;\
+    }\
+    t &operator=(t &&other) {\
+        if(flags) std::free(flags);\
+        if(keys) std::free(keys);\
+        std::memcpy(this, &other, sizeof(*this)); std::memset(&other, 0, sizeof(other));\
+        return *this;\
+    }
 
 
 #define DECLARE_KHSET(name, nbits) \
 struct khset##nbits##_t: EmptyKhSet, khash_t(name) {\
+    using key_type = typename std::decay<decltype(*keys)>::type;\
     khset##nbits##_t() {std::memset(this, 0, sizeof(*this));}\
+    khset##nbits##_t(size_t reserve_size) {std::memset(this, 0, sizeof(*this)); reserve(reserve_size);}\
     ~khset##nbits##_t() {std::free(this->flags); std::free(this->keys);}\
+    khset##nbits##_t(const std::string path) {\
+        std::memset(this, 0, sizeof(*this));\
+        gzFile fp = gzopen(path.data(), "rb");\
+        if(fp == nullptr) throw std::runtime_error("Could not open file");\
+        this->read(fp);\
+        gzclose(fp);\
+    }\
     KH_COPY_DEC(khset##nbits##_t)\
     KH_MOVE_DEC(khset##nbits##_t)\
-    KH_ASSIGN_DEC(khset##nbits##_t, name)\
+    KH_ASSIGN_DEC(khset##nbits##_t)\
     /* For each*/ \
     __FE__\
-    using key_type = typename std::decay<decltype(*keys)>::type;\
+    void swap(khset##nbits##_t &other) {\
+        std::swap_ranges(reinterpret_cast<uint8_t *>(this), reinterpret_cast<uint8_t *>(this) + sizeof(*this), reinterpret_cast<uint8_t *>(std::addressof(other)));\
+    }\
+    operator khash_t(name) &() {return *reinterpret_cast<khash_t(name) *>(this);}\
     operator khash_t(name) *() {return reinterpret_cast<khash_t(name) *>(this);}\
+    operator const khash_t(name) &() const {return *reinterpret_cast<const khash_t(name) *>(this);}\
     operator const khash_t(name) *() const {return reinterpret_cast<const khash_t(name) *>(this);}\
     khash_t(name) *operator->() {return static_cast<khash_t(name) *>(*this);}\
     const khash_t(name) *operator->() const {return static_cast<const khash_t(name) *>(*this);}\
-    khset##nbits##_t &operator+=(const khset##nbits##_t &b) {\
-        b.for_each([&](key_type k){this->insert(k);});\
-        return *this;\
-    }\
-    khiter_t insert(u##nbits val) {\
+    auto insert(u##nbits val) {\
         int khr;\
         return kh_put(name, this, val, &khr);\
     }\
-    khiter_t get(u##nbits x) const {return kh_get(name, this, x);}\
+    auto get(u##nbits x) const {return kh_get(name, this, x);}\
     void erase(u##nbits val) {\
-        auto it = get(val);\
-        if(it != capacity())\
+        auto it = get(val); if(it != capacity())\
             kh_del(name, this, it);\
     }\
     template<typename ItType, typename ItType2>\
     void insert(ItType i1, ItType2 i2) {\
         while(i1 != i2) insert(*i1++);\
     }\
+    ssize_t write(const char *path, int comp=6) const {\
+        std::string fmt = "w";\
+        if(comp == 0) fmt += 'T';\
+        else fmt += 'b', fmt += std::to_string(comp % 10);\
+        gzFile fp = gzopen(path, fmt.data());\
+        if(fp == nullptr) throw std::runtime_error("Could not open file");\
+        auto ret = this->write(fp);\
+        gzclose(fp);\
+        return ret;\
+    }\
+    ssize_t write(gzFile fp) const {\
+        ssize_t ret = gzwrite(fp, this, sizeof(*this));\
+        ret += gzwrite(fp, this->flags, __ac_fsize(this->n_buckets) * sizeof(uint32_t));\
+        return ret += gzwrite(fp, this->keys, sizeof(key_type) * this->n_buckets);\
+    }\
+    ssize_t read(gzFile fp) {\
+        ssize_t ret = gzread(fp, this, sizeof(*this));\
+        size_t sz = this->n_buckets;\
+        this->flags = static_cast<uint32_t *>(std::malloc(__ac_fsize(sz) * sizeof(uint32_t)));\
+        ret += gzread(fp, this->flags, __ac_fsize(sz) * sizeof(uint32_t));\
+        this->keys = static_cast<key_type *>(std::malloc(sz* sizeof(key_type)));\
+        ret += gzread(fp, this->keys, sz * sizeof(*this->keys));\
+        this->vals = nullptr;\
+        return ret;\
+    }\
     void clear() {kh_clear(name, this);}\
     bool contains(u##nbits x) const {return get(x) != kh_end(this);}\
     size_t size() const {return kh_size(static_cast<const khash_t(name) *>(this));}\
     size_t capacity() const {return this->n_buckets;}\
     void reserve(size_t sz) {if(kh_resize(name, this, sz) < 0) throw std::bad_alloc();}\
-};\
-static_assert(sizeof(khset##nbits##_t) == sizeof(khash_t(name)), "Wrong size!");
+}; \
+void swap(khset##nbits##_t &a, khset##nbits##_t &b) {\
+    a.swap(b);\
+}
 
 DECLARE_KHSET(set, 32)
 DECLARE_KHSET(set64, 64)
@@ -189,7 +239,7 @@ struct khset_cstr_t: EmptyKhSet, khash_t(cs) {
     operator const khash_t(cs) *() const {return reinterpret_cast<const khash_t(cs) *>(this);}
     khash_t(cs) *operator->() {return static_cast<khash_t(cs) *>(*this);}
     const khash_t(cs) *operator->() const {return static_cast<const khash_t(cs) *>(*this);}
-    khiter_t insert_move(const char *s) {
+    auto insert_move(const char *s) {
         // Takes ownership
         int khr;
         auto ret = kh_put(cs, this, s, &khr);
@@ -201,11 +251,12 @@ struct khset_cstr_t: EmptyKhSet, khash_t(cs) {
         }
         return ret;
     }
-    khiter_t get(const char *s) const {
+    auto get(const char *s) const {
         return kh_get(cs, this, s);
     }
-    void del(const char *s) {
-        auto it = get(s); if(it != capacity()) std::free(const_cast<char *>(this->keys[it]));
+    auto del(const char *s) {
+        auto it = get(s);
+        if(it != capacity()) std::free(const_cast<char *>(this->keys[it]));
     }
     khiter_t insert(const char *s) {return this->insert(s, std::strlen(s));}
     khiter_t insert(const char *s, size_t l) {
@@ -245,12 +296,13 @@ Note:
 \
 init_statement(name, VType)\
 struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
-    using value_type = typename std::decay<decltype(*vals)>::type;\
+    using value_type = std::decay_t<decltype(*vals)>;\
+    using key_type = std::decay_t<decltype(*keys)>;\
     khmap_##name##_t() {std::memset(this, 0, sizeof(*this));}\
     ~khmap_##name##_t() {\
         CONST_IF(!std::is_trivially_destructible<value_type>::value) {\
             /* call destructors if necessary */\
-            this->for_each_val([](value_type &v) {v.~value_type();});\
+            this->for_each_val([](auto &v) {v.~value_type();});\
         }\
         std::free(this->flags); std::free(this->keys); std::free(this->vals);\
     }\
@@ -259,29 +311,27 @@ struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
     /* For each*/ \
     template<typename Func>\
     void for_each(const Func &func) {\
-        /* Give up the funk! */ \
-        /* We gotta have that funk!! */ \
+        /* Give up the func! */ \
+        /* We gotta have that func!! */ \
         for(khiter_t ki = 0; ki < this->n_buckets; ++ki)\
             if(kh_exist(this, ki))\
                 func(this->keys[ki], this->vals[ki]);\
     }\
     template<typename Func>\
     void for_each_key(const Func &func) {\
-        /* Give up the funk! */ \
-        /* We gotta have that funk!! */ \
+        /* Play the func-y music, white boy */ \
         for(khiter_t ki = 0; ki < this->n_buckets; ++ki)\
             if(kh_exist(this, ki))\
                 func(this->keys[ki]);\
     }\
-    void destroy_at(khint_t ki) {(void)ki; throw std::runtime_error("NotImplemented");}\
+    void destroy_at(khint_t ki) {throw std::runtime_error("NotImplemented");}\
     void del(khint_t ki) {\
+        /* Still chunky but func-y */ \
         destroy_at(ki);\
-        return kh_del_##name(this, ki);\
+        kh_del_##name(this, ki);\
     }\
     template<typename Func>\
     void for_each_val(const Func &func) {\
-        /* Give up the funk! */ \
-        /* We gotta have that funk!! */ \
         for(khiter_t ki = 0; ki < this->n_buckets; ++ki)\
             if(kh_exist(this, ki))\
                 func(this->vals[ki]);\
@@ -309,6 +359,22 @@ struct khmap_##name##_t: EmptyKhSet, khash_t(name) {\
     size_t size() const {return kh_size(static_cast<const khash_t(name) *>(this));}\
     size_t capacity() const {return this->n_buckets;}\
     void reserve(size_t sz) {if(kh_resize(name, this, sz) < 0) throw std::bad_alloc();}\
+    ssize_t write(const char *path, int comp=6) const {\
+        std::string fmt = "w";\
+        if(comp == 0) fmt += 'T';\
+        else fmt += 'b', fmt += std::to_string(comp % 10);\
+        gzFile fp = gzopen(path, fmt.data());\
+        if(fp == nullptr) throw std::runtime_error("Could not open file");\
+        auto ret = this->write(fp);\
+        gzclose(fp);\
+        return ret;\
+    }/* note:  this assumes values are pod*/\
+    ssize_t write(gzFile fp) const {\
+        ssize_t ret = gzwrite(fp, this, sizeof(*this));\
+        ret += gzwrite(fp, this->flags, __ac_fsize(this->n_buckets) * sizeof(uint32_t));\
+        ret += gzwrite(fp, this->keys, sizeof(key_type) * this->n_buckets);\
+        return ret += gzwrite(fp, this->vals, sizeof(value_type) * this->n_buckets);\
+    }\
 };
 
 #define DECLARE_KHMAP_32(name, VType) DECLARE_KHMAP(name, VType, KHASH_MAP_INIT_INT32, 32)
@@ -320,10 +386,15 @@ DECLARE_KHMAP_64(64, ::std::uint64_t)
 template<typename T>
 size_t capacity(const T &a) {return a.capacity();} // Can be specialized later.
 
+template<typename T> T&operator+=(T &a, const T &b) {
+   b.for_each([&](auto k){a.insert(k);});
+   return a;
+}
+
 #undef KH_MOVE_DEC
 #undef KH_ASSIGN_DEC
 #undef KH_COPY_DEC
 
 } // namespace kh
 
-#endif /* #ifndef KHSET_H__ */
+#endif /* ifndef KHSET_H__ */
