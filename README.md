@@ -141,3 +141,9 @@ Note that for custom databases with fewer sequences you might want to choose a s
 ### Custom databases with custom taxonomies
 
 When using custom taxonomies, please provide `DBDIR/taxonomy/nodes.dmp` and `DBDIR/taxonomy/names.dmp` according to the format of NCBI taxonomy dumps.
+
+## License
+
+The code adpated from Kraken 1 is licensed under GPL 3.0. All code added in this project (such as the
+HyperLogLog algorithm code) is dual-licensed under MIT and GPL 3.0 (or any later version), unless stated otherwise.
+You can choose between one of them if you use that work.
