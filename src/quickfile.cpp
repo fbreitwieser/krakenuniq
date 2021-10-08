@@ -67,20 +67,22 @@ void QuickFile::open_file(string filename_str, string mode, size_t size) {
   }
 
   fptr = (char *)mmap(0, filesize, PROT_READ | PROT_WRITE, m_flags, fd, 0);
+  madvise(fptr, filesize, MADV_WILLNEED);
   if (fptr == MAP_FAILED)
     err(EX_OSERR, "unable to mmap %s", filename);
   valid = true;
 }
 
 void QuickFile::load_file() {
+  if (mlock(fptr,filesize) != 0){
   int thread_ct = 1;
   int thread = 0;
-  #ifdef _OPENMP
+#ifdef _OPENMP
   int old_thread_ct = omp_get_max_threads();
   if (old_thread_ct > 4)
     omp_set_num_threads(4);
   thread_ct = omp_get_max_threads();
-  #endif
+#endif
 
   size_t page_size = getpagesize();
   char buf[thread_ct][page_size];
@@ -104,9 +106,10 @@ void QuickFile::load_file() {
     }
   }
 
-  #ifdef _OPENMP
+#ifdef _OPENMP
   omp_set_num_threads(old_thread_ct);
-  #endif
+#endif
+  }
 }
 
 char * QuickFile::ptr() {
