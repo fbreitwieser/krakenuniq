@@ -27,6 +27,7 @@
 
 #include<vector>
 #include<unordered_set>
+#include<cstdint>
 using namespace std;
 
 //#define HLL_DEBUG
