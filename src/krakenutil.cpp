@@ -21,12 +21,51 @@
 #include "assert_helpers.h"
 #include "kraken_headers.hpp"
 #include "krakenutil.hpp"
+#include "gzstream.h"
 #include <unordered_set>
 #include<algorithm>
 
 using namespace std;
 
 namespace kraken {
+
+  inline bool ends_with(std::string const & value, std::string const & ending)
+  {
+    if (ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+  }
+
+  managed_ostream::managed_ostream() : s() {}
+  managed_ostream::managed_ostream(ostream* managed_ostream) : s(managed_ostream) {}
+  managed_ostream::managed_ostream(const string& file, bool use, bool append) {
+    if (!use || file.empty()) {
+      s = nullptr;
+    } else if (file == "-") {
+      s = &cout;
+    } else if (ends_with(file, ".gz")) {
+      s = new ogzstream(file.c_str());
+      s->exceptions(ifstream::failbit | ifstream::badbit);
+    } else {
+      s = append ? new ofstream(file.c_str(), std::ofstream::app)
+        : new ofstream(file.c_str());
+      s->exceptions(ifstream::failbit | ifstream::badbit);
+    }
+  }
+  managed_ostream::~managed_ostream()
+  {
+    if (s && s->rdbuf() != std::cout.rdbuf()) {
+      delete s;
+    }
+  }
+  ostream& managed_ostream::operator* ()
+  {
+    return *s;
+  }
+
+  ostream* managed_ostream::operator-> ()
+  {
+    return s;
+  }
 
   // Build a node->parent unordered_map from NCBI Taxonomy nodes.dmp file
   unordered_map<uint32_t, uint32_t> build_parent_map(string filename) {
