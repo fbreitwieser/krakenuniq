@@ -28,6 +28,8 @@
 #include "gzstream.h"
 #include "uid_mapping.hpp"
 #include <sstream>
+#include <inttypes.h>
+#include <cassert>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 int New_taxid_start = 1000000000;
@@ -50,14 +52,19 @@ using namespace kraken;
 #endif
 
 
+#ifndef _OPENMP
+  int omp_get_thread_num() { return 0; }
+#endif
 
 void parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 void process_file(char *filename);
+void process_file_with_db_chunk(char *filename);
+void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FILE* fp, const uint32_t db_chunk_id, const uint32_t db_id);
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, READCOUNTS>&);
-inline void print_sequence(ostringstream* oss_ptr, const DNASequence& dna);
+inline void print_sequence(ostream* oss_ptr, const DNASequence& dna);
 string hitlist_string(const vector<uint32_t> &taxa, const vector<char>& ambig_list);
 
 
@@ -76,6 +83,7 @@ bool Print_unclassified = false;
 bool Print_kraken = true;
 bool Print_kraken_report = false;
 bool Populate_memory = false;
+uint64_t Populate_memory_size = 0;
 bool Only_classified_kraken_output = false;
 bool Print_sequence = false;
 bool Print_Progress = true;
@@ -135,22 +143,6 @@ ostream* cout_or_file(string file, bool append = false) {
     }
 }
 
-void loadKrakenDB(KrakenDB& database, string DB_filename, string Index_filename) {
-  QuickFile db_file;
-  db_file.open_file(DB_filename);
-  if (Populate_memory) {
-    db_file.load_file();
-  }
-  database = KrakenDB(db_file.ptr());
-  QuickFile idx_file;
-  idx_file.open_file(Index_filename);
-  if (Populate_memory)
-    idx_file.load_file();
-
-  KrakenDBIndex db_index(idx_file.ptr());
-  database.set_index(&db_index);
-}
-
 int main(int argc, char **argv) {
   #ifdef _OPENMP
   omp_set_num_threads(1);
@@ -173,7 +165,7 @@ int main(int argc, char **argv) {
     //}
   }
 
-  if (Populate_memory)
+  if (Populate_memory && Populate_memory_size == 0)
     cerr << "Loading database(s)... " << endl;
 
   static vector<QuickFile> idx_files (DB_filenames.size());
@@ -185,18 +177,25 @@ int main(int argc, char **argv) {
   for (size_t i=0; i < DB_filenames.size(); ++i) {
     cerr << " Database " << DB_filenames[i] << endl;
     db_files[i].open_file(DB_filenames[i]);
-    if (Populate_memory)
-      db_files[i].load_file();
 
     KrakenDatabases.push_back(new KrakenDB(db_files[i].ptr()));
     idx_files[i].open_file(Index_filenames[i]);
-    if (Populate_memory)
-      idx_files[i].load_file();
+    // NOTE: we switched the order, i.e., we are creating the objects before loading everything into main memory
     db_indices[i] = KrakenDBIndex(idx_files[i].ptr());
     KrakenDatabases[i]->set_index(&db_indices[i]);
+
+    if (Populate_memory && Populate_memory_size == 0) // only when no chunk size is passed!
+    {
+      db_files[i].load_file();
+      idx_files[i].load_file();
+    }
+    else if (Populate_memory && Populate_memory_size > 0)
+    {
+      KrakenDatabases[i]->prepare_chunking(Populate_memory_size);
+    }
   }
 
-  // TODO: Check all databases have the same k
+  // Check all databases have the same k
   uint8_t kmer_size = KrakenDatabases[0]->get_k();
   for (size_t i = 1; i < KrakenDatabases.size(); ++i) {
     uint8_t kmer_size_i = KrakenDatabases[i]->get_k();
@@ -207,7 +206,7 @@ int main(int argc, char **argv) {
   };
   KmerScanner::set_k(kmer_size);
 
-  if (Populate_memory)
+  if (Populate_memory && Populate_memory_size == 0)
     cerr << "\ncomplete." << endl;
 
 
@@ -244,8 +243,12 @@ int main(int argc, char **argv) {
 
   struct timeval tv1, tv2;
   gettimeofday(&tv1, NULL);
-  for (int i = optind; i < argc; i++)
-    process_file(argv[i]);
+  for (int i = optind; i < argc; i++) {
+    if (Populate_memory && Populate_memory_size > 0)
+      process_file_with_db_chunk(argv[i]);
+    else
+      process_file(argv[i]);
+  }
   gettimeofday(&tv2, NULL);
 
   report_stats(tv1, tv2);
@@ -331,6 +334,10 @@ int main(int argc, char **argv) {
     ogzs->close();
   }
 
+  for (size_t i=0; i < KrakenDatabases.size(); ++i) {
+    delete KrakenDatabases[i];
+  }
+
   return 0;
 }
 
@@ -361,6 +368,96 @@ void report_stats(struct timeval time1, struct timeval time2) {
   fprintf(stderr, "  %llu sequences unclassified (%.2f%%)\n",
           (unsigned long long) (total_sequences - total_classified),
           (total_sequences - total_classified) * 100.0 / total_sequences);
+}
+
+void merge_intermediate_results_by_workers(const bool first_intermediate_output) {
+  const std::string filename_merged_summary = Kraken_output_file + ".tmp";
+
+  FILE *fp_prev_merged_summary = NULL;
+  std::string filename_prev_merged_summary;
+  if (!first_intermediate_output)
+  {
+    filename_prev_merged_summary = filename_merged_summary + ".prev";
+    rename(filename_merged_summary.c_str(), filename_prev_merged_summary.c_str());
+    fp_prev_merged_summary = fopen(filename_prev_merged_summary.c_str(), "rb");
+  }
+
+  FILE *fp_merged_summary = fopen(filename_merged_summary.c_str(), "wb");
+
+  std::vector<FILE*> worker_files(Num_threads);
+  std::vector<uint32_t> next_read_id(Num_threads);
+  for (int worker_id = 0; worker_id < Num_threads; ++worker_id)
+  {
+    const std::string worker_filename = filename_merged_summary + "." + std::to_string(worker_id);
+    worker_files[worker_id] = fopen(worker_filename.c_str(), "rb");
+
+    if (fread(&next_read_id[worker_id], sizeof(next_read_id[worker_id]), 1, worker_files[worker_id]) != 1)
+      next_read_id[worker_id] = 0; // 0 indicates that there is no read left in this file (reads are indexed starting at 1)
+  }
+
+  std::vector<uint32_t> taxa, taxa_prev_summary;
+  uint32_t seq_idx = 1;
+  while (true)
+  {
+    // determine worker to get this read info from
+    int worker_to_retrieve_from = -1;
+    for (int worker_id = 0; worker_id < Num_threads; ++worker_id) {
+      if (seq_idx == next_read_id[worker_id]) {
+        worker_to_retrieve_from = worker_id;
+        break;
+      }
+    }
+    if (worker_to_retrieve_from == -1)
+      break; // finished processing all files
+
+    // retrieve from that worker and load next sequence name
+    uint32_t taxa_size;
+    fread(&taxa_size, sizeof(uint32_t), 1, worker_files[worker_to_retrieve_from]);
+    taxa.resize(taxa_size);
+    fread(&taxa[0], sizeof(uint32_t), taxa_size, worker_files[worker_to_retrieve_from]);
+
+    if (!first_intermediate_output)
+    {
+      uint32_t taxa_prev_size;
+      fread(&taxa_prev_size, sizeof(uint32_t), 1, fp_prev_merged_summary);
+      assert(taxa_size == taxa_prev_size);
+      taxa_prev_summary.resize(taxa_prev_size);
+      fread(&taxa_prev_summary[0], sizeof(uint32_t), taxa_prev_size, fp_prev_merged_summary);
+
+      for (uint32_t i = 0; i < taxa_prev_summary.size(); ++i)
+      {
+        assert(!(taxa[i] && taxa_prev_summary[i])); // a kmer cannot be found in more than one database chunk
+        if (taxa_prev_summary[i])
+        {
+          taxa[i] = taxa_prev_summary[i]; // if previous chunk/database got a match, keep the tax info
+        }
+      }
+    }
+
+    fwrite(&taxa_size, sizeof(uint32_t), 1, fp_merged_summary);
+    fwrite(&taxa[0], sizeof(uint32_t), taxa_size, fp_merged_summary);
+
+    // load the next read id from that file
+    if (fread(&next_read_id[worker_to_retrieve_from], sizeof(next_read_id[worker_to_retrieve_from]), 1, worker_files[worker_to_retrieve_from]) != 1)
+      next_read_id[worker_to_retrieve_from] = 0; // 0 indicates that there is no read left in this file (reads are indexed starting at 1)
+
+    ++seq_idx;
+  }
+
+  for (int worker_id = 0; worker_id < Num_threads; ++worker_id)
+  {
+    fclose(worker_files[worker_id]);
+    const std::string worker_filename = filename_merged_summary + "." + std::to_string(worker_id);
+    unlink(worker_filename.c_str());
+  }
+
+  if (!first_intermediate_output)
+  {
+    fclose(fp_prev_merged_summary);
+    unlink(filename_prev_merged_summary.c_str());
+  }
+
+  fclose(fp_merged_summary);
 }
 
 void process_file(char *filename) {
@@ -440,8 +537,221 @@ void process_file(char *filename) {
   delete reader;
 }
 
+void process_file_with_db_chunk(char *filename) {
+  string file_str(filename);
+  DNASequence dna;
 
-inline void print_sequence(ostringstream* oss_ptr, const DNASequence& dna) {
+  // iterate over databases
+  bool first_intermediate_output = true;
+  for (size_t i=0; i<KrakenDatabases.size(); ++i)
+  {
+    for (uint32_t db_chunk_id = 0; db_chunk_id < KrakenDatabases[0]->chunks(); ++db_chunk_id)
+    {
+      total_sequences = 0;
+      total_bases = 0;
+      KrakenDatabases[i]->load_chunk(db_chunk_id);
+
+      DNASequenceReader *reader;
+      if (Fastq_input)
+        reader = new FastqReader(file_str);
+      else
+        reader = new FastaReader(file_str);
+      uint32_t seq_idx = 1;
+
+#ifdef _OPENMP
+      #pragma omp parallel
+#endif
+      {
+        vector <std::pair<DNASequence, uint32_t> > work_unit;
+        const int worker_id = omp_get_thread_num();
+        const std::string worker_filename = Kraken_output_file + ".tmp." + std::to_string(worker_id);
+
+        FILE *fp = fopen(worker_filename.c_str(), "wb");
+
+        while (reader->is_valid()) {
+          work_unit.clear();
+          size_t total_nt = 0;
+
+#ifdef _OPENMP
+          #pragma omp critical(get_input)
+#endif
+          {
+            while (total_nt < Work_unit_size) {
+              dna = reader->next_sequence();
+              if (!reader->is_valid())
+                break;
+              work_unit.emplace_back(dna, seq_idx);
+              total_nt += dna.seq.size();
+              ++seq_idx;
+            }
+          }
+          if (total_nt == 0)
+            break;
+
+          for (size_t j = 0; j < work_unit.size(); j++) {
+            classify_sequence_with_db_chunk(work_unit[j], fp, db_chunk_id, 0);
+          }
+
+#ifdef _OPENMP
+          #pragma omp critical(progress)
+#endif
+          {
+            total_sequences += work_unit.size();
+            total_bases += total_nt;
+            if (Print_Progress) {
+              fprintf(stderr, "\r Processed %llu sequences (database chunk %" PRIu32" of %" PRIu32 ")",
+                      total_sequences, db_chunk_id + 1, KrakenDatabases[i]->chunks());
+            }
+          }
+        }
+        fclose(fp);
+      }  // end parallel section
+
+      delete reader;
+      merge_intermediate_results_by_workers(first_intermediate_output);
+      first_intermediate_output = false;
+    }
+  }
+
+  fprintf(stderr, "\r Processed %llu sequences\n", total_sequences);
+
+  // merge intermediate results of all chunks and classify
+  // TODO: parallelize this (need to buffer reads), we also do not care about the final output order
+  total_sequences = 0;
+  total_classified = 0;
+
+  DNASequenceReader *reader;
+  if (Fastq_input)
+    reader = new FastqReader(file_str);
+  else
+    reader = new FastaReader(file_str);
+
+  unordered_map<uint32_t, uint32_t> hit_counts;
+  vector<uint32_t> taxa;
+  vector<char> ambig_list;
+
+  const std::string taxa_summary_filename = Kraken_output_file + ".tmp";
+  FILE* fp_taxa_summary = fopen(taxa_summary_filename.c_str(), "rb");
+
+  while (reader->is_valid()) {
+    hit_counts.clear();
+    taxa.clear();
+    ambig_list.clear();
+
+    dna = reader->next_sequence();
+    if (!reader->is_valid())
+      break;
+
+    // merge results from chunks into 'taxa'
+    uint32_t hits = 0;
+
+    // get number of elements (taxa.size())
+    uint32_t taxa_size;
+    fread(&taxa_size, sizeof(taxa_size), 1, fp_taxa_summary);
+
+    taxa.resize(taxa_size);
+    fread(&taxa[0], sizeof(uint32_t), taxa_size, fp_taxa_summary);
+
+    for (uint32_t i = 0; i < taxa.size(); ++i)
+    {
+      if (taxa[i])
+      {
+        ++hit_counts[taxa[i]];
+        // TODO: stop querying this read with other databases
+        if (Quick_mode && ++hits >= Minimum_hit_count)
+          goto quick_mode_call;
+      }
+    }
+
+quick_mode_call:
+    uint64_t *kmer_ptr;
+    uint32_t taxon = 0;
+    if (dna.seq.size() >= KrakenDatabases[0]->get_k()) {
+      KmerScanner scanner(dna.seq);
+      uint32_t taxa_idx = 0;
+      while ((kmer_ptr = scanner.next_kmer()) != NULL) {
+        if (scanner.ambig_kmer()) {
+          ambig_list.push_back(1);
+        } else {
+          ambig_list.push_back(0);
+          uint64_t cannonical_kmer = KrakenDatabases[0]->canonical_representation(*kmer_ptr);
+          taxon = taxa[taxa_idx];
+          taxon_counts[taxon].add_kmer(cannonical_kmer);
+        }
+        ++taxa_idx;
+      }
+    }
+
+    uint32_t call = 0;
+    if (Map_UIDs) {
+      if (Quick_mode) {
+        cerr << "Quick mode not available when mapping UIDs" << endl;
+        exit(1);
+      } else {
+        call = resolve_uids3(hit_counts, Parent_map, Uid_dict,
+                             UID_to_TaxID_map_file.ptr(), UID_to_TaxID_map_file.size());
+      }
+    } else {
+      if (Quick_mode)
+        call = hits >= Minimum_hit_count ? taxon : 0;
+      else
+        call = resolve_tree(hit_counts, Parent_map);
+    }
+
+    total_classified += (call != 0);
+    taxon_counts[call].incrementReadCount();
+
+    if (Print_unclassified && !call)
+      print_sequence(Unclassified_output, dna);
+
+    if (Print_classified && call)
+      print_sequence(Classified_output, dna);
+
+    if (!Print_kraken) {
+      goto next_read; // return call;
+    }
+
+    if (call) {
+      (*Kraken_output) << "C\t";
+    }
+    else {
+      if (Only_classified_kraken_output) {
+        goto next_read; // return false;
+      }
+      (*Kraken_output) << "U\t";
+    }
+    (*Kraken_output) << dna.id << '\t' << call << '\t' << dna.seq.size() << '\t';
+
+    if (Quick_mode) {
+      (*Kraken_output) << "Q:" << hits;
+    }
+    else {
+      if (taxa.empty())
+        (*Kraken_output) << "0:0";
+      else
+        (*Kraken_output) << hitlist_string(taxa, ambig_list);
+    }
+
+    if (Print_sequence)
+      (*Kraken_output) << "\t" << dna.seq;
+
+    (*Kraken_output) << "\n";
+    // return call;
+next_read:
+    ++total_sequences;
+    fprintf(stderr, "\r Processed %llu sequences (%.2f%% classified)",
+            total_sequences, total_classified * 100.0 / total_sequences);
+    (void)1;
+  }
+
+  fclose(fp_taxa_summary);
+  unlink(taxa_summary_filename.c_str());
+
+  delete reader;
+}
+
+
+inline void print_sequence(ostream* oss_ptr, const DNASequence& dna) {
       if (Fastq_input) {
         (*oss_ptr) << "@" << dna.header_line << endl
             << dna.seq << endl
@@ -473,7 +783,7 @@ void append_hitlist_string(string& hitlist_string, uint32_t& last_taxon, uint32_
 }
 */
 
-string hitlist_string(const vector<uint32_t> &taxa, const vector<uint8_t> &ambig)
+string hitlist_string(const vector<uint32_t> &taxa, const vector<char> &ambig)
 {
   int64_t last_code;
   int code_count = 1;
@@ -548,7 +858,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, READCOUNTS>& my_taxon_counts) {
   vector<uint32_t> taxa;
-  vector<uint8_t> ambig_list;
+  vector<char> ambig_list;
   unordered_map<uint32_t, uint32_t> hit_counts;
   uint64_t *kmer_ptr;
   uint32_t taxon = 0;
@@ -661,6 +971,44 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   return call;
 }
 
+void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FILE* fp, const uint32_t db_chunk_id, const uint32_t db_id) {
+  vector<uint32_t> taxa;
+  uint64_t *kmer_ptr;
+  uint32_t taxon;
+
+  auto & dna = seq.first;
+  const uint32_t & seq_idx = seq.second;
+
+  vector<db_status> db_statuses(KrakenDatabases.size());
+
+  if (dna.seq.size() >= KrakenDatabases[0]->get_k()) {
+    size_t n_kmers = dna.seq.size()-KrakenDatabases[0]->get_k()+1;
+    taxa.reserve(n_kmers);
+    KmerScanner scanner(dna.seq);
+    while ((kmer_ptr = scanner.next_kmer()) != NULL) {
+      taxon = 0;
+      if (!scanner.ambig_kmer()) {
+        uint64_t cannonical_kmer = KrakenDatabases[db_id]->canonical_representation(*kmer_ptr);
+        const uint64_t minimizer = KrakenDatabases[db_id]->bin_key(cannonical_kmer); // TODO: inefficient because minimizer will also be computed in kmer_query()
+
+        if (KrakenDatabases[db_id]->is_minimizer_in_chunk(minimizer, db_chunk_id)) {
+          uint32_t* val_ptr = KrakenDatabases[db_id]->kmer_query_with_db_chunks(
+                  cannonical_kmer, &db_statuses[db_id].current_bin_key,
+                  &db_statuses[db_id].current_min_pos, &db_statuses[db_id].current_max_pos);
+          if (val_ptr)
+            taxon = *val_ptr;
+        }
+      }
+      taxa.push_back(taxon);
+    }
+  }
+
+  const uint32_t taxa_size = taxa.size();
+  fwrite(&seq_idx, sizeof(uint32_t), 1, fp); // seq_idx
+  fwrite(&taxa_size, sizeof(uint32_t), 1, fp); // number of elements
+  fwrite(&taxa[0], sizeof(uint32_t), taxa_size, fp); // elements
+}
+
 set<uint32_t> get_ancestry(uint32_t taxon) {
   set<uint32_t> path;
 
@@ -677,7 +1025,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:x:")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -743,6 +1091,10 @@ void parse_command_line(int argc, char **argv) {
       case 'M' :
         Populate_memory = true;
         break;
+      case 'x' :
+        Populate_memory = true;
+        Populate_memory_size = parse_human_readable_size(optarg); // strtoull(optarg, NULL, 0);
+        break;
       case 'I' :
         UID_to_TaxID_map_filename = optarg;
         Map_UIDs = true;
@@ -786,6 +1138,7 @@ void usage(int exit_code) {
        << "  -f               Input is in FASTQ format" << endl
        << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
+       << "  -x size          Preload database files using x amount of RAM (e.g. 10G)" << endl
        << "  -s               Print read sequence in Kraken output" << endl
        << "  -h               Print this message" << endl
        << endl

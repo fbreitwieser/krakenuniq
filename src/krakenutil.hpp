@@ -22,9 +22,12 @@
 #define KRAKENUTIL_HPP
 
 #include "kraken_headers.hpp"
+#include <inttypes.h>
 #include <unordered_map>
 
 namespace kraken {
+  uint64_t parse_human_readable_size(char * size_str);
+
   // Build a map of node to parent from an NCBI taxonomy nodes.dmp file
   std::unordered_map<uint32_t, uint32_t> build_parent_map(std::string filename);
 

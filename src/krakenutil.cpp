@@ -27,6 +27,32 @@
 using namespace std;
 
 namespace kraken {
+  uint64_t parse_human_readable_size(char * size_str) {
+    char *endp = size_str;
+    int sh;
+    errno = 0;
+    uint64_t x = strtoumax(size_str, &endp, 10);
+    if (errno || endp == size_str)
+      return 0;
+    switch(*endp) {
+      case 'k':
+      case 'K':
+        sh=10; break;
+      case 'm':
+      case 'M':
+        sh=20; break;
+      case 'g':
+      case 'G':
+        sh=30; break;
+      case 0:
+        sh=0; break;
+      default:
+        return 0;
+    }
+    if (x > SIZE_MAX >> sh)
+      return 0;
+    return x << sh;
+  }
 
   // Build a node->parent unordered_map from NCBI Taxonomy nodes.dmp file
   unordered_map<uint32_t, uint32_t> build_parent_map(string filename) {
