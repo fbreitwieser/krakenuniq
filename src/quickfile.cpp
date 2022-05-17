@@ -43,6 +43,10 @@ void QuickFile::open_file(string filename_str, string mode, size_t size) {
                   : mode == "r" ? O_RDONLY : O_RDWR;
   int m_flags = mode == "r" ? MAP_PRIVATE : MAP_SHARED;
 
+  int m_prot = PROT_READ;
+  if (mode != "r")
+    m_prot |= PROT_WRITE;
+
   fd = open(filename, o_flags, 0666);
   // Second try for R/W if failure was due to non-existence
   if (fd < 0 && mode == "rw" && errno == ENOENT) {
@@ -66,7 +70,7 @@ void QuickFile::open_file(string filename_str, string mode, size_t size) {
     filesize = sb.st_size;
   }
 
-  fptr = (char *)mmap(0, filesize, PROT_READ | PROT_WRITE, m_flags, fd, 0);
+  fptr = (char *)mmap(0, filesize, m_prot, m_flags, fd, 0);
   madvise(fptr, filesize, MADV_WILLNEED);
   if (fptr == MAP_FAILED)
     err(EX_OSERR, "unable to mmap %s", filename);

@@ -56,6 +56,7 @@ my $fastq_input = 0;
 my @db_prefix;
 my $threads;
 my $preload = 0;
+my $preload_size;
 my $gunzip = 0;
 my $bunzip2 = 0;
 my $paired = 0;
@@ -85,6 +86,7 @@ GetOptions(
   "o|output=s" => \$outfile,
   "report-file=s" => \$report_file,
   "preload" => \$preload,
+  "preload-size=s" => \$preload_size,
   "paired" => \$paired,
   "hll-precision=i", \$hll_precision,
   "exact", \$use_exact_counting,
@@ -198,6 +200,7 @@ push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
 push @flags, "-c", if $only_classified_output;
 push @flags, "-M" if $preload;
+push @flags, "-x", $preload_size if defined $preload_size;
 push @flags, "-r", $report_file if defined $report_file;
 push @flags, "-a", $db_prefix[0]."/taxDB";
 push @flags, "-s" if $print_sequence;
@@ -310,6 +313,7 @@ Options:
   --only-classified-output
                           Print no Kraken output for unclassified sequences
   --preload               Loads DB into memory before classification
+  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small)
   --paired                The two filenames provided are paired-end reads
   --check-names           Ensure each pair of reads have names that agree
                           with each other; ignored if --paired is not specified
