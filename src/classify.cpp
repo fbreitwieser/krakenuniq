@@ -60,7 +60,7 @@ void parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 void process_file(char *filename);
 void process_file_with_db_chunk(char *filename);
-void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FILE* fp, const uint32_t db_chunk_id, const uint32_t db_id);
+void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, std::fstream & fp, const uint32_t db_chunk_id, const uint32_t db_id);
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, READCOUNTS>&);
@@ -382,7 +382,8 @@ void merge_intermediate_results_by_workers(const bool first_intermediate_output)
     fp_prev_merged_summary = fopen(filename_prev_merged_summary.c_str(), "rb");
   }
 
-  FILE *fp_merged_summary = fopen(filename_merged_summary.c_str(), "wb");
+  std::fstream fp_merged_summary(filename_merged_summary, std::fstream::out | std::fstream::binary | std::fstream::trunc);
+  fp_merged_summary.exceptions(std::fstream::badbit);
 
   std::vector<FILE*> worker_files(Num_threads);
   std::vector<uint32_t> next_read_id(Num_threads);
@@ -434,8 +435,14 @@ void merge_intermediate_results_by_workers(const bool first_intermediate_output)
       }
     }
 
-    fwrite(&taxa_size, sizeof(uint32_t), 1, fp_merged_summary);
-    fwrite(&taxa[0], sizeof(uint32_t), taxa_size, fp_merged_summary);
+    try {
+      fp_merged_summary.write((char*) &taxa_size, 1 * sizeof(uint32_t));
+      fp_merged_summary.write((char*) &taxa[0], taxa_size * sizeof(uint32_t));
+    }
+    catch (const std::fstream::failure& e) {
+      printf("ERROR: Could not write to temporary file: %s\n", e.what());
+      exit(1);
+    }
 
     // load the next read id from that file
     if (fread(&next_read_id[worker_to_retrieve_from], sizeof(next_read_id[worker_to_retrieve_from]), 1, worker_files[worker_to_retrieve_from]) != 1)
@@ -457,7 +464,7 @@ void merge_intermediate_results_by_workers(const bool first_intermediate_output)
     unlink(filename_prev_merged_summary.c_str());
   }
 
-  fclose(fp_merged_summary);
+  fp_merged_summary.close();
 }
 
 void process_file(char *filename) {
@@ -566,7 +573,8 @@ void process_file_with_db_chunk(char *filename) {
         const int worker_id = omp_get_thread_num();
         const std::string worker_filename = Kraken_output_file + ".tmp." + std::to_string(worker_id);
 
-        FILE *fp = fopen(worker_filename.c_str(), "wb");
+        std::fstream fp(worker_filename, std::fstream::out | std::fstream::binary | std::fstream::trunc);
+        fp.exceptions(std::fstream::badbit);
 
         while (reader->is_valid()) {
           work_unit.clear();
@@ -604,7 +612,7 @@ void process_file_with_db_chunk(char *filename) {
             }
           }
         }
-        fclose(fp);
+        fp.close();
       }  // end parallel section
 
       delete reader;
@@ -971,7 +979,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   return call;
 }
 
-void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FILE* fp, const uint32_t db_chunk_id, const uint32_t db_id) {
+void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, std::fstream & fp, const uint32_t db_chunk_id, const uint32_t db_id) {
   vector<uint32_t> taxa;
   uint64_t *kmer_ptr;
   uint32_t taxon;
@@ -1003,10 +1011,16 @@ void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FIL
     }
   }
 
-  const uint32_t taxa_size = taxa.size();
-  fwrite(&seq_idx, sizeof(uint32_t), 1, fp); // seq_idx
-  fwrite(&taxa_size, sizeof(uint32_t), 1, fp); // number of elements
-  fwrite(&taxa[0], sizeof(uint32_t), taxa_size, fp); // elements
+  try {
+    const uint32_t taxa_size = taxa.size();
+    fp.write((char*) &seq_idx, 1 * sizeof(uint32_t)); // seq_idx
+    fp.write((char*) &taxa_size, 1 * sizeof(uint32_t)); // number of elements
+    fp.write((char*) &taxa[0], taxa_size * sizeof(uint32_t)); // elements
+  }
+  catch (const std::fstream::failure& e) {
+    printf("ERROR: Could not write to temporary file: %s\n", e.what());
+    exit(1);
+  }
 }
 
 set<uint32_t> get_ancestry(uint32_t taxon) {
