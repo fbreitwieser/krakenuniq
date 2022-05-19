@@ -370,8 +370,8 @@ void report_stats(struct timeval time1, struct timeval time2) {
           (total_sequences - total_classified) * 100.0 / total_sequences);
 }
 
-void merge_intermediate_results_by_workers(const bool first_intermediate_output) {
-  const std::string filename_merged_summary = Kraken_output_file + ".tmp";
+void merge_intermediate_results_by_workers(const bool first_intermediate_output, const std::string & tmp_file_name) {
+  const std::string filename_merged_summary = tmp_file_name;
 
   FILE *fp_prev_merged_summary = NULL;
   std::string filename_prev_merged_summary;
@@ -548,6 +548,8 @@ void process_file_with_db_chunk(char *filename) {
   string file_str(filename);
   DNASequence dna;
 
+  const std::string tmp_file_name = std::tmpnam(nullptr);
+
   // iterate over databases
   bool first_intermediate_output = true;
   for (size_t i=0; i<KrakenDatabases.size(); ++i)
@@ -571,7 +573,7 @@ void process_file_with_db_chunk(char *filename) {
       {
         vector <std::pair<DNASequence, uint32_t> > work_unit;
         const int worker_id = omp_get_thread_num();
-        const std::string worker_filename = Kraken_output_file + ".tmp." + std::to_string(worker_id);
+        const std::string worker_filename = tmp_file_name + "." + std::to_string(worker_id);
 
         std::fstream fp(worker_filename, std::fstream::out | std::fstream::binary | std::fstream::trunc);
         fp.exceptions(std::fstream::badbit);
@@ -616,7 +618,7 @@ void process_file_with_db_chunk(char *filename) {
       }  // end parallel section
 
       delete reader;
-      merge_intermediate_results_by_workers(first_intermediate_output);
+      merge_intermediate_results_by_workers(first_intermediate_output, tmp_file_name);
       first_intermediate_output = false;
     }
   }
@@ -638,7 +640,7 @@ void process_file_with_db_chunk(char *filename) {
   vector<uint32_t> taxa;
   vector<char> ambig_list;
 
-  const std::string taxa_summary_filename = Kraken_output_file + ".tmp";
+  const std::string taxa_summary_filename = tmp_file_name;
   FILE* fp_taxa_summary = fopen(taxa_summary_filename.c_str(), "rb");
 
   while (reader->is_valid()) {
