@@ -370,6 +370,19 @@ void report_stats(struct timeval time1, struct timeval time2) {
           (total_sequences - total_classified) * 100.0 / total_sequences);
 }
 
+bool determine_input_file_type(char* filename)
+{
+  bxz::ifstream file;
+  file.open(filename);
+  if (file.rdstate() & ifstream::failbit) {
+    err(EX_NOINPUT, "can't open %s", filename);
+  }
+  std::istreambuf_iterator<char> file_iter(file);
+  bool ret = *file_iter == '@';
+  file.close();
+  return ret;
+};
+
 void merge_intermediate_results_by_workers(const bool first_intermediate_output, const std::string & tmp_file_name) {
   const std::string filename_merged_summary = tmp_file_name;
 
@@ -472,6 +485,8 @@ void process_file(char *filename) {
   DNASequenceReader *reader;
   DNASequence dna;
 
+  Fastq_input = determine_input_file_type(filename);
+
   if (Fastq_input)
     reader = new FastqReader(file_str);
   else
@@ -547,6 +562,8 @@ void process_file(char *filename) {
 void process_file_with_db_chunk(char *filename) {
   string file_str(filename);
   DNASequence dna;
+
+  Fastq_input = determine_input_file_type(filename);
 
   const std::string tmp_file_name = std::tmpnam(nullptr);
 
@@ -1041,7 +1058,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:x:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qcC:U:Ma:r:sI:p:x:")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -1071,9 +1088,6 @@ void parse_command_line(int argc, char **argv) {
         if (sig <= 0)
           errx(EX_USAGE, "can't use nonpositive minimum hit count");
         Minimum_hit_count = sig;
-        break;
-      case 'f' :
-        Fastq_input = true;
         break;
       case 'c' :
         Only_classified_kraken_output = true;
@@ -1151,14 +1165,12 @@ void usage(int exit_code) {
        << "  -m #             Minimum hit count (ignored w/o -q)" << endl
        << "  -C filename      Print classified sequences" << endl
        << "  -U filename      Print unclassified sequences" << endl
-       << "  -f               Input is in FASTQ format" << endl
        << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
        << "  -x size          Preload database files using x amount of RAM (e.g. 10G)" << endl
        << "  -s               Print read sequence in Kraken output" << endl
        << "  -h               Print this message" << endl
        << endl
-       << "At least one FASTA or FASTQ file must be specified." << endl
        << "Kraken output is to standard output by default." << endl;
   exit(exit_code);
 }
