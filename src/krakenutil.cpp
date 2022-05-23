@@ -54,6 +54,15 @@ namespace kraken {
     return x << sh;
   }
 
+  std::string get_directory(const std::string & file_path)
+  {
+    const size_t last_slash_pos = file_path.find_last_of('/');
+    if (last_slash_pos == std::string::npos)
+      return "./";
+    else
+      return file_path.substr(0, last_slash_pos + 1);
+  }
+
   // Build a node->parent unordered_map from NCBI Taxonomy nodes.dmp file
   unordered_map<uint32_t, uint32_t> build_parent_map(string filename) {
     unordered_map<uint32_t, uint32_t> pmap;

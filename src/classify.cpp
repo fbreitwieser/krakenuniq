@@ -30,6 +30,7 @@
 #include <sstream>
 #include <inttypes.h>
 #include <cassert>
+#include <cstdio>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 int New_taxid_start = 1000000000;
@@ -565,7 +566,16 @@ void process_file_with_db_chunk(char *filename) {
 
   Fastq_input = determine_input_file_type(filename);
 
-  const std::string tmp_file_name = std::tmpnam(nullptr);
+  std::string dir_for_tmp_file = "./";
+  if (!Kraken_output_file.empty())
+    dir_for_tmp_file = get_directory(Kraken_output_file);
+  else if (!Classified_output_file.empty())
+    dir_for_tmp_file = get_directory(Classified_output_file);
+  else if (!Unclassified_output_file.empty())
+    dir_for_tmp_file = get_directory(Unclassified_output_file);
+  else if (!Report_output_file.empty())
+    dir_for_tmp_file = get_directory(Report_output_file);
+  const std::string tmp_file_name = tempnam(dir_for_tmp_file.c_str(), "tmp");
 
   // iterate over databases
   bool first_intermediate_output = true;
