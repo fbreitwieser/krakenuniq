@@ -17,8 +17,7 @@ PROGS1 = classify classifyExact db_sort set_lcas db_shrink build_taxdb read_uid_
 TEST_PROGS = grade_classification test_hll_on_db dump_db_kmers
 #PROGS = $(PROGS1) $(TEST_PROGS)
 PROGS = $(PROGS1)
-#LIBFLAGS = -L. -lz -lgzstream ${LDFLAGS}
-LIBFLAGS = -L. -lz ${LDFLAGS}
+LIBFLAGS = -L. -lz -lbz2 ${LDFLAGS}
 
 .PHONY: all install clean
 
@@ -37,12 +36,14 @@ db_shrink: krakendb.o quickfile.o
 db_sort: krakendb.o quickfile.o
 
 set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
+	$(CXX) $(CXXFLAGS) -c set_lcas.cpp -o set_lcas
 
 grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
 count_unique: hyperloglogplus.o seqreader.o krakenutil.o
+	$(CXX) $(CXXFLAGS) -c count_unique.cpp -o count_unique
 
 test_count_unique: hyperloglogplus.o 
 

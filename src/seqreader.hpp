@@ -21,6 +21,7 @@
 #define SEQREADER_HPP
 
 #include "kraken_headers.hpp"
+#include "third_party/bxzstr/include/bxzstr.hpp"
 
 namespace kraken {
   typedef struct {
@@ -44,7 +45,7 @@ namespace kraken {
     bool is_valid();
 
     private:
-    std::ifstream file;
+    bxz::ifstream file;
     std::string linebuffer;
     bool valid;
   };
@@ -56,7 +57,7 @@ namespace kraken {
     bool is_valid();
 
     private:
-    std::ifstream file;
+    bxz::ifstream file;
     bool valid;
   };
 }

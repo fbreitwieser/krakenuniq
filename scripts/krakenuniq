@@ -46,8 +46,6 @@ my $CLASSIFY = "$KRAKEN_DIR/classify";
 my $CLASSIFY_EXACT = "$KRAKEN_DIR/classifyExact";
 my $CREATE_TAXDB = "$KRAKEN_DIR/build_taxdb";
 my $READ_MERGER = "$KRAKEN_DIR/read_merger.pl";
-my $GZIP_MAGIC = chr(hex "1f") . chr(hex "8b");
-my $BZIP2_MAGIC = "BZ";
 
 my $quick = 0;
 my $min_hits = 1;
@@ -153,25 +151,12 @@ if ($paired && @ARGV != 2) {
   die "$PROG: --paired requires exactly two filenames\n";
 }
 
-my $compressed = $gunzip || $bunzip2;
-if ($gunzip && $bunzip2) {
-  die "$PROG: can't use both gzip and bzip2 compression flags\n";
+if ($gunzip || $bunzip2) {
+  print STDERR "NOTE: No need to use --gzip-compressed or --bzip2-compressed anymore, format is detected automatically.\n";
 }
-if ($fasta_input && $fastq_input) {
-  die "$PROG: can't use both FASTA and FASTQ input flags\n";
+if ($fasta_input || $fastq_input) {
+  print STDERR "NOTE: No need to use --fasta-input or --fastq-input anymore, format is detected automatically.\n";
 }
-
-my $auto_detect = 1;
-if ($fasta_input || $fastq_input || $compressed) {
-  $auto_detect = 0;
-}
-if (!defined $ARGV[0] || ! -f $ARGV[0]) {
-  $auto_detect = 0;
-}
-if ($auto_detect) {
-  auto_detect_file_format();
-}
-
 
 if (defined $report_file && !-d dirname($report_file)) {
   print STDERR "Creating directory for $report_file.\n";
@@ -194,7 +179,6 @@ push @flags, map { ("-i", $_) } @idx_files;
 push @flags, "-t", $threads if $threads > 1;
 push @flags, "-q" if $quick;
 push @flags, "-m", $min_hits if $min_hits > 1;
-push @flags, "-f" if $fastq_input && ! $paired;  # merger always outputs FASTA
 push @flags, "-U", $unclassified_out if defined $unclassified_out;
 push @flags, "-C", $classified_out if defined $classified_out;
 push @flags, "-o", $outfile if defined $outfile;
@@ -230,23 +214,8 @@ if (! -f $db_prefix[0]."/taxDB") {
 my @pipe_argv;
 if ($paired) {
   my @merge_flags;
-  push @merge_flags, "--fa" if $fasta_input;
-  push @merge_flags, "--fq" if $fastq_input;
-  push @merge_flags, "--gz" if $gunzip;
-  push @merge_flags, "--bz2" if $bunzip2;
   push @merge_flags, "--check-names" if $check_names;
   @pipe_argv = ($READ_MERGER, @merge_flags, @ARGV);
-}
-elsif ($compressed) {
-  if ($gunzip) {
-    @pipe_argv = ("gzip", "-dc", @ARGV);
-  }
-  elsif ($bunzip2) {
-    @pipe_argv = ("bzip2", "-dc", @ARGV);
-  }
-  else {
-    die "$PROG: unrecognized compression program! This is a Kraken bug.\n";
-  }
 }
 
 # if args exist, set up the pipe/fork/exec 
@@ -295,10 +264,6 @@ Usage: $PROG --report-file FILENAME [options] <filename(s)>
 Options:
   --db NAME               Name for Kraken DB (default: $default_db)
   --threads NUM           Number of threads (default: $def_thread_ct)
-  --fasta-input           Input is FASTA format
-  --fastq-input           Input is FASTQ format
-  --gzip-compressed       Input is gzip compressed
-  --bzip2-compressed      Input is bzip2 compressed
   --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: $hll_precision)
   --exact                 Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
   --quick                 Quick operation (use first hit or hits)
@@ -323,8 +288,9 @@ Options:
 Experimental:
   --uid-mapping           Map using UID database
 
-If none of the *-input or *-compressed flags are specified, and the 
-file is a regular file, automatic format detection is attempted.
+The file format (fasta/fastq) and compression (gzip/bzip2) do not need to be specified anymore.
+The format is detected automatically.
+
 EOF
   exit $exit_code;
 }
@@ -338,50 +304,4 @@ sub display_version {
   print "Copyright 2017-2018, Florian Breitwieser (fbreitwieser\@jhu.edu)\n";
   print "Copyright 2013-2017, Derrick Wood (dwood\@cs.jhu.edu) for Kraken\n";
   exit 0;
-}
-
-sub auto_detect_file_format {
-  my $magic;
-  my $filename = $ARGV[0];
-
-  # read 2-byte magic number to determine type of compression (if any)
-  open FILE, "<", $filename;
-  read FILE, $magic, 2;
-  close FILE;
-  if ($magic eq $GZIP_MAGIC) {
-    $compressed = 1;
-    $gunzip = 1;
-  }
-  elsif ($magic eq $BZIP2_MAGIC) {
-    $compressed = 1;
-    $bunzip2 = 1;
-  }
-  else {
-    # if no compression, just look at first char
-    chop $magic;
-  }
-
-  # uncompress to stream and read first char
-  if ($gunzip) {
-    open FILE, "-|", "gzip", "-dc", $filename
-      or die "$PROG: can't determine format of $filename (gzip error): $!\n";
-    read FILE, $magic, 1;
-    close FILE;
-  }
-  elsif ($bunzip2) {
-    open FILE, "-|", "bzip2", "-dc", $ARGV[0]
-      or die "$PROG: can't determine format of $filename (bzip2 error): $!\n";
-    read FILE, $magic, 1;
-    close FILE;
-  }
-
-  if ($magic eq ">") {
-    $fasta_input = 1;
-  }
-  elsif ($magic eq "@") {
-    $fastq_input = 1;
-  }
-  else {
-    die "$PROG: can't determine what format $filename is!\n";
-  }
 }

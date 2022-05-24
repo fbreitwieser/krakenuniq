@@ -30,6 +30,7 @@
 #include <sstream>
 #include <inttypes.h>
 #include <cassert>
+#include <cstdio>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 int New_taxid_start = 1000000000;
@@ -60,7 +61,7 @@ void parse_command_line(int argc, char **argv);
 void usage(int exit_code=EX_USAGE);
 void process_file(char *filename);
 void process_file_with_db_chunk(char *filename);
-void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FILE* fp, const uint32_t db_chunk_id, const uint32_t db_id);
+void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, std::fstream & fp, const uint32_t db_chunk_id, const uint32_t db_id);
 bool classify_sequence(DNASequence &dna, ostringstream &koss,
                        ostringstream &coss, ostringstream &uoss,
                        unordered_map<uint32_t, READCOUNTS>&);
@@ -370,8 +371,21 @@ void report_stats(struct timeval time1, struct timeval time2) {
           (total_sequences - total_classified) * 100.0 / total_sequences);
 }
 
-void merge_intermediate_results_by_workers(const bool first_intermediate_output) {
-  const std::string filename_merged_summary = Kraken_output_file + ".tmp";
+bool determine_input_file_type(char* filename)
+{
+  bxz::ifstream file;
+  file.open(filename);
+  if (file.rdstate() & ifstream::failbit) {
+    err(EX_NOINPUT, "can't open %s", filename);
+  }
+  std::istreambuf_iterator<char> file_iter(file);
+  bool ret = *file_iter == '@';
+  file.close();
+  return ret;
+};
+
+void merge_intermediate_results_by_workers(const bool first_intermediate_output, const std::string & tmp_file_name) {
+  const std::string filename_merged_summary = tmp_file_name;
 
   FILE *fp_prev_merged_summary = NULL;
   std::string filename_prev_merged_summary;
@@ -382,7 +396,8 @@ void merge_intermediate_results_by_workers(const bool first_intermediate_output)
     fp_prev_merged_summary = fopen(filename_prev_merged_summary.c_str(), "rb");
   }
 
-  FILE *fp_merged_summary = fopen(filename_merged_summary.c_str(), "wb");
+  std::fstream fp_merged_summary(filename_merged_summary, std::fstream::out | std::fstream::binary | std::fstream::trunc);
+  fp_merged_summary.exceptions(std::fstream::badbit);
 
   std::vector<FILE*> worker_files(Num_threads);
   std::vector<uint32_t> next_read_id(Num_threads);
@@ -434,8 +449,14 @@ void merge_intermediate_results_by_workers(const bool first_intermediate_output)
       }
     }
 
-    fwrite(&taxa_size, sizeof(uint32_t), 1, fp_merged_summary);
-    fwrite(&taxa[0], sizeof(uint32_t), taxa_size, fp_merged_summary);
+    try {
+      fp_merged_summary.write((char*) &taxa_size, 1 * sizeof(uint32_t));
+      fp_merged_summary.write((char*) &taxa[0], taxa_size * sizeof(uint32_t));
+    }
+    catch (const std::fstream::failure& e) {
+      printf("ERROR: Could not write to temporary file: %s\n", e.what());
+      exit(1);
+    }
 
     // load the next read id from that file
     if (fread(&next_read_id[worker_to_retrieve_from], sizeof(next_read_id[worker_to_retrieve_from]), 1, worker_files[worker_to_retrieve_from]) != 1)
@@ -457,13 +478,15 @@ void merge_intermediate_results_by_workers(const bool first_intermediate_output)
     unlink(filename_prev_merged_summary.c_str());
   }
 
-  fclose(fp_merged_summary);
+  fp_merged_summary.close();
 }
 
 void process_file(char *filename) {
   string file_str(filename);
   DNASequenceReader *reader;
   DNASequence dna;
+
+  Fastq_input = determine_input_file_type(filename);
 
   if (Fastq_input)
     reader = new FastqReader(file_str);
@@ -541,6 +564,19 @@ void process_file_with_db_chunk(char *filename) {
   string file_str(filename);
   DNASequence dna;
 
+  Fastq_input = determine_input_file_type(filename);
+
+  std::string dir_for_tmp_file = "./";
+  if (!Kraken_output_file.empty())
+    dir_for_tmp_file = get_directory(Kraken_output_file);
+  else if (!Classified_output_file.empty())
+    dir_for_tmp_file = get_directory(Classified_output_file);
+  else if (!Unclassified_output_file.empty())
+    dir_for_tmp_file = get_directory(Unclassified_output_file);
+  else if (!Report_output_file.empty())
+    dir_for_tmp_file = get_directory(Report_output_file);
+  const std::string tmp_file_name = tempnam(dir_for_tmp_file.c_str(), "tmp");
+
   // iterate over databases
   bool first_intermediate_output = true;
   for (size_t i=0; i<KrakenDatabases.size(); ++i)
@@ -564,9 +600,10 @@ void process_file_with_db_chunk(char *filename) {
       {
         vector <std::pair<DNASequence, uint32_t> > work_unit;
         const int worker_id = omp_get_thread_num();
-        const std::string worker_filename = Kraken_output_file + ".tmp." + std::to_string(worker_id);
+        const std::string worker_filename = tmp_file_name + "." + std::to_string(worker_id);
 
-        FILE *fp = fopen(worker_filename.c_str(), "wb");
+        std::fstream fp(worker_filename, std::fstream::out | std::fstream::binary | std::fstream::trunc);
+        fp.exceptions(std::fstream::badbit);
 
         while (reader->is_valid()) {
           work_unit.clear();
@@ -604,11 +641,11 @@ void process_file_with_db_chunk(char *filename) {
             }
           }
         }
-        fclose(fp);
+        fp.close();
       }  // end parallel section
 
       delete reader;
-      merge_intermediate_results_by_workers(first_intermediate_output);
+      merge_intermediate_results_by_workers(first_intermediate_output, tmp_file_name);
       first_intermediate_output = false;
     }
   }
@@ -630,7 +667,7 @@ void process_file_with_db_chunk(char *filename) {
   vector<uint32_t> taxa;
   vector<char> ambig_list;
 
-  const std::string taxa_summary_filename = Kraken_output_file + ".tmp";
+  const std::string taxa_summary_filename = tmp_file_name;
   FILE* fp_taxa_summary = fopen(taxa_summary_filename.c_str(), "rb");
 
   while (reader->is_valid()) {
@@ -971,7 +1008,7 @@ bool classify_sequence(DNASequence &dna, ostringstream &koss,
   return call;
 }
 
-void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FILE* fp, const uint32_t db_chunk_id, const uint32_t db_id) {
+void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, std::fstream & fp, const uint32_t db_chunk_id, const uint32_t db_id) {
   vector<uint32_t> taxa;
   uint64_t *kmer_ptr;
   uint32_t taxon;
@@ -1003,10 +1040,16 @@ void classify_sequence_with_db_chunk(std::pair<DNASequence, uint32_t> & seq, FIL
     }
   }
 
-  const uint32_t taxa_size = taxa.size();
-  fwrite(&seq_idx, sizeof(uint32_t), 1, fp); // seq_idx
-  fwrite(&taxa_size, sizeof(uint32_t), 1, fp); // number of elements
-  fwrite(&taxa[0], sizeof(uint32_t), taxa_size, fp); // elements
+  try {
+    const uint32_t taxa_size = taxa.size();
+    fp.write((char*) &seq_idx, 1 * sizeof(uint32_t)); // seq_idx
+    fp.write((char*) &taxa_size, 1 * sizeof(uint32_t)); // number of elements
+    fp.write((char*) &taxa[0], taxa_size * sizeof(uint32_t)); // elements
+  }
+  catch (const std::fstream::failure& e) {
+    printf("ERROR: Could not write to temporary file: %s\n", e.what());
+    exit(1);
+  }
 }
 
 set<uint32_t> get_ancestry(uint32_t taxon) {
@@ -1025,7 +1068,7 @@ void parse_command_line(int argc, char **argv) {
 
   if (argc > 1 && strcmp(argv[1], "-h") == 0)
     usage(0);
-  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qfcC:U:Ma:r:sI:p:x:")) != -1) {
+  while ((opt = getopt(argc, argv, "d:i:t:u:n:m:o:qcC:U:Ma:r:sI:p:x:")) != -1) {
     switch (opt) {
       case 'd' :
         DB_filenames.push_back(optarg);
@@ -1055,9 +1098,6 @@ void parse_command_line(int argc, char **argv) {
         if (sig <= 0)
           errx(EX_USAGE, "can't use nonpositive minimum hit count");
         Minimum_hit_count = sig;
-        break;
-      case 'f' :
-        Fastq_input = true;
         break;
       case 'c' :
         Only_classified_kraken_output = true;
@@ -1135,14 +1175,12 @@ void usage(int exit_code) {
        << "  -m #             Minimum hit count (ignored w/o -q)" << endl
        << "  -C filename      Print classified sequences" << endl
        << "  -U filename      Print unclassified sequences" << endl
-       << "  -f               Input is in FASTQ format" << endl
        << "  -c               Only include classified reads in output" << endl
        << "  -M               Preload database files" << endl
        << "  -x size          Preload database files using x amount of RAM (e.g. 10G)" << endl
        << "  -s               Print read sequence in Kraken output" << endl
        << "  -h               Print this message" << endl
        << endl
-       << "At least one FASTA or FASTQ file must be specified." << endl
        << "Kraken output is to standard output by default." << endl;
   exit(exit_code);
 }

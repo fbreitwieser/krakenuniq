@@ -28,6 +28,8 @@
 namespace kraken {
   uint64_t parse_human_readable_size(char * size_str);
 
+  std::string get_directory(const std::string & file_path);
+
   // Build a map of node to parent from an NCBI taxonomy nodes.dmp file
   std::unordered_map<uint32_t, uint32_t> build_parent_map(std::string filename);
 
