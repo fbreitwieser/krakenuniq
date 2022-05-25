@@ -416,7 +416,9 @@ void KrakenDB::load_chunk(const uint32_t db_chunk_id) {
 
   char* id_chunk_start = index_ptr->fptr + strlen(KRAKEN_INDEX_STRING) + 1 + (idx_chunk_bounds[db_chunk_id] * 8);
   index_ptr->data_offset = idx_chunk_bounds[db_chunk_id] * 8;
-  const size_t id_chunk_len = (idx_chunk_bounds[db_chunk_id + 1] - idx_chunk_bounds[db_chunk_id]) * 8;
+  size_t id_chunk_len = (idx_chunk_bounds[db_chunk_id + 1] - idx_chunk_bounds[db_chunk_id]) * 8;
+  if (db_chunk_id < dbx_chunk_bounds.size() - 1)
+    id_chunk_len += 8;
 
   index_ptr->data = data + db_chunk_len;
   memcpy(index_ptr->data, id_chunk_start, id_chunk_len);
@@ -448,7 +450,7 @@ uint64_t KrakenDB::upper_bound(uint64_t first, const uint64_t last)
     // float total_size_gb = 1.0f * (size_index + size_data) / (1024 * 1024 * 1024);
 
     // printf("- it = %llu (size: %f)\n", it, total_size_gb);
-    if (size_index + size_data <= data_size) { // if (!(data_size < size_index + size_data)) // if (!comp(value, *it))
+    if (size_index + size_data + 8 <= data_size) { // if (!(data_size < size_index + size_data)) // if (!comp(value, *it))
       first = ++it;
       count -= step + 1;
     }
