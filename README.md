@@ -5,6 +5,19 @@ False-positive identifications are a significant problem in metagenomics classif
 
 **If you use KrakenUniq in your research, please cite our publication:** [KrakenUniq: confident and fast metagenomics classification using unique k-mer counts. Breitwieser FP, Baker DN, Salzberg SL. Genome Biology, Dec 2018. https://doi.org/10.1186/s13059-018-1568-0](https://doi.org/10.1186/s13059-018-1568-0)
 
+# Announcements
+## New Release v0.7
+New option for low-memory computers: --preload-size
+By default, KrakenUniq performs memory mapping to load the database; i.e., it does not load the entire database into main memory. (Kraken 1 employs the same strategy.) This makes classification of larger read datasets much slower, but it allows KrakenUniq to run on machines with low available main memory. If enough free RAM is available to hold the entire database in main memory, users are recommended to explicitly load the entire database prior to classification using the flag --preload, which dramatically speeds up the classification, often by a factor of 20 or more.
+
+To improve the performance when not enough main memory is available to load the entire database into RAM, we added a new capability to KrakenUniq. When using this new feature, only a chunk of the database is loaded into memory at a time, after which the algorithm iterates over the reads and looks up all k-mers in those reads that are matching in this database chunk. This process is repeated until the entire database has been processed. The k-mer lookups are then merged, and reads are classified based on the results of the full database. This new feature makes it feasible to run KrakenUniq on very large datasets and huge databases on virtually any computer, even a laptop, while providing exact classifications that are identical to those of KrakenUniq in its other modes. Users can employ this feature with --preload-size and specify the amount of available main memory that they want to use for loading chunks of the database, e.g., --preload-size 8G or --preload-size 500M.
+
+This release also includes an improvement for automatic detection of input format.
+The input format (fastq or fasta, bzip2 or gzip compressed) is now detected automatically. No need to use --fasta-input, --fastq-input, --gzip-compressed or --bzip2-compressed switches.
+
+## New Release v0.6
+This release fixes database preload option. Now --preload option will force loading the database in physical RAM (not swap) if enough physical RAM is available. KrakenUniq (and also Kraken) often ran very slow with really big databases. The problem was that --preload didn't truly force to load the DB in memory, so it spends forever (many days) going back and forth to disk. With the fix included in this release, krakenuniq ran in 16 minutes on a database where before it took >100 hours. 
+
 ## Installation
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/krakenuniq/README.html)
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/krakenuniq/badges/latest_release_date.svg)](https://anaconda.org/bioconda/krakenuniq)
