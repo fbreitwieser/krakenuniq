@@ -18,6 +18,8 @@
  * along with Kraken.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define __STDC_FORMAT_MACROS 1 // for PRIu64, etc.
+
 #include "kraken_headers.hpp"
 #include "krakendb.hpp"
 #include "krakenutil.hpp"
@@ -31,6 +33,7 @@
 #include <inttypes.h>
 #include <cassert>
 #include <cstdio>
+#include <inttypes.h>
 
 const size_t DEF_WORK_UNIT_SIZE = 500000;
 int New_taxid_start = 1000000000;
