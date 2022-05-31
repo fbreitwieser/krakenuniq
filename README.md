@@ -28,6 +28,7 @@ KrakenUniq is available in the Anaconda cloud. To install, type:
 ```
 conda install krakenuniq
 ```
+This is the bioconda link for KrakenUniq:  https://anaconda.org/bioconda/krakenuniq
 
 Installation from source from GitHub:
 ```
