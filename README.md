@@ -15,7 +15,7 @@ To improve the performance when not enough main memory is available to load the 
 This release also includes an improvement for automatic detection of input format.
 The input format (fastq or fasta, bzip2 or gzip compressed) is now detected automatically. No need to use --fasta-input, --fastq-input, --gzip-compressed or --bzip2-compressed switches.
 
-The improvements included in this release are described in the preprint posted on biorXiv: https://www.biorxiv.org/content/10.1101/2022.06.01.494344v1
+The improvements included in this release are described in the preprint posted on bioRxiv: https://www.biorxiv.org/content/10.1101/2022.06.01.494344v1
 
 ## New Release v0.6
 This release fixes database preload option. Now --preload option will force loading the database in physical RAM (not swap) if enough physical RAM is available. KrakenUniq (and also Kraken) often ran very slow with really big databases. The problem was that --preload didn't truly force to load the DB in memory, so it spends forever (many days) going back and forth to disk. With the fix included in this release, krakenuniq ran in 16 minutes on a database where before it took >100 hours. 
