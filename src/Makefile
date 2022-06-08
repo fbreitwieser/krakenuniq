@@ -35,15 +35,15 @@ db_shrink: krakendb.o quickfile.o
 
 db_sort: krakendb.o quickfile.o
 
-set_lcas: krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
-	$(CXX) $(CXXFLAGS) -c set_lcas.cpp -o set_lcas
+set_lcas: set_lcas.cpp krakendb.o quickfile.o krakenutil.o seqreader.o uid_mapping.o
+	$(CXX) $(CXXFLAGS) -o set_lcas $^ $(LIBFLAGS)
 
 grade_classification: #taxdb.hpp report-cols.hpp
 
 read_uid_mapping: quickfile.o
 
-count_unique: hyperloglogplus.o seqreader.o krakenutil.o
-	$(CXX) $(CXXFLAGS) -c count_unique.cpp -o count_unique
+count_unique: count_unique.cpp hyperloglogplus.o seqreader.o krakenutil.o
+	$(CXX) $(CXXFLAGS) -o count_unique $^ $(LIBFLAGS)
 
 test_count_unique: hyperloglogplus.o 
 
