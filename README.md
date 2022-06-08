@@ -6,7 +6,7 @@ False-positive identifications are a significant problem in metagenomics classif
 **If you use KrakenUniq in your research, please cite our publication:** [KrakenUniq: confident and fast metagenomics classification using unique k-mer counts. Breitwieser FP, Baker DN, Salzberg SL. Genome Biology, Dec 2018. https://doi.org/10.1186/s13059-018-1568-0](https://doi.org/10.1186/s13059-018-1568-0)
 
 # Announcements
-##New release v0.7.1
+## New release v0.7.1
 This minor release fixes a bug in the Makefile that resulted in installation of unusable executables count_unique and set_lcas. The bug resulted in fatal error in building a new krakenuniq database. Classification with an existing database was not affected.
 
 ## New Release v0.7
