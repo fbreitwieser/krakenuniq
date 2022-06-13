@@ -222,9 +222,9 @@ if ($paired) {
     open STDOUT, ">", 'merged.fa' or die $!;
     open STDERR, ">", 'merged.err' or die $!;
     exec $READ_MERGER, @merge_flags, @ARGV;
-    @ARGV=();
-    push(@ARGV,"merged.fa");
  }
+  @ARGV=();
+  push(@ARGV,"merged.fa");
 }
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
