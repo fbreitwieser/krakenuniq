@@ -304,7 +304,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   REPNAME=database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT $(cat library-files.txt | tr '\n' ' ') > $REPNAME.kraken.tsv
   fi
 fi
 
@@ -337,7 +337,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping --fasta-input <( cat_library ) > $REPNAME.kraken.tsv
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping $(cat library-files.txt | tr '\n' ' ') > $REPNAME.kraken.tsv
   fi
 fi
 
