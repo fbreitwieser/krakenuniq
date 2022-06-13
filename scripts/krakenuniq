@@ -210,27 +210,21 @@ if (! -f $db_prefix[0]."/taxDB") {
   system $cmd;
 }
 
+my $DIR="./";
+if(defined($outfile)){
+  $DIR=dirname($outfile);
+} elsif (defined($report_file)){
+  $DIR=dirname($report_file);
+}
 # pipe input to classify no longer supported or allowed
 if ($paired) {
-  my @merge_flags;
-  push @merge_flags, "--check-names" if $check_names;
-  my $pid = fork;
-  if (!defined $pid) {
-      die "Cannot fork: $!";
-  }
-  elsif ($pid == 0) {
-    my $DIR="./";
-    if(defined($outfile)){
-      $DIR=dirname($outfile);
-    } elsif (defined($report_file)){
-      $DIR=dirname($report_file);
-    }
-    open STDOUT, ">", '$DIR/merged.fa' or die $!;
-    open STDERR, ">", '$DIR/merged.err' or die $!;
-    exec $READ_MERGER, @merge_flags, @ARGV;
- }
+  my $cmd="perl $READ_MERGER ";
+  $cmd.=" --check-names " if $check_names;
+  $cmd.=join(" ",@ARGV);
+  $cmd.=" 1>$DIR/merged.fa 2>$DIR/merged.err";
+  system($cmd);
   @ARGV=();
-  push(@ARGV,"merged.fa");
+  push(@ARGV,"$DIR/merged.fa");
 }
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
@@ -243,6 +237,10 @@ if (defined $report_file) {
 }
 exec $cmd, @flags, @ARGV;
 die "$PROG: exec error: $!\n";
+if ($paired) {
+  unlink("$DIR/merged.fa");
+  unlink("$DIR/merged.err");
+}
 
 sub usage {
   my $exit_code = @_ ? shift : 64;

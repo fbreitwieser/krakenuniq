@@ -86,7 +86,7 @@ if ($ftype =~ /gzip/) {
 }
 # auto-detect compression and open file 2
 open($fh2,"file $ARGV[1] |");
-my ($fname,$ftype)=split(/\s+/,<$fh2>);
+($fname,$ftype)=split(/\s+/,<$fh2>);
 close($fh2);
 if ($ftype =~ /gzip/) {
   open $fh2, "-|", "gunzip", "-c", $ARGV[1]
