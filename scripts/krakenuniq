@@ -210,36 +210,21 @@ if (! -f $db_prefix[0]."/taxDB") {
   system $cmd;
 }
 
-# handle piping for decompression/merging
-my @pipe_argv;
+# pipe input to classify no longer supported or allowed
 if ($paired) {
   my @merge_flags;
   push @merge_flags, "--check-names" if $check_names;
-  @pipe_argv = ($READ_MERGER, @merge_flags, @ARGV);
-}
-
-# if args exist, set up the pipe/fork/exec 
-if (@pipe_argv) {
-  pipe RD, WR;
-  my $pid = fork();
-  if ($pid < 0) {
-    die "$PROG: fork error: $!\n";
+  my $pid = fork;
+  if (!defined $pid) {
+      die "Cannot fork: $!";
   }
-  if ($pid) {
-    open STDIN, "<&RD"
-      or die "$PROG: can't dup stdin to read end of pipe: $!\n";
-    close RD;
-    close WR;
-    @ARGV = ("/dev/fd/0");  # make classifier read from pipe
-  }
-  else {
-    open STDOUT, ">&WR"
-      or die "$PROG: can't dup stdout to write end of pipe: $!\n";
-    close RD;
-    close WR;
-    exec @pipe_argv
-      or die "$PROG: can't exec $pipe_argv[0]: $!\n";
-  }
+  elsif ($pid == 0) {
+    open STDOUT, ">", 'merged.fa' or die $!;
+    open STDERR, ">", 'merged.err' or die $!;
+    exec $READ_MERGER, @merge_flags, @ARGV;
+    @ARGV=();
+    push(@ARGV,"merged.fa");
+ }
 }
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;

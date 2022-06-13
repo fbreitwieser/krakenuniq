@@ -29,15 +29,9 @@ my $PROG = basename $0;
 
 my $fasta_input = 0;
 my $fastq_input = 0;
-my $gunzip = 0;
-my $bunzip2 = 0;
 my $check_names = 0;
 
 GetOptions(
-  "fa" => \$fasta_input,
-  "fq" => \$fastq_input,
-  "gz" => \$gunzip,
-  "bz2" => \$bunzip2,
   "check-names" => \$check_names
 );
 
@@ -53,31 +47,54 @@ for my $file (@ARGV) {
   }
 }
 
-my $compressed = $gunzip || $bunzip2;
-if ($gunzip && $bunzip2) {
-  die "$PROG: can't use both gzip and bzip2 compression flags\n";
-}
-if (! ($fasta_input xor $fastq_input)) {
-  die "$PROG: must specify exactly one of FASTA and FASTQ input flags\n";
-}
-
 # Open files (or pipes from decompression progs)
+# auto-detect compression, if any
 my ($fh1, $fh2);
-if ($gunzip) {
+open($fh1,"file $ARGV[0] |");
+my ($fname,$ftype)=split(/\s+/,<$fh1>);
+close($fh1);
+if ($ftype =~ /gzip/) {
   open $fh1, "-|", "gunzip", "-c", $ARGV[0]
     or die "$PROG: can't open gunzip pipe with $ARGV[0]: $!\n";
-  open $fh2, "-|", "gunzip", "-c", $ARGV[1]
-    or die "$PROG: can't open gunzip pipe with $ARGV[1]: $!\n";
-}
-elsif ($bunzip2) {
+} elsif ($ftype =~ /bzip2/) {
   open $fh1, "-|", "bunzip2", "-c", $ARGV[0]
     or die "$PROG: can't open bunzip2 pipe with $ARGV[0]: $!\n";
-  open $fh2, "-|", "bunzip2", "-c", $ARGV[1]
-    or die "$PROG: can't open bunzip2 pipe with $ARGV[1]: $!\n";
-}
-else {
+} else {
   open $fh1, "<", $ARGV[0]
     or die "$PROG: can't open $ARGV[0]: $!\n";
+}
+#auto-detect file type
+my $line=<$fh1>;
+if ($line =~ /^>/){
+  $fasta_input=1;
+} elsif ($line =~ /^@/){
+  $fastq_input=1;
+} else {
+  die "Unknown file format for $ARGV[0]";
+}
+close($fh1);
+#we assume that both files are fastq or both files are fasta
+if ($ftype =~ /gzip/) {
+  open $fh1, "-|", "gunzip", "-c", $ARGV[0]
+    or die "$PROG: can't open gunzip pipe with $ARGV[0]: $!\n";
+} elsif ($ftype =~ /bzip2/) {
+  open $fh1, "-|", "bunzip2", "-c", $ARGV[0]
+    or die "$PROG: can't open bunzip2 pipe with $ARGV[0]: $!\n";
+} else {
+  open $fh1, "<", $ARGV[0]
+    or die "$PROG: can't open $ARGV[0]: $!\n";
+}
+# auto-detect compression and open file 2
+open($fh2,"file $ARGV[1] |");
+my ($fname,$ftype)=split(/\s+/,<$fh2>);
+close($fh2);
+if ($ftype =~ /gzip/) {
+  open $fh2, "-|", "gunzip", "-c", $ARGV[1]
+    or die "$PROG: can't open gunzip pipe with $ARGV[1]: $!\n";
+} elsif ($ftype =~ /bzip2/) {
+  open $fh2, "-|", "bunzip2", "-c", $ARGV[1]
+    or die "$PROG: can't open bunzip2 pipe with $ARGV[1]: $!\n";
+} else {
   open $fh2, "<", $ARGV[1]
     or die "$PROG: can't open $ARGV[1]: $!\n";
 }
