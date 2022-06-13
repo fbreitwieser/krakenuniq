@@ -219,8 +219,14 @@ if ($paired) {
       die "Cannot fork: $!";
   }
   elsif ($pid == 0) {
-    open STDOUT, ">", 'merged.fa' or die $!;
-    open STDERR, ">", 'merged.err' or die $!;
+    my $DIR="./";
+    if(defined($outfile)){
+      $DIR=dirname($outfile);
+    } elsif (defined($report_file)){
+      $DIR=dirname($report_file);
+    }
+    open STDOUT, ">", '$DIR/merged.fa' or die $!;
+    open STDERR, ">", '$DIR/merged.err' or die $!;
     exec $READ_MERGER, @merge_flags, @ARGV;
  }
   @ARGV=();
