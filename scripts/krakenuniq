@@ -228,15 +228,15 @@ if ($paired) {
 }
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
-print STDERR "$cmd @flags @ARGV\n";
+print STDERR "$cmd @flags\n";
 if (defined $report_file) {
     my $mycmd = qx/ps -o args= $$/;
     open(my $RF, ">", $report_file) or die "Could not open report file for writing";
     print $RF "# KrakenUniq v#####=VERSION=##### DATE:$date DB:@db_prefix DB_SIZE:$db_size WD:$wd\n# CL:$mycmd\n";
     close($RF)
 }
-exec $cmd, @flags, @ARGV;
-die "$PROG: exec error: $!\n";
+system("$cmd @flags @ARGV");
+#die "$PROG: exec error: $!\n";
 if ($paired) {
   unlink("$DIR/merged.fa");
   unlink("$DIR/merged.err");
