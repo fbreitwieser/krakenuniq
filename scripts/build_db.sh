@@ -132,17 +132,17 @@ else
     -o database <( cat_library )
 
   # Merge only if necessary
-  if [ -e "database_1" ]
+  if [ -s "database_1" ]
   then
     $JELLYFISH_BIN merge -o database.jdb.tmp database_* && mv database.jdb.tmp database.jdb && rm -f database_*
-  elif [ -e "database" ]
+  elif [ -s "database_0" ]
   then
+    mv database_0 database.jdb
+  else
     echo "You are likely using Jellyfish version 2 in $JELLYFISH_BIN"
     $JELLYFISH_BIN --version
     echo "KrakenUniq requires Jellyfish version 1 for building the database, please install KrakenUniq version 0.7.3 or higher to install the proper version of Jellyfish automatically or use option --jellyfish-bin </path_to/jellyfish> where jellyfish is jellyfish is version 1 binary"
     exit 1
-  else
-    mv database_0 database.jdb
   fi
   echo "K-mer set created. [$(report_time_elapsed $start_time1)]"
 fi
