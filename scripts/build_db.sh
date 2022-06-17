@@ -134,14 +134,13 @@ else
   # Merge only if necessary
   if [ -e "database_1" ]
   then
-    $JELLYFISH_BIN merge -o database.jdb.tmp database_*
+    $JELLYFISH_BIN merge -o database.jdb.tmp database_* && mv database.jdb.tmp database.jdb && rm -f database_*
+  else if [ -e "database" ]
+  then
+    mv database database.jdb
   else
-    mv database_0 database.jdb.tmp
+    mv database_0 database.jdb
   fi
-
-  # Once here, DB is finalized, can put file in place.
-  mv database.jdb.tmp database.jdb
-
   echo "K-mer set created. [$(report_time_elapsed $start_time1)]"
 fi
 
