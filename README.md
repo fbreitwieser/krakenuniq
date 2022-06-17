@@ -6,6 +6,9 @@ False-positive identifications are a significant problem in metagenomics classif
 **If you use KrakenUniq in your research, please cite our publication:** [KrakenUniq: confident and fast metagenomics classification using unique k-mer counts. Breitwieser FP, Baker DN, Salzberg SL. Genome Biology, Dec 2018. https://doi.org/10.1186/s13059-018-1568-0](https://doi.org/10.1186/s13059-018-1568-0)
 
 # Announcements
+## New release v0.7.3
+This maintenance release fixes issues with building large databases.  This release also installs Jellyfish version 1 by default under KRAKENUNIQ_INSTALL_DIR/jellyfish-install/bin/, unless -s switch is used.  KrakenUniq requires Jellyfish version 1 to build databases.
+
 ## New release v0.7.2
 This maintenance release fixes the --paired option in krakenuniq and the minor problem at the last stage of building a new database (report).
 
