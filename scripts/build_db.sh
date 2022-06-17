@@ -61,7 +61,7 @@ script_dir=`dirname $0`
 
 DATABASE_DIR="$KRAKEN_DB_NAME"
 FIND_OPTS=-L
-[[ "$JELLYFISH_BIN" == "" ]] && JELLYFISH_BIN=`$script_dir/check_for_jellyfish.sh`
+[[ "$JELLYFISH_BIN" == "" ]] && JELLYFISH_BIN="$script_dir/jellyfish-install/bin/jellyfish"
 NCBI_SERVER="ftp.ncbi.nih.gov"
 FTP_SERVER="ftp://$NCBI_SERVER"
 
@@ -137,7 +137,10 @@ else
     $JELLYFISH_BIN merge -o database.jdb.tmp database_* && mv database.jdb.tmp database.jdb && rm -f database_*
   elif [ -e "database" ]
   then
-    mv database database.jdb
+    echo "You are likely using Jellyfish version 2 in $JELLYFISH_BIN"
+    $JELLYFISH_BIN --version
+    echo "KrakenUniq requires Jellyfish version 1 for building the database, please install KrakenUniq version 0.7.3 or higher to install the proper version of Jellyfish automatically or use option --jellyfish-bin </path_to/jellyfish> where jellyfish is jellyfish is version 1 binary"
+    exit 1
   else
     mv database_0 database.jdb
   fi
@@ -303,7 +306,9 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   REPNAME=database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT $(cat library-files.txt | tr '\n' ' ') > $REPNAME.kraken.tsv
+    cat library-files.txt | tr '\n' '\0' | xargs -0 cat > library-files.fa.tmp && mv library-files.fa.tmp library-files.fa && \
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT library-files.fa > $REPNAME.kraken.tsv && \
+    rm -f library-files.fa
   fi
 fi
 
@@ -336,7 +341,9 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   REPNAME=uid_database
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping $(cat library-files.txt | tr '\n' ' ') > $REPNAME.kraken.tsv
+    cat library-files.txt | tr '\n' '\0' | xargs -0 cat > library-files.fa.tmp && mv library-files.fa.tmp library-files.fa && \
+    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping library-files.fa > $REPNAME.kraken.tsv && \
+    rm -f library-files.fa
   fi
 fi
 

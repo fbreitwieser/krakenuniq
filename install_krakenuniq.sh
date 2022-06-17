@@ -20,7 +20,7 @@ set -e
 
 DIR=$(dirname $0)
 VERSION=`cat $(dirname $0)/VERSION`
-INSTALL_JELLYFISH=0
+INSTALL_JELLYFISH=1
 MAKE_ARGS=
 MAKE_CLEAN="clean"
 ADD_DEBUG_INFO=0
@@ -29,8 +29,8 @@ LINK_DIR=
 USAGE="Usage: $(basename $0) [OPTIONS] INSTALL_DIR
 
 OPTIONS:
-    -j          Install jellyfish v1.1 in INSTALL_DIR, too.
     -l BIN_DIR  Link KrakenUniq executables to BIN_DIR, e.g /usr/local/bin or ~/bin.
+    -s          Skip installing jellyfish v1.1 in INSTALL_DIR.
     -c BIN      Use compiler BIN instead of g++.
     -g          Add debug info
     -h          This help message
@@ -43,8 +43,8 @@ while getopts "Chjc:gl:" OPTION; do
     case $OPTION in
     c) MAKE_ARGS="CXX=\"$OPTARG\"" ;;
     C) MAKE_CLEAN="" ;;
-    j) INSTALL_JELLYFISH=1 ;;
     g) ADD_DEBUG_INFO=1 ;;
+    s) INSTALL_JELLYFISH=0 ;;
     l) LINK_DIR="$OPTARG" ;;
     h) echo "$USAGE"; exit 0 ;;
     *) echo "Incorrect options provided. $USAGE"
@@ -72,22 +72,13 @@ fi
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
 mkdir -p "$KRAKEN_DIR"
-if [ "$INSTALL_JELLYFISH" == "1" ]; then
-  WD=`pwd`
-  cd $KRAKEN_DIR
-  if [[ ! -d jellyfish ]]; then
-    wget http://www.cbcb.umd.edu/software/jellyfish/jellyfish-1.1.11.tar.gz
-    tar xf jellyfish-1.1.11.tar.gz
-    mv jellyfish-1.1.11 jellyfish-install
-  fi
-  cd jellyfish-install
-  [[ -f Makefile ]] || ./configure
-  make
-  #make install ## doest not work for me on OSX
-  cp $KRAKEN_DIR/jellyfish-install/bin/jellyfish $KRAKEN_DIR
-  #rm -r jellyfish-1.1.11.tar.gz jellyfish-1.1.11
-  cd $WD
-fi
+(cd $KRAKEN_DIR
+if [[ ! -s jellyfish-install/bin/jellyfish ]]; then
+  wget https://github.com/gmarcais/Jellyfish/releases/download/v1.1.12/jellyfish-1.1.12.tar.gz 
+  tar xzf jellyfish-1.1.12.tar.gz && rm -rf jellyfish-1.1.12.tar.gz
+  mv jellyfish-1.1.12 jellyfish-install
+  cd jellyfish-install && ./configure --prefix=$PWD && make -j install || echo "Jellyfish 1 installation failed"
+fi)
 
 [[ "$ADD_DEBUG_INFO" == 1 ]] && MAKE_ARGS="$MAKE_ARGS NDEBUG=-g"
 echo make -C $DIR/src $MAKE_CLEAN install $MAKE_ARGS
@@ -114,6 +105,7 @@ if [[ "$LINK_DIR" != "" ]]; then
     for file in $KRAKEN_DIR/krakenuniq*; do
         [ -x "$file" ] && ln -sf $file $LINK_DIR/`basename $file`
     done
+    ln -sf $KRAKEN_DIR/jellyfish-install $LINK_DIR/jellyfish-install
     echo "Linked KrakenUniq files to $LINK_DIR."
 else
     echo "You may want to link KrakenUniq scripts to /usr/bin or another directory for executables, or add the install directory to the PATH environment variable. Main executables: "
