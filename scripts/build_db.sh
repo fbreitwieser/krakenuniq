@@ -135,7 +135,7 @@ else
   if [ -e "database_1" ]
   then
     $JELLYFISH_BIN merge -o database.jdb.tmp database_* && mv database.jdb.tmp database.jdb && rm -f database_*
-  else if [ -e "database" ]
+  elif [ -e "database" ]
   then
     mv database database.jdb
   else
