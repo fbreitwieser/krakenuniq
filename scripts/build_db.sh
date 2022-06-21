@@ -235,7 +235,7 @@ else
     exe eval tar zxf taxdump.tar.gz
     cd ..
   fi
-  build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
+  build_taxdb $TAXONOMY_DIR/names.dmp $TAXONOMY_DIR/nodes.dmp | sort -S 20% -t$'\t' -rnk6,6 -rnk5,5 > taxDB.tmp
   mv taxDB.tmp taxDB
   echo "taxDB construction finished. [$(report_time_elapsed $start_time1)]"
 fi

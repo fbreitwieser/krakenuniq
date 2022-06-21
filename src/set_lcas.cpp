@@ -113,10 +113,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (!Operate_in_RAM && Output_DB_filename.size() > 0) {
-      cerr << "You need to operate in RAM (flag -M) to use output to a different file (flag -o)" << endl;
-      return 1;
-  }
+  //if (!Operate_in_RAM && Output_DB_filename.size() > 0) {
+  //    cerr << "You need to operate in RAM (flag -M) to use output to a different file (flag -o)" << endl;
+  //    return 1;
+  //}
 
   QuickFile db_file(DB_filename, "rw");
   size_t db_file_size = db_file.size();
@@ -126,9 +126,6 @@ int main(int argc, char **argv) {
     dat = slurp_file(DB_filename, db_file_size);
     Database = KrakenDB(dat.data());
   } else {
-    if (Output_DB_filename.size() > 0) {
-      //system("cp " + DB_filename + " " + Output_DB_filename);
-    }
     Database = KrakenDB(db_file.ptr());
   }
 
@@ -162,6 +159,11 @@ int main(int argc, char **argv) {
     ofs.write(dat.data(), db_file_size);
     ofs.close();
     dat.clear();
+  } else if (!Pretend) {
+    if (Output_DB_filename.size() > 0) {
+      string cmd="cp " + DB_filename + " " + Output_DB_filename;
+      system(cmd.c_str());
+    }
   }
 
   UID_map_file.close();
