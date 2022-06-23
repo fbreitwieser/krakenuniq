@@ -39,7 +39,7 @@ On MacOS, if you experience the error \"clang: fatal error: unsupported option '
 "
 
 
-while getopts "Chjc:gl:" OPTION; do
+while getopts "Cshc:gl:" OPTION; do
     case $OPTION in
     c) MAKE_ARGS="CXX=\"$OPTARG\"" ;;
     C) MAKE_CLEAN="" ;;
