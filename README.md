@@ -9,7 +9,7 @@ False-positive identifications are a significant problem in metagenomics classif
 ## New release v0.7.3
 This maintenance release provides the following updates: 
 (1) fixes issues with building large databases
-(2) installs Jellyfish version 1 by default under KRAKENUNIQ_INSTALL_DIR/jellyfish-install/bin/, unless -s switch is used (KrakenUniq requires Jellyfish version 1 to build databases), to avoid failure in building the database when wrong version of Jellyfish is used (fixes #100)
+(2) installs Jellyfish version 1 under KRAKENUNIQ_INSTALL_DIR/jellyfish-install/bin/, if -j switch is used (KrakenUniq requires Jellyfish version 1 to build databases)
 (3) fixes --work-on-disk option (#97)
 
 ## New release v0.7.2
