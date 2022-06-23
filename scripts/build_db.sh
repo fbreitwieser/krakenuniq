@@ -83,7 +83,7 @@ fi
 
 if [ "$KRAKEN_REBUILD_DATABASE" == "1" ]
 then
-  rm -f database.* *.map lca.complete library-files.txt uid_database.* taxDB
+  rm -f database0.* database.* *.map lca.complete library-files.txt uid_database.* taxDB
 fi
 
 LIBRARY_DIR="library/"
