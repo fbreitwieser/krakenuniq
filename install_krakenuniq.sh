@@ -72,13 +72,16 @@ fi
 export KRAKEN_DIR=$(perl -MCwd=abs_path -le 'print abs_path(shift)' "$1")
 
 mkdir -p "$KRAKEN_DIR"
+if [ "$INSTALL_JELLYFISH" == "1" ]; then
+echo "Installing jellyfish"
 (cd $KRAKEN_DIR
-if [[ ! -s jellyfish-install/bin/jellyfish ]]; then
+if [ ! -e jellyfish-install/bin/jellyfish ]; then
   wget https://github.com/gmarcais/Jellyfish/releases/download/v1.1.12/jellyfish-1.1.12.tar.gz 
   tar xzf jellyfish-1.1.12.tar.gz && rm -rf jellyfish-1.1.12.tar.gz
   mv jellyfish-1.1.12 jellyfish-install
   cd jellyfish-install && ./configure --prefix=$PWD && make -j install || echo "Jellyfish 1 installation failed"
 fi)
+fi
 
 [[ "$ADD_DEBUG_INFO" == 1 ]] && MAKE_ARGS="$MAKE_ARGS NDEBUG=-g"
 echo make -C $DIR/src $MAKE_CLEAN install $MAKE_ARGS
