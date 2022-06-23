@@ -123,7 +123,7 @@ krakenuniq --db DBDIR --threads 10 --report-file REPORTFILE.tsv > READCLASSIFICA
 
 ### Memory requirements
 
-KrakenUniq requires a lot of RAM - ideally 128GB - 512GB. For more memory efficient classification consider using [centrifuge](https://github.com/infphilo/centrifuge).
+Stating with version 0.7.1, KrakenUniq can efficiently classify reads with databases exceeding the avalilable RAM using --preload-size switch.  10-16Gb of RAM is enough to classify with ~400Gb database in a reasonable amount of time.
 
 ### KrakenUniq vs Kraken vs Kraken 2
 
