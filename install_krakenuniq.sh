@@ -20,7 +20,7 @@ set -e
 
 DIR=$(dirname $0)
 VERSION=`cat $(dirname $0)/VERSION`
-INSTALL_JELLYFISH=1
+INSTALL_JELLYFISH=0
 MAKE_ARGS=
 MAKE_CLEAN="clean"
 ADD_DEBUG_INFO=0
@@ -30,7 +30,7 @@ USAGE="Usage: $(basename $0) [OPTIONS] INSTALL_DIR
 
 OPTIONS:
     -l BIN_DIR  Link KrakenUniq executables to BIN_DIR, e.g /usr/local/bin or ~/bin.
-    -s          Skip installing jellyfish v1.1 in INSTALL_DIR.
+    -j          Install jellyfish v1.1 in INSTALL_DIR.
     -c BIN      Use compiler BIN instead of g++.
     -g          Add debug info
     -h          This help message
@@ -44,7 +44,7 @@ while getopts "Cshc:gl:" OPTION; do
     c) MAKE_ARGS="CXX=\"$OPTARG\"" ;;
     C) MAKE_CLEAN="" ;;
     g) ADD_DEBUG_INFO=1 ;;
-    s) INSTALL_JELLYFISH=0 ;;
+    j) INSTALL_JELLYFISH=1 ;;
     l) LINK_DIR="$OPTARG" ;;
     h) echo "$USAGE"; exit 0 ;;
     *) echo "Incorrect options provided. $USAGE"
