@@ -59,7 +59,7 @@ cd krakenuniq
 ./install_krakenuniq /PATH/TO/INSTALL_DIR
 ```
 
-Note that KrakenUniq requires Jellyfish v1 to be installed for the database building step (`krakenuniq-build`). To install Jellyfish alongside KrakenUniq, use the `-j` flag for the `install_krakenhll.sh` script. Alternatively, you can specify the Jellyfish path to `krakenuniq-build` with `krakenuniq-build --jellyfish-bin /usr/bin/jellyfish1`.
+KrakenUniq requires Jellyfish version 1.x.x to be installed for the database building step (`krakenuniq-build`). Starting with v0.7.3, krakenuniq will download and install jellyfish v1.1.12 automatically by default. To skip installing Jellyfish use the `-s` flag for the `install_krakenuniq.sh` script. Alternatively, you can specify the Jellyfish path to `krakenuniq-build` with `krakenuniq-build --jellyfish-bin /usr/bin/jellyfish1`.
 
 OSX by default links `g++` to `clang` without OpenMP support. When using clang, you may get the error `clang: fatal error: unsupported option '-fopenmp'`. To fix this, install `g++` with HomeBrew and use the `-c` option of `krakenuniq_install.sh` to specify the HomeBrew version of `g++`, which is accessible with `g++-8`: 
 ``` 
