@@ -44,7 +44,15 @@ conda install krakenuniq
 ```
 This is the bioconda link for KrakenUniq:  https://anaconda.org/bioconda/krakenuniq
 
-Installation from source from GitHub:
+Installation from a release -- recommended.  Check https://github.com/fbreitwieser/krakenuniq/releases for the latest version.  Then run the following commands (<VERSION> is the version, e.g. 0.7.3):
+```
+wget https://github.com/fbreitwieser/krakenuniq/archive/refs/tags/v<VERSION>.tar.gz
+tar xzf v<VERSION>.tar.gz
+cd krakenuniq-<VERSION>
+./install_krakenuniq /PATH/TO/INSTALL_DIR
+```
+
+Installation from source from GitHub (the latest -- may not be stable):
 ```
 git clone https://github.com/fbreitwieser/krakenuniq
 cd krakenuniq
