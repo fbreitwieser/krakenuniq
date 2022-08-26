@@ -37,7 +37,7 @@ sub download_ncbi_search(@);
 sub download_ncbi_acs(@);
 sub get_sorted_maps(@);
 
-my $FTP="ftp://ftp.ncbi.nih.gov";
+my $FTP="https://ftp.ncbi.nih.gov";
 my @ALL_GENOMES=qw/bacteria viral archaea fungi protozoa invertebrate plant vertebrate_mammalian vertebrate_other/;
 my %valid_domains = map { $_ => 1 } @ALL_GENOMES;
 my @ALL_DATABASES=qw/refseq genbank taxonomy contaminants/;
@@ -569,19 +569,28 @@ sub download_ncbi_search(@) {
   my $esearch_file = "$nbr_dir/esearch_res.json";
   download($complete_url, $esearch_file);
 
-  my $n_res=`grep -m1 '"count":' $esearch_file | sed -e 's/.*: "//' -e 's/",.*//'`;
+  print "$esearch_file";
+
+  #my $n_res=`grep -m1 '"count":' $esearch_file | sed -e 's/.*: "//' -e 's/",.*//'`;
+  my $n_res=`grep -Po '"count":"[0-9]+' $esearch_file | head -1 | grep -o '[[:digit:]]*'`; # Modified
   chomp $n_res;
   print STDERR "Downloading $n_res sequences into $nbr_dir.\n";
   return if (!defined $n_res || $n_res eq 0);
 
   # Step 2: Download FASTAs (or other formats), 10k at a time
-  my $querykey = `grep "querykey" $esearch_file`;
-  $querykey =~ /"querykey": "(.*)"/;
-  $querykey = $1;
 
-  my $webenv = `grep "webenv" $esearch_file`;
-  $webenv =~ /"webenv": "(.*)"/;
-  $webenv = $1;
+  # my $querykey = `grep "querykey" $esearch_file`;
+  # $querykey =~ /"querykey": "(.*)"/;
+  # $querykey = $1;
+
+  my $querykey=`grep -Po '"querykey":"[[:digit:]]*"' $esearch_file | grep -o "[[:digit:]]*"`;
+  chomp $querykey;
+
+  # my $webenv = `grep "webenv" $esearch_file`;
+  # $webenv =~ /"webenv": "(.*)"/;
+  # $webenv = $1;
+  my $webenv =`grep -Po '(?<=webenv":")(.*)(?=","idlist)' $esearch_file`;
+  chomp $webenv;
 
   my $url_params="query_key=$querykey&webenv=$webenv";
   die "Error getting sequences with URL $complete_url . Check $esearch_file." if (!defined $url_params || $url_params eq "");
@@ -589,6 +598,7 @@ sub download_ncbi_search(@) {
   my $retstart = 0;
   my $retmax = 10000;
   my @all_fas = ();
+
   while ($retstart < $n_res) {
 
     my $curr_retmax = min($n_res, $retstart+$retmax);
@@ -645,9 +655,12 @@ sub download_ncbi_search(@) {
       unlink($part_file);
       close($FA_HANDLE) if $fa_handle_open;
     }
-    $retstart += $curr_retmax;
+    $retstart += $retmax;
+
+
     print STDERR " done \n";
     wait_children();
+
   
   }
   foreach (@sorted_map_file_handles) {
@@ -683,7 +696,7 @@ sub download_maps(@) {
   my ($dir, @maps_def) = @_;
   my @files;
   foreach (@maps_def) {
-    my $url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
+    my $url = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/$_.accession2taxid.gz";
     download($url, "$dir/$_.accession2taxid.gz", { verbose => 1 });
     push @files, "$dir/$_.accession2taxid.gz";
   }
@@ -875,7 +888,7 @@ sub create_map_file_ac(@) {
 
 sub download_nt(@) {
   my ($BASE_DIR, $TAX_DIR, $LIB_DIR) = @_;
-	my $nt_loc = "ftp://ftp.ncbi.nih.gov/blast/db/FASTA/nt.gz";
+	my $nt_loc = "https://ftp.ncbi.nih.gov/blast/db/FASTA/nt.gz";
   download($nt_loc, "$BASE_DIR/nt.fna.gz", { gunzip => 1, verbose => 1, 'dont-unlink-gz-file' => 1 } );
   my $nt_file = "$BASE_DIR/nt.fna";
   my @tax_maps = download_maps($TAX_DIR, "nucl_gb", "nucl_wgs");
@@ -1069,8 +1082,8 @@ sub download_contaminats(@) {
   make_path $CONTAMINANT_DIR;
 
   # download UniVec and EmVec database
-  download("ftp://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec","$CONTAMINANT_DIR/UniVec.fna");
-  download("ftp://ftp.ebi.ac.uk/pub/databases/emvec/emvec.dat.gz","$CONTAMINANT_DIR/emvec.dat.gz", { gunzip => 1 });
+  download("https://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec","$CONTAMINANT_DIR/UniVec.fna");
+  download("https://ftp.ebi.ac.uk/pub/databases/emvec/emvec.dat.gz","$CONTAMINANT_DIR/emvec.dat.gz", { gunzip => 1 });
 
   open(my $E1, "<", "$CONTAMINANT_DIR/emvec.dat");
   open(my $E2, ">", "$CONTAMINANT_DIR/EmVec.fna");
@@ -1111,6 +1124,7 @@ sub download_taxonomy(@) {
   -d $dir || make_path $dir;
 
   if (!-s "$dir/taxdump.tar.gz") {
+    print "Download taxdump.tar.gz";
     download("$FTP/pub/taxonomy/taxdump.tar.gz", "$dir/taxdump.tar.gz", { verbose => 1});
     system_l("Storing taxonomy timestamp", "date > $dir/timestamp");
   }
@@ -1147,7 +1161,7 @@ sub download_domain(@) {
   my $ass_file = "$domain_dir/assembly_summary.txt";
   my $ass_file_filtered = "$domain_dir/assembly_summary_filtered.txt";
   my $n_genomes = 0;
-  download("ftp://ftp.ncbi.nlm.nih.gov/genomes/$DATABASE/$domain/assembly_summary.txt", $ass_file) or die "Could not download assembly summary file!";
+  download("https://ftp.ncbi.nlm.nih.gov/genomes/$DATABASE/$domain/assembly_summary.txt", $ass_file) or die "Could not download assembly summary file!";
 
   my $is_viral_refseq =1 if $domain eq "viral" && $DATABASE eq "refseq";
 
