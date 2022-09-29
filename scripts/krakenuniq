@@ -230,7 +230,7 @@ if ($paired) {
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
 print STDERR "$cmd @flags\n";
 if (defined $report_file) {
-    my $mycmd = qx/ps -o args= $$/;
+    my $mycmd = 'krakenuniq ' . join(' ', @ARGS);
     open(my $RF, ">", $report_file) or die "Could not open report file for writing";
     print $RF "# KrakenUniq v#####=VERSION=##### DATE:$date DB:@db_prefix DB_SIZE:$db_size WD:$wd\n# CL:$mycmd\n";
     close($RF)
