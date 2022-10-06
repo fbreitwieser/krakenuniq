@@ -46,8 +46,7 @@ laptop, while providing the same very high classification accuracy as the previo
 
 The GenBank genome repository currently contains over 400,000 prokaryotic genomes and over
 20,000 eukaryotes, including thousands of microbial eukaryotes such as fungi and protists. To take
-advantage of this ever-growing variety of microbial sequences, metagenomic sequence analysis meth-
-ods must create customized databases that capture all of this sequence diversity. Tools such as
+advantage of this ever-growing variety of microbial sequences, metagenomic sequence analysis methods must create customized databases that capture all of this sequence diversity. Tools such as
 Kraken [@wood2014kraken] and KrakenUniq [@breitwieser2018krakenuniq] classify DNA or RNA sequencing reads against a pre-built
 database of genomes using an exact *k-mer* matching strategy that is not only highly accurate but that,
 because it avoids the step of sequence alignment, makes both systems extremely fast.
