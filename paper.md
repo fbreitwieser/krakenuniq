@@ -15,7 +15,7 @@
 
 Kraken and KrakenUniq are widely-used tools for classifying metagenomics sequences. A key
 requirement for these systems is a database containing all *k-mers* from all genomes that the
-users want to be able to detect, where k = 31 by default. This database can be very large,
+users want to be able to detect, where *k* = 31 by default. This database can be very large,
 easily exceeding 100 gigabytes (GB) and sometimes 400 GB. Previously, Kraken and KrakenUniq
 required loading the entire database into main memory (RAM), and if RAM was insufficient, they
 used memory mapping, which significantly increased the running time for large datasets. We have
@@ -84,6 +84,8 @@ of KrakenUniq in its other modes. Users can employ this feature by using `--prel
 the amount of available main memory that they want to use for loading chunks of the database, e.g.,
 `--preload-size 8G` or `--preload-size 500M`.
 
+<div align="center">
+  
 | Mode | Running time |
 | :---- | ----------: |
 | default (memory mapping) | 48 hours |
@@ -92,7 +94,9 @@ the amount of available main memory that they want to use for loading chunks of 
 | `--preload-size 16G` |32 min|
 | `--preload-size 32G` |25 min|
 | `--preload-size 64G` |19 min|
-
+  
+</div>
+  
 Table 1: Running times for classifying 9.4 million reads (from a human eye metagenome, SRR12486990)
 with 8 threads using KrakenUniq in different modes. The database size was 392 GB, and it consisted
 of all complete bacterial, archeal, and viral genomes in RefSeq from 2020, 46 selected eukaryotic
