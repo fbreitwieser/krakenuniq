@@ -48,7 +48,7 @@ The GenBank genome repository currently contains over 400,000 prokaryotic genome
 20,000 eukaryotes, including thousands of microbial eukaryotes such as fungi and protists. To take
 advantage of this ever-growing variety of microbial sequences, metagenomic sequence analysis meth-
 ods must create customized databases that capture all of this sequence diversity. Tools such as
-Kraken [wood2014kraken:2014] and KrakenUniq [breitwieser2018krakenuniq:2018] classify DNA or RNA sequencing reads against a pre-built
+Kraken [@wood2014kraken] and KrakenUniq [@breitwieser2018krakenuniq] classify DNA or RNA sequencing reads against a pre-built
 database of genomes using an exact *k-mer* matching strategy that is not only highly accurate but that,
 because it avoids the step of sequence alignment, makes both systems extremely fast.
 
@@ -61,16 +61,16 @@ common ancestor of those genomes. This strategy means that only a single ID is a
 
 However, with the number of genomes available today, a standard Kraken database will contain
 billions of *k-mers*, and even with careful compression this data structure can grow very large. A key
-requirement for the speed of the Kraken algorithm (which is 900 times faster than MegaBlast [wood2014kraken:2014])
+requirement for the speed of the Kraken algorithm (which is 900 times faster than MegaBlast [@wood2014kraken])
 is the loading of the entire database into main memory. For the large databases and read datasets that
 are commonly used in metagenomics experiments today, this requires dedicated machines with large
 amounts of RAM (e.g., exceeding 100 GB or even 400 GB), without which classification becomes slow
-and impractical. The newer Kraken2 system [wood2019improved:2019] achieves a significantly lower memory footprint
+and impractical. The newer Kraken2 system [@wood2019improved] achieves a significantly lower memory footprint
 by using probabilistic data structures to reduce the database size, at the cost of slightly lower accuracy
 than KrakenUniq. This reduction in accuracy includes a very small but non-zero false positive rate
 (i.e., where the system incorrectly reports that a *k-mer* is present in a particular genome), which is
 problematic for certain applications that require very high precision. In particular, when metagenomic
-sequencing is used for the diagnosis of infections in a clinical setting [salzberg-pardo2016:2016], the pathogen of interest
+sequencing is used for the diagnosis of infections in a clinical setting [@salzberg-pardo2016], the pathogen of interest
 might be detected from just a handful of reads. In that scenario, even a few false positives can be
 confusing, and KrakenUniq is the preferred method rather than Kraken2.
 
@@ -118,7 +118,7 @@ the amount of available main memory that they want to use for loading chunks of 
 Table 1: Running times for classifying 9.4 million reads (from a human eye metagenome, SRR12486990)
 with 8 threads using KrakenUniq in different modes. The database size was 392 GB, and it consisted
 of all complete bacterial, archeal, and viral genomes in RefSeq from 2020, 46 selected eukaryotic
-human pathogens [lu2018removing:2018]), as well the human genome and a collection of common vector sequences. In
+human pathogens [@lu2018removing]), as well the human genome and a collection of common vector sequences. In
 the database chunking experiments (using `–preload-size`) KrakenUniq loaded the database into main
 memory in 49, 25, 13 and 7 chunks (respectively).
 
