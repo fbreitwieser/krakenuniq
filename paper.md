@@ -1,17 +1,31 @@
-# <p align="center">Metagenomic classification with KrakenUniq on low-memory computers</p>
-
-### <p align="center">Christopher Pockrandt<sup>1,2,\*</sup>, Aleksey V. Zimin<sup>1,2</sup>, and Steven L. Salzberg<sup>1,2,3,4,\*</sup></p>
-<p align="center">
-<ol>
-<li> Center for Computational Biology, Johns Hopkins University, Baltimore, MD 21211, USA
-<li> Department of Biomedical Engineering, Johns Hopkins University, Baltimore, MD 21211, USA
-<li> Department of Computer Science, Johns Hopkins University, Baltimore, MD 21218, USA
-<li> Department of Biostatistics, Johns Hopkins University, Baltimore, MD 21205, USA
-</ol>
+---
+title: 'Metagenomic classification with KrakenUniq on low-memory computers'
+tags:
+  - metagenomics
+  - classification
+  - species
+authors:
+  - name: Christopher Pockrand
+    affiliation: "1, 2"
+  - name: Aleksey V. Zimin
+    affiliation: "1, 2"
+  - name: Steven L. Salzberg
+    affiliation: "1, 2, 3, 4"
+affiliations:
+  - name: Center for Computational Biology, Johns Hopkins University, Baltimore, MD 21211, USA
+    index: 1
+  - name: Department of Biomedical Engineering, Johns Hopkins University, Baltimore, MD 21211, USA
+    index: 2
+  - name: Department of Computer Science, Johns Hopkins University, Baltimore, MD 21218, USA
+    index: 3
+  - name: Department of Biostatistics, Johns Hopkins University, Baltimore, MD 21205, USA
+    index: 4
+date: 6 October 2022
+bibliography: paper.bib
 *Corresponding authors: pockrandt@jhu.edu, salzberg@jhu.edu
-</p>
+---
 
-### <p align="center">Abstract</p>
+# Summary
 
 Kraken and KrakenUniq are widely-used tools for classifying metagenomics sequences. A key
 requirement for these systems is a database containing all *k-mers* from all genomes that the
@@ -24,7 +38,7 @@ chunks, with only a modest increase in running time. This enhancement now makes 
 to run KrakenUniq on very large datasets and huge databases on virtually any computer, even a
 laptop, while providing the same very high classification accuracy as the previous system.
 
-### Introduction
+# Introduction
 
 The GenBank genome repository currently contains over 400,000 prokaryotic genomes and over
 20,000 eukaryotes, including thousands of microbial eukaryotes such as fungi and protists. To take
@@ -69,7 +83,7 @@ chunking. This new feature is released in KrakenUniq v0.7 and subsequent release
 https://github.com/fbreitwieser/krakenuniq (Github)<br>
 https://anaconda.org/bioconda/krakenuniq (Conda)<br>
 
-### Database chunking
+# Database chunking
 
 Under this new algorithm, KrakenUniq only loads a chunk of the database into memory at a time,
 based on the amount of available memory. It then iterates over all of the reads provided as input and
@@ -120,4 +134,8 @@ This feature has only been added to KrakenUniq, and not to Kraken, which is no l
 maintained. Because KrakenUniq offers more features, shares the same implementation with Kraken
 and produces the same output, we highly recommend that users upgrade from Kraken to KrakenUniq.
 
-**Acknowledgements.** This work was supported in part by NIH grants R35-GM130151 and R01-HG006677.
+# Acknowledgements
+
+This work was supported in part by NIH grants R35-GM130151 and R01-HG006677.
+
+# Citations
