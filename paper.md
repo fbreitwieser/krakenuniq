@@ -142,4 +142,4 @@ and produces the same output, we highly recommend that users upgrade from Kraken
 
 This work was supported in part by NIH grants R35-GM130151 and R01-HG006677.
 
-# Citations
+# References
