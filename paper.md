@@ -5,7 +5,7 @@ tags:
   - classification
   - species
 authors:
-  - name: Christopher Pockrand
+  - name: Christopher Pockrandt
     affiliation: "1, 2"
     corresponding: true
     email: pockrandt@jhu.edu
@@ -16,7 +16,7 @@ authors:
     corresponding: true
     email: salzberg@jhu.edu
 affiliations:
-  - name: Center for Computational Biology, Johns Hopkins University, Baltimore, MD 21211, USA
+  - name: Center for Computational Biology, Johns Hopkins University, Baltimore, MD 21211, USA   
     index: 1
   - name: Department of Biomedical Engineering, Johns Hopkins University, Baltimore, MD 21211, USA
     index: 2
