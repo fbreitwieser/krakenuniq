@@ -7,10 +7,14 @@ tags:
 authors:
   - name: Christopher Pockrand
     affiliation: "1, 2"
+    corresponding: true
+    email: pockrandt@jhu.edu
   - name: Aleksey V. Zimin
     affiliation: "1, 2"
   - name: Steven L. Salzberg
     affiliation: "1, 2, 3, 4"
+    corresponding: true
+    email: salzberg@jhu.edu
 affiliations:
   - name: Center for Computational Biology, Johns Hopkins University, Baltimore, MD 21211, USA
     index: 1
@@ -22,7 +26,7 @@ affiliations:
     index: 4
 date: 6 October 2022
 bibliography: paper.bib
-*Corresponding authors: pockrandt@jhu.edu, salzberg@jhu.edu
+
 ---
 
 # Summary
