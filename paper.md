@@ -16,13 +16,13 @@ authors:
     corresponding: true
     email: salzberg@jhu.edu
 affiliations:
-  - name: Center for Computational Biology,  Johns Hopkins University,  Baltimore,  MD 21211,  USA
+  - name: Center for Computational Biology, Johns Hopkins University, Baltimore, MD 21218-2683, USA
     index: 1
-  - name: Department of Biomedical Engineering, Johns Hopkins University, Baltimore, MD 21211, USA
+  - name: Department of Biomedical Engineering, Johns Hopkins University, Baltimore, MD 21218-2683, USA
     index: 2
-  - name: Department of Computer Science, Johns Hopkins University, Baltimore, MD 21218, USA
+  - name: Department of Computer Science, Johns Hopkins University, Baltimore, MD 21218-2683, USA
     index: 3
-  - name: Department of Biostatistics, Johns Hopkins University, Baltimore, MD 21205, USA
+  - name: Department of Biostatistics, Johns Hopkins University, Baltimore, MD 21218-2683, USA
     index: 4
 date: 6 October 2022
 bibliography: paper.bib
