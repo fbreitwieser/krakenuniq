@@ -9,7 +9,7 @@ We now have two standard Kraken1/KrakenUniq databases available for free downloa
 
 # Announcements
 ## New release v1.0.2
-This release fixes the issue with running multiple krakenuniq processes in the same folder with --paired input files.  
+This release fixes the issue with possibly incorrect output produced when running multiple krakenuniq processes in the same folder with --paired input files.  
 
 ## New release v1.0.1
 This release fixes the Issue #116 and #117. Thanks to @boulund for the fix!
