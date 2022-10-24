@@ -31,6 +31,9 @@ use File::Path qw/make_path/;
 
 my $PROG = basename $0;
 my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
+# generate random prefix
+my @set = ('0' ..'9', 'A' .. 'F');
+my $random_prefix = join("",map($set[rand @set],1..8));
 
 # Test to see if the executables got moved, try to recover if we can
 if (! -e "$KRAKEN_DIR/classify") {
@@ -222,10 +225,10 @@ if ($paired) {
   my $cmd="perl $READ_MERGER ";
   $cmd.=" --check-names " if $check_names;
   $cmd.=join(" ",@ARGV);
-  $cmd.=" 1>$DIR/merged.fa 2>$DIR/merged.err";
+  $cmd.=" 1>$DIR/$random_prefix.merged.fa 2>$DIR/$random_prefix.merged.err";
   system($cmd);
   @ARGV=();
-  push(@ARGV,"$DIR/merged.fa");
+  push(@ARGV,"$DIR/$random_prefix.merged.fa");
 }
 
 my $cmd = $use_exact_counting? $CLASSIFY_EXACT : $CLASSIFY;
@@ -239,8 +242,8 @@ if (defined $report_file) {
 system("$cmd @flags @ARGV");
 #die "$PROG: exec error: $!\n";
 if ($paired) {
-  unlink("$DIR/merged.fa");
-  unlink("$DIR/merged.err");
+  unlink("$DIR/$random_prefix.merged.fa");
+  unlink("$DIR/$random_prefix.merged.err");
 }
 
 sub usage {
