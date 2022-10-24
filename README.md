@@ -8,6 +8,9 @@ False-positive identifications are a significant problem in metagenomics classif
 We now have two standard Kraken1/KrakenUniq databases available for free download from the Amazon cloud. You can find links at [https://benlangmead.github.io/aws-indexes/k2](https://benlangmead.github.io/aws-indexes/k2). One is our "standard" database with all RefSeq bacteria, archaea, and viruses, plus common vectors and the human genome. The other is all of the first database plus all available genomes of eukaryotic pathogens. Each DB is over 300GB, and by downloading them you can avoid having to build them yourself.
 
 # Announcements
+## New release v1.0.2
+This release fixes the issue with running multiple krakenuniq processes in the same folder with --paired input files.  
+
 ## New release v1.0.1
 This release fixes the Issue #116 and #117. Thanks to @boulund for the fix!
 
