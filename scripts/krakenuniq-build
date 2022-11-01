@@ -196,7 +196,7 @@ if (@library_dirs && defined $taxonomy_dir && !-d $db) {
     system("mkdir -p $db");
 }
 
-$ENV{"JELLYFISH_BIN"} = $jellyfish_bin;
+$ENV{"JELLYFISH_BIN"} = $jellyfish_bin if(defined($jellyfish_bin));
 $ENV{"KRAKEN_DB_NAME"} = $db;
 $ENV{"KRAKEN_THREAD_CT"} = $threads;
 $ENV{"KRAKEN_MINIMIZER_LEN"} = $minimizer_len;
