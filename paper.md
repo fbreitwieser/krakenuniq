@@ -42,6 +42,12 @@ chunks, with only a modest increase in running time. This enhancement now makes 
 to run KrakenUniq on very large datasets and huge databases on virtually any computer, even a
 laptop, while providing the same very high classification accuracy as the previous system.
 
+# Statement of need
+
+KrakenUniq software classifies reads from metagenomic samples to establish which 
+organisms are present in the samples and estimate their abundance. The software is widely-used used
+by researchers and clinicians in medical diagnostics, microbiome and environmental studies.
+
 # Introduction
 
 The GenBank genome repository currently contains over 400,000 prokaryotic genomes and over
