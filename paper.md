@@ -94,12 +94,20 @@ https://anaconda.org/bioconda/krakenuniq (Conda)<br>
 
 # Database chunking
 
-Under this new algorithm, KrakenUniq only loads a chunk of the database into memory at a time,
-based on the amount of available memory. It then iterates over all of the reads provided as input and
-looks up all *k-mers* in those reads that are matching in this database chunk. This process is repeated
-until the entire database has been processed. The *k-mer* lookups are then merged, and reads are
-classified based on the results of the full database. Classification results will be identical to running in
-the default mode; i.e., database chunking does not alter the output.
+The KrakenUniq database consists of two tables: A *k-mer* table maps each *k-mer* to the taxonomical id and
+is sorted by the *k-mers'* minimizers. A second table, the minimizer table, is lexicographically sorted and
+maps each minimizer to the corresponding *k-mers* in the *k-mer* table which form a contiguous block.
+Hence, the database can be chunked by taking a chunk of the minimizer table and the corresponding range
+of the *k-mer* table that contains all *k-mers* for the selected minimizers. Specifically, KrakenUniq performs
+a binary search on the minimizer table to find the largest minimizer such that the chunk of the minimizer table and
+the corresponding chunk of the *k-mer* table together use not more than the specified amount of memory.
+
+Under this new algorithm, KrakenUniq loads a chunk of the database into memory at a time. It then iterates
+over all of the reads provided as input and looks up all *k-mers* in those reads that are matching in this database chunk.
+The taxonomical ids for these *k-mers* (or placeholders for *k-mers* without a hit) are stored in a temporary file on disk.
+With every chunk iteration taxonomical ids of newly found *k-mers* are added to the file. This process is repeated until
+the entire database has been processed. The *k-mer* lookups stored in the temporary file are then used to classify the reads.
+Classification results will be identical to running in the default mode; i.e., database chunking does not alter the output.
 
 This new feature makes it feasible to run KrakenUniq on very large datasets and huge databases on
 virtually any computer, even a laptop, while providing exact classifications that are identical to those
