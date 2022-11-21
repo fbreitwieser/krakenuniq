@@ -98,13 +98,14 @@ The KrakenUniq database consists of two tables: A *k-mer* table maps each *k-mer
 is sorted by the *k-mers'* minimizers. A second table, the minimizer table, is lexicographically sorted and
 maps each minimizer to the corresponding *k-mers* in the *k-mer* table which form a contiguous block.
 Hence, the database can be chunked by taking a chunk of the minimizer table and the corresponding range
-of the *k-mer* table that contains all *k-mers* for the selected minimizers. Specifically, KrakenUniq performs
-a binary search on the minimizer table to find the largest minimizer such that the chunk of the minimizer table and
-the corresponding chunk of the *k-mer* table together use not more than the specified amount of memory.
+of the *k-mer* table that contains all *k-mers* for the selected minimizers. 
 
-Under this new algorithm, KrakenUniq loads a chunk of the database into memory at a time. It then iterates
-over all of the reads provided as input and looks up all *k-mers* in those reads that are matching in this database chunk.
-The taxonomical ids for these *k-mers* (or placeholders for *k-mers* without a hit) are stored in a temporary file on disk.
+Under this new algorithm, KrakenUniq loads a chunk of the database into memory at a time. KrakenUniq performs
+a binary search on the minimizer table to find the largest minimizer such that the chunk of the minimizer table and
+the corresponding chunk of the *k-mer* table together use not more than the specified amount of memory. It then loads the chunk
+of the minimizer table and the corresponding chunk of the k-mer table and iterates
+over all of the reads provided as input.  The code looks up all *k-mers* in the reads in the loaded chunk of the database.
+The taxonomical ids for the *k-mers* that matched a k-mer in the chunk (or placeholders for *k-mers* without a hit) are stored in a temporary file on disk.
 With every chunk iteration taxonomical ids of newly found *k-mers* are added to the file. This process is repeated until
 the entire database has been processed. The *k-mer* lookups stored in the temporary file are then used to classify the reads.
 Classification results will be identical to running in the default mode; i.e., database chunking does not alter the output.
