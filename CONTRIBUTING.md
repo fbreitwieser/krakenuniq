@@ -1,81 +1,131 @@
-# Contributing
+<!-- omit in toc -->
+# Contributing to KrakenUniq
 
-We welcome contributions in the forms of helpful suggesions, code or issues reported by github issue tracker.
-In reporting an issue please include enough information (full command line, link to downloadable data file(s)) for us to be able to reproduce the issue.  
+First off, thanks for taking the time to contribute! ❤️
 
-Please note we have a code of conduct, please follow it in all your interactions with the project.
+All types of contributions are encouraged and valued. See the [Table of Contents](#table-of-contents) for different ways to help and details about how this project handles them. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions. 🎉
+
+> And if you like the project, but just don't have time to contribute, that's fine. There are other easy ways to support the project and show your appreciation, which we would also be very happy about:
+> - Star the project
+> - Tweet about it
+> - Refer this project in your project's readme
+> - Mention the project at local meetups and tell your friends/colleagues
+
+<!-- omit in toc -->
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [I Have a Question](#i-have-a-question)
+- [I Want To Contribute](#i-want-to-contribute)
+- [Reporting Bugs](#reporting-bugs)
+- [Suggesting Enhancements](#suggesting-enhancements)
+
 
 ## Code of Conduct
 
-### Our Pledge
+This project and everyone participating in it is governed by the
+[KrakenUniq Code of Conduct](https://github.com/fbreitwieser/krakenuniqblob/master/CODE_OF_CONDUCT.md).
+By participating, you are expected to uphold this code. Please report unacceptable behavior
+to .
 
-In the interest of fostering an open and welcoming environment, we as
-contributors and maintainers pledge to making participation in our project and
-our community a harassment-free experience for everyone, regardless of age, body
-size, disability, ethnicity, gender identity and expression, level of experience,
-nationality, personal appearance, race, religion, or sexual identity and
-orientation.
 
-### Our Standards
+## I Have a Question
 
-Examples of behavior that contributes to creating a positive environment
-include:
+> If you want to ask a question, we assume that you have read the available [Documentation](https://github.com/fbreitwieser/krakenuniq).
 
-* Using welcoming and inclusive language
-* Being respectful of differing viewpoints and experiences
-* Gracefully accepting constructive criticism
-* Focusing on what is best for the community
-* Showing empathy towards other community members
+Before you ask a question, it is best to search for existing [Issues](https://github.com/fbreitwieser/krakenuniq/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
 
-Examples of unacceptable behavior by participants include:
+If you then still feel the need to ask a question and need clarification, we recommend the following:
 
-* The use of sexualized language or imagery and unwelcome sexual attention or
-advances
-* Trolling, insulting/derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or electronic
-  address, without explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+- Open an [Issue](https://github.com/fbreitwieser/krakenuniq/issues/new).
+- Provide as much context as you can about what you're running into.
+- Provide project and platform versions (nodejs, npm, etc), depending on what seems relevant.
 
-### Our Responsibilities
+We will then take care of the issue as soon as possible.
 
-Project maintainers are responsible for clarifying the standards of acceptable
-behavior and are expected to take appropriate and fair corrective action in
-response to any instances of unacceptable behavior.
+<!--
+You might want to create a separate issue tag for questions and include it in this description. People should then tag their issues accordingly.
 
-Project maintainers have the right and responsibility to remove, edit, or
-reject comments, commits, code, wiki edits, issues, and other contributions
-that are not aligned to this Code of Conduct, or to ban temporarily or
-permanently any contributor for other behaviors that they deem inappropriate,
-threatening, offensive, or harmful.
+Depending on how large the project is, you may want to outsource the questioning, e.g. to Stack Overflow or Gitter. You may add additional contact and information possibilities:
+- IRC
+- Slack
+- Gitter
+- Stack Overflow tag
+- Blog
+- FAQ
+- Roadmap
+- E-Mail List
+- Forum
+-->
 
-### Scope
+## I Want To Contribute
 
-This Code of Conduct applies both within project spaces and in public spaces
-when an individual is representing the project or its community. Examples of
-representing a project or community include using an official project e-mail
-address, posting via an official social media account, or acting as an appointed
-representative at an online or offline event. Representation of a project may be
-further defined and clarified by project maintainers.
+> ### Legal Notice <!-- omit in toc -->
+> When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license.
 
-### Enforcement
+### Reporting Bugs
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at [INSERT EMAIL ADDRESS]. All
-complaints will be reviewed and investigated and will result in a response that
-is deemed necessary and appropriate to the circumstances. The project team is
-obligated to maintain confidentiality with regard to the reporter of an incident.
-Further details of specific enforcement policies may be posted separately.
+<!-- omit in toc -->
+#### Before Submitting a Bug Report
 
-Project maintainers who do not follow or enforce the Code of Conduct in good
-faith may face temporary or permanent repercussions as determined by other
-members of the project's leadership.
+A good bug report shouldn't leave others needing to chase you up for more information. Therefore, we ask you to investigate carefully, collect information and describe the issue in detail in your report. Please complete the following steps in advance to help us fix any potential bug as fast as possible.
 
-### Attribution
+- Make sure that you are using the latest version.
+- Determine if your bug is really a bug and not an error on your side e.g. using incompatible environment components/versions (Make sure that you have read the [documentation](https://github.com/fbreitwieser/krakenuniq). If you are looking for support, you might want to check [this section](#i-have-a-question)).
+- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/fbreitwieser/krakenuniqissues?q=label%3Abug).
+- Also make sure to search the internet (including Stack Overflow) to see if users outside of the GitHub community have discussed the issue.
+- Collect information about the bug:
+- Stack trace (Traceback)
+- OS, Platform and Version (Windows, Linux, macOS, x86, ARM)
+- Version of the interpreter, compiler, SDK, runtime environment, package manager, depending on what seems relevant.
+- Possibly your input and the output
+- Can you reliably reproduce the issue? And can you also reproduce it with older versions?
 
-This Code of Conduct is adapted from the [Contributor Covenant][homepage], version 1.4,
-available at [http://contributor-covenant.org/version/1/4][version]
+<!-- omit in toc -->
+#### How Do I Submit a Good Bug Report?
 
-[homepage]: http://contributor-covenant.org
-[version]: http://contributor-covenant.org/version/1/4/
+> You must never report security related issues, vulnerabilities or bugs including sensitive information to the issue tracker, or elsewhere in public. Instead sensitive bugs must be sent by email to .
+<!-- You may add a PGP key to allow the messages to be sent encrypted as well. -->
+
+We use GitHub issues to track bugs and errors. If you run into an issue with the project:
+
+- Open an [Issue](https://github.com/fbreitwieser/krakenuniq/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
+- Explain the behavior you would expect and the actual behavior.
+- Please provide as much context as possible and describe the *reproduction steps* that someone else can follow to recreate the issue on their own. This usually includes your code. For good bug reports you should isolate the problem and create a reduced test case.
+- Provide the information you collected in the previous section.
+
+Once it's filed:
+
+- The project team will label the issue accordingly.
+- A team member will try to reproduce the issue with your provided steps. If there are no reproduction steps or no obvious way to reproduce the issue, the team will ask you for those steps and mark the issue as `needs-repro`. Bugs with the `needs-repro` tag will not be addressed until they are reproduced.
+- If the team is able to reproduce the issue, it will be marked `needs-fix`, as well as possibly other tags (such as `critical`), and the issue will be left to be [implemented by someone](#your-first-code-contribution).
+
+<!-- You might want to create an issue template for bugs and errors that can be used as a guide and that defines the structure of the information to be included. If you do so, reference it here in the description. -->
+
+
+### Suggesting Enhancements
+
+This section guides you through submitting an enhancement suggestion for KrakenUniq, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
+
+<!-- omit in toc -->
+#### Before Submitting an Enhancement
+
+- Make sure that you are using the latest version.
+- Read the [documentation](https://github.com/fbreitwieser/krakenuniq) carefully and find out if the functionality is already covered, maybe by an individual configuration.
+- Perform a [search](https://github.com/fbreitwieser/krakenuniq/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
+- Find out whether your idea fits with the scope and aims of the project. It's up to you to make a strong case to convince the project's developers of the merits of this feature. Keep in mind that we want features that will be useful to the majority of our users and not just a small subset. If you're just targeting a minority of users, consider writing an add-on/plugin library.
+
+<!-- omit in toc -->
+#### How Do I Submit a Good Enhancement Suggestion?
+
+Enhancement suggestions are tracked as [GitHub issues](https://github.com/fbreitwieser/krakenuniq/issues).
+
+- Use a **clear and descriptive title** for the issue to identify the suggestion.
+- Provide a **step-by-step description of the suggested enhancement** in as many details as possible.
+- **Describe the current behavior** and **explain which behavior you expected to see instead** and why. At this point you can also tell which alternatives do not work for you.
+- You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux. <!-- this should only be included if the project has a GUI -->
+- **Explain why this enhancement would be useful** to most KrakenUniq users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
+
+<!-- omit in toc -->
+## Attribution
+This guide is based on the **contributing-gen**. [Make your own](https://github.com/bttger/contributing-gen)!
