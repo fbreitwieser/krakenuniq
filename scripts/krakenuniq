@@ -270,8 +270,8 @@ Options:
                           suppress normal output
   --only-classified-output
                           Print no Kraken output for unclassified sequences
-  --preload               Loads DB into memory before classification
-  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small)
+  --preload               Loads the entire DB into memory before classification
+  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small), overrides --preload flag
   --paired                The two filenames provided are paired-end reads
   --check-names           Ensure each pair of reads have names that agree
                           with each other; ignored if --paired is not specified
