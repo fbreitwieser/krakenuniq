@@ -135,15 +135,16 @@ human pathogens [@lu2018removing]), as well the human genome and a collection of
 the database chunking experiments (using `–preload-size`) KrakenUniq loaded the database into main
 memory in 49, 25, 13 and 7 chunks (respectively).
 
-Running times and speedups can vary significantly depending on the type of storage (e.g., databases
+Running times can vary significantly depending on the type of storage (e.g., databases
 on network storage can take longer to load) and the size of the read dataset (i.e., classifying a small
-number of reads does not justify preloading the entire database, especially not on slow storage). **Table
-1** shows that in a typical use case, loading the entire database is far faster than memory mapping (14
-minutes versus 48 hours). Loading the database by chunks adds overhead because of the need to
+number of reads does not justify preloading the entire database, especially of fast storage). The speed of loading 
+the database is not impacted by the `--preload-size` option because the database is still read in a linear way.  
+Saving intermediate files from the chunks is done in the same way as in the original code.  
+The only difference is that now classification results from all individual chunks are concatenated into a single file, which is read once all chunks are finished. **Table 1** shows that in a typical use case, even when the database does fit in RAM, loading the entire database (`--preload` option) is far faster than memory mapping (14 minutes versus 48 hours). Loading the database by chunks adds overhead because of the need to
 iterate over the reads multiple times, but is still comparable to pre-loading the entire database and
 highly recommended when not enough main memory is available. For example, limiting the database
 to 8G, which means it can be loaded even on a standard laptop computer, increased the running
-time only about 3.4-fold, even though the database was broken into 49 chunks. For large read datasets we expect that setting the `--preload-size` flag will always be faster than the default behavior of memory mapping. The format of the
+time only about 3.4-fold, even though the database was broken into 49 chunks. For large read datasets we expect that setting the `--preload` or `--preload-size` flag will always be faster than the default behavior of memory mapping. The format of the
 databases used by the new algorithm has not changed, hence all previously built databases for Kraken
 and KrakenUniq can be used.
 
