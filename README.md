@@ -79,15 +79,15 @@ brew install gcc
 ./install_krakenuniq -c g++-8 /PATH/TO/INSTALL_DIR
 ```
 
-## General usage
+## Command-line options
 
-Usage instructions can be obtained by running `krakenuniq --help`:
+This is the output of `krakenuniq --help`:
 ```
 Usage: $PROG --report-file FILENAME [options] <filename(s)>
 Options:
-  --db NAME               Name for Kraken DB (default: $default_db)
-  --threads NUM           Number of threads (default: $def_thread_ct)
-  --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: $hll_precision)
+  --db NAME               Name for Kraken DB (default: none)
+  --threads NUM           Number of threads (default: 1)
+  --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: 12)
   --exact                 Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
   --quick                 Quick operation (use first hit or hits)
   --min-hits NUM          In quick op., number of hits req'd for classification
