@@ -94,20 +94,20 @@ https://anaconda.org/bioconda/krakenuniq (Conda)<br>
 
 # Database chunking
 
-The KrakenUniq database consists of two tables: A *k-mer* table maps each *k-mer* to the taxonomical id and
+The KrakenUniq database consists of two tables: A *k-mer* table maps each *k-mer* to its taxonomic ID and
 is sorted by the *k-mers'* minimizers. A second table, the minimizer table, is lexicographically sorted and
 maps each minimizer to the corresponding *k-mers* in the *k-mer* table which form a contiguous block.
 Hence, the database can be chunked by taking a chunk of the minimizer table and the corresponding range
 of the *k-mer* table that contains all *k-mers* for the selected minimizers. 
 
-Under this new algorithm, KrakenUniq loads a chunk of the database into memory at a time. KrakenUniq performs
+Under this new algorithm, KrakenUniq loads one chunk of the database into memory at a time. KrakenUniq performs
 a binary search on the minimizer table to find the largest minimizer such that the chunk of the minimizer table and
 the corresponding chunk of the *k-mer* table together use not more than the specified amount of memory. It then loads the chunk
 of the minimizer table and the corresponding chunk of the k-mer table and iterates
-over all of the reads provided as input.  The code looks up all *k-mers* in the reads in the loaded chunk of the database.
-The taxonomical ids for the *k-mers* that matched a k-mer in the chunk (or placeholders for *k-mers* without a hit) are stored in a temporary file on disk for each read.
-With every chunk iteration taxonomical ids of newly found *k-mers* in the reads are added to the temporary file. This process is repeated until
-the entire database has been processed. At this point the temporary file contains classification for all k-mers in the reads. KrakenUniq then reads the temporary file, collects *k-mer* hits for every read and uses them to classify each read. Classification results will be identical to running in the default mode; i.e., database chunking does not alter the output.
+over all of the reads provided as input.  The code looks up all *k-mers* in the reads in the currently-loaded chunk of the database.
+The taxonomic IDs for the *k-mers* that matched a k-mer in the chunk (or placeholders for *k-mers* without a hit) are stored in a temporary file on disk for each read.
+With every chunk iteration, taxonomic IDs of newly found *k-mers* in the reads are appended to the temporary file. This process is repeated until
+the entire database has been processed. At this point the temporary file contains taxonomic IDs for all k-mers in the reads that matched any part of the database. KrakenUniq then reads the temporary file, collects *k-mer* hits for every read, and uses them to classify each read. Classification results will be identical to running in the default mode; i.e., database chunking does not alter the output.
 
 This new feature makes it feasible to run KrakenUniq on very large datasets and huge databases on
 virtually any computer, even a laptop, while providing exact classifications that are identical to those
