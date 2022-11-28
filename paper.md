@@ -143,7 +143,7 @@ minutes versus 48 hours). Loading the database by chunks adds overhead because o
 iterate over the reads multiple times, but is still comparable to pre-loading the entire database and
 highly recommended when not enough main memory is available. For example, limiting the database
 to 8G, which means it can be loaded even on a standard laptop computer, increased the running
-time only about 3.4-fold, even though the database was broken into 49 chunks. The format of the
+time only about 3.4-fold, even though the database was broken into 49 chunks. For large read datasets we expect that setting the `--preload-size` flag will always be faster than the default behavior of memory mapping. The format of the
 databases used by the new algorithm has not changed, hence all previously built databases for Kraken
 and KrakenUniq can be used.
 
