@@ -79,6 +79,40 @@ brew install gcc
 ./install_krakenuniq -c g++-8 /PATH/TO/INSTALL_DIR
 ```
 
+## General usage
+
+Usage instructions can be obtained by running `krakenuniq --help`:
+```
+Usage: $PROG --report-file FILENAME [options] <filename(s)>
+Options:
+  --db NAME               Name for Kraken DB (default: $default_db)
+  --threads NUM           Number of threads (default: $def_thread_ct)
+  --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: $hll_precision)
+  --exact                 Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
+  --quick                 Quick operation (use first hit or hits)
+  --min-hits NUM          In quick op., number of hits req'd for classification
+                          NOTE: this is ignored if --quick is not specified
+  --unclassified-out FILENAME
+                          Print unclassified sequences to filename
+  --classified-out FILENAME
+                          Print classified sequences to filename
+  --output FILENAME       Print output to filename (default: stdout); "off" will
+                          suppress normal output
+  --only-classified-output
+                          Print no Kraken output for unclassified sequences
+  --preload               Loads the entire DB into memory before classification
+  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small), overrides --preload flag
+  --paired                The two filenames provided are paired-end reads
+  --check-names           Ensure each pair of reads have names that agree
+                          with each other; ignored if --paired is not specified
+  --help                  Print this message
+  --version               Print version information
+Experimental:
+  --uid-mapping           Map using UID database
+The file format (fasta/fastq) and compression (gzip/bzip2) do not need to be specified anymore.
+The format is detected automatically.
+```
+
 ## Database building
 
 Note that KrakenUniq natively supports Kraken 1 databases (however not Kraken 2). If you have existing Kraken databases, you may run KrakenUniq directly on them, though for support of taxon nodes for genomes and sequences (see below) you will need to rebuild them with KrakenUniq. For building a custom database, there are three requirements:
