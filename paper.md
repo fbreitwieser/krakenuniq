@@ -97,7 +97,7 @@ https://anaconda.org/bioconda/krakenuniq (Conda)<br>
 # Database chunking
 
 The KrakenUniq database consists of two tables: A *k-mer* table maps each *k-mer* to its taxonomic ID and
-is sorted by the *k-mers'* minimizers. A second table, the minimizer table, is lexicographically sorted and
+is sorted by the *k-mers'* minimizers [@roberts2004reducing]. A second table, the minimizer table, is lexicographically sorted and
 maps each minimizer to the corresponding *k-mers* in the *k-mer* table which form a contiguous block.
 Hence, the database can be chunked by taking a chunk of the minimizer table and the corresponding range
 of the *k-mer* table that contains all *k-mers* for the selected minimizers. 
