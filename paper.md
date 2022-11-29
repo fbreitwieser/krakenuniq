@@ -46,7 +46,9 @@ laptop, while providing the same very high classification accuracy as the previo
 
 KrakenUniq software classifies reads from metagenomic samples to establish which 
 organisms are present in the samples and estimate their abundance. The software is widely-used used
-by researchers and clinicians in medical diagnostics, microbiome and environmental studies.
+by researchers and clinicians in medical diagnostics, microbiome and environmental studies. 
+
+Typical databases used by KrakenUniq are tens to hundreds of gigabytes in size.  The original KrakenUniq code required loading the entire database in RAM, which demanded expensive high-memory servers to run it efficiently. If a user did not have enough physical RAM to load the entire database, KrakenUniq resorted to memory-mapping the database, which significantly increased run times, frequently by a factor of more than 100.  The new functionality described in this paper enables users who do not have access to high-memory servers to run KrakenUniq efficiently, with a performance hit of factor of 3-4, down from 100+.
 
 # Introduction
 
