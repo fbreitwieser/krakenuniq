@@ -52,7 +52,7 @@ Typical databases used by KrakenUniq are tens to hundreds of gigabytes in size. 
 
 # Introduction
 
-The GenBank genome repository (https://www.ncbi.nlm.nih.gov/genbank/) currently contains over 400,000 prokaryotic genomes and over
+The GenBank genome repository [@benson2012genbank] currently contains over 400,000 prokaryotic genomes and over
 20,000 eukaryotes, including thousands of microbial eukaryotes such as fungi and protists. To take
 advantage of this ever-growing variety of microbial sequences, metagenomic sequence analysis methods must create customized databases that capture all of this sequence diversity. Tools such as
 Kraken [@wood2014kraken] and KrakenUniq [@breitwieser2018krakenuniq] classify DNA or RNA sequencing reads against a pre-built
