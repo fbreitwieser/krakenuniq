@@ -52,7 +52,7 @@ This release fixes database preload option. Now --preload option will force load
 KrakenUniq is available in the Anaconda cloud. To install, type:
 
 ```
-conda install krakenuniq
+conda install -c bioconda krakenuniq
 ```
 This is the bioconda link for KrakenUniq:  https://anaconda.org/bioconda/krakenuniq
 
