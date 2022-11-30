@@ -130,7 +130,7 @@ the amount of available main memory that they want to use for loading chunks of 
   
 </div>
   
-Table 1: Running times for classifying 9.4 million reads (from a human eye metagenome, SRR12486990)
+Table 1: Running times for classifying 9.4 million reads (from a human eye metagenome, accession SRR12486990, available from NCBI at https://www.ncbi.nlm.nih.gov/sra/SRR12486990)
 with 8 threads using KrakenUniq in different modes. The database size was 392 GB, and it consisted
 of all complete bacterial, archeal, and viral genomes in RefSeq from 2020, 46 selected eukaryotic
 human pathogens [@lu2018removing]), as well the human genome and a collection of common vector sequences. The database is available for download at https://benlangmead.github.io/aws-indexes/k2 under the name EuPathDB46. The command lines used to measure the runtimes were `krakenuniq --db krakendb-2020-08-16-all_pluseupath --threads 24 --report-file report --output classify SRR12486990.fastq` with no additional options for default, and with addition of the preload option shown in the table for various preload sizes. in the database chunking experiments (using `–preload-size`) KrakenUniq loaded the database into RAM in 49, 25, 13 and 7 chunks (respectively).
