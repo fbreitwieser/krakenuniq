@@ -154,6 +154,6 @@ and produces the same output, we highly recommend that users upgrade from Kraken
 
 # Acknowledgements
 
-This work was supported in part by NIH grants R35-GM130151 and R01-HG006677.
+This work was supported in part by NIH grants R35-GM130151, R01-HG006677, and U24-CA180922.
 
 # References
