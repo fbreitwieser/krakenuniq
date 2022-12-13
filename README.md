@@ -64,6 +64,12 @@ cd krakenuniq-<VERSION>
 ./install_krakenuniq /PATH/TO/INSTALL_DIR
 ```
 
+Installation with Docker:
+```
+docker build -t krakenuniq . 
+docker run --rm -it -it krakenuniq krakenuniq --help
+```
+
 Installation from source from GitHub (the latest -- may not be stable):
 ```
 git clone https://github.com/fbreitwieser/krakenuniq
