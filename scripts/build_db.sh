@@ -94,15 +94,15 @@ TAXONOMY_DIR="taxonomy/"
 
 if [ ! -s "library-files.txt" ]; then
     echo "Finding all library files"
-    find $FIND_OPTS $LIBRARY_DIR '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' ')' > library-files.txt
+    find $FIND_OPTS $LIBRARY_DIR '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' -o -iname '*.fa.gz' -o -iname '*.fasta.gz' -o -iname '*.fsa.gz' -o -iname '*.fna.gz' ')' > library-files.txt
 fi
 
 cat_library() {
-  cat library-files.txt | tr '\n' '\0' | xargs -0 cat
+  cat library-files.txt | tr '\n' '\0' | xargs -0 zcat -f
 }
 
 cat_libraryp() {
-  find $FIND_OPTS $LIBRARY_DIR/{$@,} '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' ')' | tr '\n' '\0' | xargs -0 cat
+  find $FIND_OPTS $LIBRARY_DIR/{$@,} '(' -iname '*.fna' -o -iname '*.fa' -o -iname '*.ffn' -o -iname '*.fasta' -o -iname '*.fsa' -o -iname '*.fa.gz' -o -iname '*.fasta.gz' -o -iname '*.fsa.gz' -o -iname '*.fna.gz' ')' | tr '\n' '\0' | xargs -0 zcat -f
 }
 
 N_FILES=`cat library-files.txt | wc -l`
@@ -267,7 +267,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
     fi
 
 	[[ -z "${KRAKEN_LCA_ORDER}" ]] && DC="-c database.kdb.counts" || DC=""
-    set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+    set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx \
         -b taxDB $PARAM $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map $DC \
         -F <( cat_library ) -T > seqid2taxid-plus.map
     if [ "$KRAKEN_ADD_TAXIDS_FOR_SEQ" == "1" ] || [ "$KRAKEN_ADD_TAXIDS_FOR_GENOME" == "1" ]; then
@@ -286,12 +286,12 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
         echo " Setting LCAs for $DDIR (substep 6.$COUNTER of 6.$TOTAL) ..."
 	    [[ $COUNTER -eq $TOTAL ]] && DC="-c database.kdb.counts" || DC=""
 		  ## First reset all taxids that appear in the set to zero (flag -R)
-        exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+        exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx \
           -b taxDB $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map \
           -F <( cat_libraryp $DDIR ) -TR
 
 		  ## Then just re-set them
-        exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx -v \
+        exe eval set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -o database.kdb -i database.idx \
           -b taxDB $PARAM1 -t $KRAKEN_THREAD_CT -m seqid2taxid.map $DC \
           -F <( cat_libraryp $DDIR ) -T
 
@@ -331,7 +331,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
       fi
     fi
     start_time1=$(date "+%s.%N")
-      set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -I uid_to_taxid.map -o uid_database.kdb -i database.idx -v \
+      set_lcas $MEMFLAG -x -d $SORTED_DB_NAME -I uid_to_taxid.map -o uid_database.kdb -i database.idx \
         -b taxDB $PARAM -t $KRAKEN_THREAD_CT -m seqid2taxid.map -c uid_database.kdb.counts -F <( cat_library )
   
     echo "UID Database created. [$(report_time_elapsed $start_time1)]"
