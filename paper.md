@@ -90,7 +90,7 @@ which dramatically speeds up the classification (see **Table 1**).
 
 To improve KrakenUniq’s performance when not enough main memory is available to load the
 entire database into RAM, we have added a new capability to KrakenUniq, which we call database
-chunking. This new feature is released in KrakenUniq v0.7 and subsequent releases at:<br>
+chunking. This new feature is released in KrakenUniq v1.0.0 and subsequent releases at:<br>
 https://github.com/fbreitwieser/krakenuniq (Github)<br>
 https://anaconda.org/bioconda/krakenuniq (Conda)<br>
 
