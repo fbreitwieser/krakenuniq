@@ -8,6 +8,10 @@ False-positive identifications are a significant problem in metagenomics classif
 We now have two standard Kraken1/KrakenUniq databases available for free download from the Amazon cloud. You can find links at [https://benlangmead.github.io/aws-indexes/k2](https://benlangmead.github.io/aws-indexes/k2). One is our "standard" database with all RefSeq bacteria, archaea, and viruses, plus common vectors and the human genome. The other is all of the first database plus all available genomes of eukaryotic pathogens. Each DB is over 300GB, and by downloading them you can avoid having to build them yourself.
 
 # Announcements
+
+## New release v1.0.3
+In this release we added a Dockerfile (thanks @Jessime).  There are also few minor updates to documentation. This code of this release has been reviewed in connection with our publication in JOSS.
+
 ## New release v1.0.2
 This release fixes the issue with possibly incorrect output produced when running multiple krakenuniq processes in the same folder with --paired input files.  
 
@@ -52,7 +56,7 @@ This release fixes database preload option. Now --preload option will force load
 KrakenUniq is available in the Anaconda cloud. To install, type:
 
 ```
-conda install krakenuniq
+conda install -c bioconda krakenuniq
 ```
 This is the bioconda link for KrakenUniq:  https://anaconda.org/bioconda/krakenuniq
 
@@ -62,6 +66,12 @@ wget https://github.com/fbreitwieser/krakenuniq/archive/refs/tags/v<VERSION>.tar
 tar xzf v<VERSION>.tar.gz
 cd krakenuniq-<VERSION>
 ./install_krakenuniq /PATH/TO/INSTALL_DIR
+```
+
+Installation with Docker:
+```
+docker build -t krakenuniq . 
+docker run --rm -it -it krakenuniq krakenuniq --help
 ```
 
 Installation from source from GitHub (the latest -- may not be stable):
@@ -77,6 +87,40 @@ OSX by default links `g++` to `clang` without OpenMP support. When using clang, 
 ``` 
 brew install gcc
 ./install_krakenuniq -c g++-8 /PATH/TO/INSTALL_DIR
+```
+
+## Command-line options
+
+This is the output of `krakenuniq --help`:
+```
+Usage: $PROG --report-file FILENAME [options] <filename(s)>
+Options:
+  --db NAME               Name for Kraken DB (default: none)
+  --threads NUM           Number of threads (default: 1)
+  --hll-precision INT     Precision for HyperLogLog k-mer cardinality estimation, between 10 and 18 (default: 12)
+  --exact                 Compute exact cardinality instead of estimate (slower, requires memory proportional to cardinality!)
+  --quick                 Quick operation (use first hit or hits)
+  --min-hits NUM          In quick op., number of hits req'd for classification
+                          NOTE: this is ignored if --quick is not specified
+  --unclassified-out FILENAME
+                          Print unclassified sequences to filename
+  --classified-out FILENAME
+                          Print classified sequences to filename
+  --output FILENAME       Print output to filename (default: stdout); "off" will
+                          suppress normal output
+  --only-classified-output
+                          Print no Kraken output for unclassified sequences
+  --preload               Loads the entire DB into memory before classification
+  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small), overrides --preload flag
+  --paired                The two filenames provided are paired-end reads
+  --check-names           Ensure each pair of reads have names that agree
+                          with each other; ignored if --paired is not specified
+  --help                  Print this message
+  --version               Print version information
+Experimental:
+  --uid-mapping           Map using UID database
+The file format (fasta/fastq) and compression (gzip/bzip2) do not need to be specified anymore.
+The format is detected automatically.
 ```
 
 ## Database building

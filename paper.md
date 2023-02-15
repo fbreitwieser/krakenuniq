@@ -46,11 +46,13 @@ laptop, while providing the same very high classification accuracy as the previo
 
 KrakenUniq software classifies reads from metagenomic samples to establish which 
 organisms are present in the samples and estimate their abundance. The software is widely-used used
-by researchers and clinicians in medical diagnostics, microbiome and environmental studies.
+by researchers and clinicians in medical diagnostics, microbiome and environmental studies. 
+
+Typical databases used by KrakenUniq are tens to hundreds of gigabytes in size.  The original KrakenUniq code required loading the entire database in RAM, which demanded expensive high-memory servers to run it efficiently. If a user did not have enough physical RAM to load the entire database, KrakenUniq resorted to memory-mapping the database, which significantly increased run times, frequently by a factor of more than 100.  The new functionality described in this paper enables users who do not have access to high-memory servers to run KrakenUniq efficiently, with a CPU time performance increase of 3 to 4-fold, down from 100+.
 
 # Introduction
 
-The GenBank genome repository currently contains over 400,000 prokaryotic genomes and over
+The GenBank genome repository [@benson2012genbank] currently contains over 400,000 prokaryotic genomes and over
 20,000 eukaryotes, including thousands of microbial eukaryotes such as fungi and protists. To take
 advantage of this ever-growing variety of microbial sequences, metagenomic sequence analysis methods must create customized databases that capture all of this sequence diversity. Tools such as
 Kraken [@wood2014kraken] and KrakenUniq [@breitwieser2018krakenuniq] classify DNA or RNA sequencing reads against a pre-built
@@ -88,14 +90,14 @@ which dramatically speeds up the classification (see **Table 1**).
 
 To improve KrakenUniq’s performance when not enough main memory is available to load the
 entire database into RAM, we have added a new capability to KrakenUniq, which we call database
-chunking. This new feature is released in KrakenUniq v0.7 and subsequent releases at:<br>
+chunking. This new feature is released in KrakenUniq v1.0.0 and subsequent releases at:<br>
 https://github.com/fbreitwieser/krakenuniq (Github)<br>
 https://anaconda.org/bioconda/krakenuniq (Conda)<br>
 
 # Database chunking
 
 The KrakenUniq database consists of two tables: A *k-mer* table maps each *k-mer* to its taxonomic ID and
-is sorted by the *k-mers'* minimizers. A second table, the minimizer table, is lexicographically sorted and
+is sorted by the *k-mers'* minimizers [@roberts2004reducing]. A second table, the minimizer table, is lexicographically sorted and
 maps each minimizer to the corresponding *k-mers* in the *k-mer* table which form a contiguous block.
 Hence, the database can be chunked by taking a chunk of the minimizer table and the corresponding range
 of the *k-mer* table that contains all *k-mers* for the selected minimizers. 
@@ -128,22 +130,21 @@ the amount of available main memory that they want to use for loading chunks of 
   
 </div>
   
-Table 1: Running times for classifying 9.4 million reads (from a human eye metagenome, SRR12486990)
+Table 1: Running times for classifying 9.4 million reads (from a human eye metagenome, accession SRR12486990, available from NCBI at https://www.ncbi.nlm.nih.gov/sra/SRR12486990)
 with 8 threads using KrakenUniq in different modes. The database size was 392 GB, and it consisted
 of all complete bacterial, archeal, and viral genomes in RefSeq from 2020, 46 selected eukaryotic
-human pathogens [@lu2018removing]), as well the human genome and a collection of common vector sequences. In
-the database chunking experiments (using `–preload-size`) KrakenUniq loaded the database into main
-memory in 49, 25, 13 and 7 chunks (respectively).
+human pathogens [@lu2018removing]), as well the human genome and a collection of common vector sequences. The database is available for download at https://benlangmead.github.io/aws-indexes/k2 under the name EuPathDB46. The command lines used to measure the runtimes were `krakenuniq --db krakendb-2020-08-16-all_pluseupath --threads 24 --report-file report --output classify SRR12486990.fastq` with no additional options for default, and with addition of the preload option shown in the table for various preload sizes. in the database chunking experiments (using `–preload-size`) KrakenUniq loaded the database into RAM in 49, 25, 13 and 7 chunks (respectively).
 
-Running times and speedups can vary significantly depending on the type of storage (e.g., databases
+Running times can vary significantly depending on the type of storage (e.g., databases
 on network storage can take longer to load) and the size of the read dataset (i.e., classifying a small
-number of reads does not justify preloading the entire database, especially not on slow storage). **Table
-1** shows that in a typical use case, loading the entire database is far faster than memory mapping (14
-minutes versus 48 hours). Loading the database by chunks adds overhead because of the need to
+number of reads does not justify preloading the entire database, especially of fast storage). The speed of loading 
+the database is not impacted by the `--preload-size` option because the database is still read in a linear way.  
+Saving intermediate files from the chunks is done in the same way as in the original code.  
+The only difference is that now classification results from all individual chunks are concatenated into a single file, which is read once all chunks are finished. **Table 1** shows that in a typical use case, even when the database does fit in RAM, loading the entire database (`--preload` option) is far faster than memory mapping (14 minutes versus 48 hours). Loading the database by chunks adds overhead because of the need to
 iterate over the reads multiple times, but is still comparable to pre-loading the entire database and
 highly recommended when not enough main memory is available. For example, limiting the database
 to 8G, which means it can be loaded even on a standard laptop computer, increased the running
-time only about 3.4-fold, even though the database was broken into 49 chunks. The format of the
+time only about 3.4-fold, even though the database was broken into 49 chunks. For large read datasets we expect that setting the `--preload` or `--preload-size` flag will always be faster than the default behavior of memory mapping. The format of the
 databases used by the new algorithm has not changed, hence all previously built databases for Kraken
 and KrakenUniq can be used.
 
@@ -153,6 +154,6 @@ and produces the same output, we highly recommend that users upgrade from Kraken
 
 # Acknowledgements
 
-This work was supported in part by NIH grants R35-GM130151 and R01-HG006677.
+This work was supported in part by NIH grants R35-GM130151, R01-HG006677, and U24-CA180922.
 
 # References
