@@ -307,7 +307,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating database summary report $REPNAME.report.tsv ..."
     cat library-files.txt | tr '\n' '\0' | xargs -0 cat > library-files.fa.tmp && mv library-files.fa.tmp library-files.fa && \
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT library-files.fa > $REPNAME.kraken.tsv && \
+    krakenuniq --preload --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT library-files.fa > $REPNAME.kraken.tsv && \
     rm -f library-files.fa
   fi
 fi
@@ -316,7 +316,7 @@ fi
 if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   if [ -s "uid_database.kdb" ]
   then
-    echo "Skipping step 6.3, UID datanbase already generated."
+    echo "Skipping step 6.3, UID database already generated."
   else
     echo "Building UID database (step 6.3 of 6)..."
     PARAM=""
@@ -342,7 +342,7 @@ if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   if [[ ! -s $REPNAME.report.tsv ]]; then
     echo "Creating UID database summary report $REPNAME.report.tsv ..."
     cat library-files.txt | tr '\n' '\0' | xargs -0 cat > library-files.fa.tmp && mv library-files.fa.tmp library-files.fa && \
-    krakenuniq --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping library-files.fa > $REPNAME.kraken.tsv && \
+    krakenuniq --preload --db . --report-file $REPNAME.report.tsv --threads $KRAKEN_THREAD_CT --uid-mapping library-files.fa > $REPNAME.kraken.tsv && \
     rm -f library-files.fa
   fi
 fi
