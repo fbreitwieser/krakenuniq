@@ -134,19 +134,40 @@ Note that KrakenUniq natively supports Kraken 1 databases (however not Kraken 2)
 While you may supply this information yourself, `krakenuniq-download` supports a variety of data sources to download the taxonomy, sequence and mapping files. Please find examples below on how to download different sequence sets:
 
 ```
-## Download the taxonomy
-krakenuniq-download --db DBDIR taxonomy
+## Download the taxonomy and the sequences
+krakenuniq-download --db DBDIR <PATTERN>
 
-## All complete bacterial and archaeal genomes genomes in RefSeq using 10 threads, and masking low-complexity sequences in the genomes
+<PATTERN> can be one of
+     'contaminants'     Contaminant sequences from UniVec and EmVec.
+     'taxonomy'         NCBI taxonomy mappings from ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/
+     'nucleotide'       Download nucleotide sequences using a query specified using --search or --ac.
+     'microbial-nt'     Download microbial sequences from nt database.
+     'nt'               Download sequences from nt database, specified via --taxa.
+     'viral-neighbors'  Download viral strain sequences from the NCBI Viral Genome Resource.
+                        (Search: \"$vir_nbr_search_term\").
+     'genbank/DOMAIN'   Download all complete genomes for DOMAIN from GenBank.
+     'refseq/DOMAIN'    Download all complete genomes for DOMAIN from RefSeq.
+     'refseq/DOMAIN/ASS_LEVEL'
+     'refseq/DOMAIN/ASS_LEVEL/COLUMN=value1(/COLUMN=value2)*' 
+        Possible values for DOMAIN: @ALL_GENOMES.
+        Possible values for ASS_LEVEL: Any, Complete_Genome, Chromosome, Scaffold and Contig. 
+        Possible values for COLUMN: Any column in the NCBI assembly_summary.txt, e.g. species_taxid or assembly_accession.
+        
+EXAMPLES:
+
+## Download all human assemblies
+krakenuniq-download --db DBDIR 'refseq/vertebrate_mammalian/Any/species_taxid=9606'
+
+## Download all complete bacterial and archaeal genomes genomes in RefSeq using 10 threads, and masking low-complexity sequences in the genomes
 krakenuniq-download --db DBDIR --threads 10 --dust refseq/bacteria refseq/archaea
 
-## Contaminant sequences from UniVec and EmVec, plus the human reference genome
+## Download all contaminant sequences from UniVec and EmVec, plus the human reference genome
 krakenuniq-download --db DBDIR refseq/vertebrate_mammalian/Chromosome/species_taxid=9606
 
-## All viral genomes from RefSeq plus viral 'neighbors' in NCBI Nucleotide
+## Download all viral genomes from RefSeq plus viral 'neighbors' in NCBI Nucleotide
 krakenuniq-download --db DBDIR refseq/viral/Any viral-neighbors
 
-## All microbial (including eukaryotes) sequences in the NCBI nt database
+## Download all microbial (including eukaryotes) sequences in the NCBI nt database
 krakenuniq-download --db DBDIR --dust microbial-nt
 ```
 
