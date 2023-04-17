@@ -6,7 +6,8 @@ RUN apk add --no-cache \
   make \
   g++ \
   bzip2-dev \
-  zlib-dev
+  zlib-dev \
+  file
 
 WORKDIR /app
 COPY . . 
