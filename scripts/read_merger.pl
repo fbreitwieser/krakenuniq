@@ -30,6 +30,8 @@ my $PROG = basename $0;
 my $fasta_input = 0;
 my $fastq_input = 0;
 my $check_names = 0;
+my $fh1;
+my $fh2;
 
 GetOptions(
   "check-names" => \$check_names
