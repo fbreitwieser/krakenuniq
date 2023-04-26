@@ -9,6 +9,9 @@ We now have two standard Kraken1/KrakenUniq databases available for free downloa
 
 # Announcements
 
+## New release v1.0.4
+In this release we removed the requirement to have "file" command in the Docker or Singularity image (thanks @lskatz and @boulund).  We now force --preload switch when building the database for speed.
+
 ## New release v1.0.3
 In this release we added a Dockerfile (thanks @Jessime).  There are also few minor updates to documentation. This code of this release has been reviewed in connection with our publication in JOSS.
 
