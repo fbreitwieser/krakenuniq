@@ -196,7 +196,7 @@ sub print_sequence {
   print $seq1->{seq} . "\n";
 }
 
-sub determine_compression_type {
+sub determine_file_type {
     my ($file_path) = @_;
     open(my $fh, '<:raw', $file_path) or die "Could not open file '$file_path': $!";
     my $header = '';
