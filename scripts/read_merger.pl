@@ -47,22 +47,21 @@ for my $file (@ARGV) {
   }
 }
 
-# Open files (or pipes from decompression progs)
-# auto-detect compression, if any
-my ($fh1, $fh2);
-open($fh1,"file $ARGV[0] |");
-my ($fname,$ftype)=split(/\s+/,<$fh1>);
-close($fh1);
-if ($ftype =~ /gzip/) {
+#auto-detect compression types
+my $ftype1 = determine_file_type($ARGV[0]);
+my $ftype2 = determine_file_type($ARGV[1]);
+
+if ($ftype1 eq "gzip") {
   open $fh1, "-|", "gunzip", "-c", $ARGV[0]
     or die "$PROG: can't open gunzip pipe with $ARGV[0]: $!\n";
-} elsif ($ftype =~ /bzip2/) {
+} elsif ($ftype1 eq "bzip") {
   open $fh1, "-|", "bunzip2", "-c", $ARGV[0]
     or die "$PROG: can't open bunzip2 pipe with $ARGV[0]: $!\n";
-} else {
+} elsif($ftype1 eq "fastq" || $ftype1 eq "fasta") {
   open $fh1, "<", $ARGV[0]
     or die "$PROG: can't open $ARGV[0]: $!\n";
 }
+
 #auto-detect file type
 my $line=<$fh1>;
 if ($line =~ /^>/){
@@ -74,27 +73,25 @@ if ($line =~ /^>/){
 }
 close($fh1);
 #we assume that both files are fastq or both files are fasta
-if ($ftype =~ /gzip/) {
+
+if ($ftype1 eq "gzip") {
   open $fh1, "-|", "gunzip", "-c", $ARGV[0]
     or die "$PROG: can't open gunzip pipe with $ARGV[0]: $!\n";
-} elsif ($ftype =~ /bzip2/) {
+} elsif ($ftype1 eq "bzip") {
   open $fh1, "-|", "bunzip2", "-c", $ARGV[0]
     or die "$PROG: can't open bunzip2 pipe with $ARGV[0]: $!\n";
-} else {
+} elsif($ftype1 eq "fastq" || $ftype1 eq "fasta") {
   open $fh1, "<", $ARGV[0]
     or die "$PROG: can't open $ARGV[0]: $!\n";
 }
-# auto-detect compression and open file 2
-open($fh2,"file $ARGV[1] |");
-($fname,$ftype)=split(/\s+/,<$fh2>);
-close($fh2);
-if ($ftype =~ /gzip/) {
+
+if ($ftype2 eq "gzip") {
   open $fh2, "-|", "gunzip", "-c", $ARGV[1]
     or die "$PROG: can't open gunzip pipe with $ARGV[1]: $!\n";
-} elsif ($ftype =~ /bzip2/) {
+} elsif ($ftype2 eq "bzip") {
   open $fh2, "-|", "bunzip2", "-c", $ARGV[1]
     or die "$PROG: can't open bunzip2 pipe with $ARGV[1]: $!\n";
-} else {
+} elsif($ftype2 eq "fastq" || $ftype2 eq "fasta") {
   open $fh2, "<", $ARGV[1]
     or die "$PROG: can't open $ARGV[1]: $!\n";
 }
@@ -195,4 +192,24 @@ sub print_sequence {
   my ($seq1) = @_;
   print ">" . $seq1->{id} . "\n";
   print $seq1->{seq} . "\n";
+}
+
+sub determine_compression_type {
+    my ($file_path) = @_;
+    open(my $fh, '<:raw', $file_path) or die "Could not open file '$file_path': $!";
+    my $header = '';
+    read($fh, $header, 3);
+    close($fh);
+    # Changing this line to just check for first character @
+    if ($header =~ /^@/) {
+        return 'fastq';
+    }elsif ($header =~ /^>/) {
+        return 'fasta';
+    }elsif ($header eq 'BZh') {
+        return 'bzip';
+    }elsif ($header eq "\x1f\x8b\x08") {
+        return 'gzip';
+    }else {
+        die "Unknown input file type for $file_path";
+    }
 }
