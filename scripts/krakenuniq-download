@@ -15,7 +15,7 @@ use IO::Uncompress::Gunzip qw/gunzip $GunzipError/;
 use autodie;
 use Term::ANSIColor;
 use Getopt::Long;
-use LWP::Simple;
+#use LWP::Simple;
 #use LWP::UserAgent;
 use List::Util qw/min/;
 use FindBin;
