@@ -326,7 +326,7 @@ int main(int argc, char **argv) {
     gettimeofday(&tv2, NULL);
     fprintf(stderr, "Report finished in %.3f seconds.\n", get_seconds(tv1,tv2));
   }
-  cerr << "Finishing up ...";
+  cerr << "Finishing up ..." << endl;
 
   for (size_t i = 0; i < Open_fstreams.size(); ++i) {
     ofstream* ofs = Open_fstreams[i];
