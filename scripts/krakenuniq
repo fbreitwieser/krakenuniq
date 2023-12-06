@@ -121,6 +121,12 @@ See --help for more details.\n";
   exit 1;
 }
 
+if (scalar(@db_prefix) > 1 && defined($preload_size) ) {
+  print STDERR "--preload size option can only be used with a single input database! 
+See --help for more details.\n";
+  exit 1;
+}
+
 eval { @db_prefix = map { krakenlib::find_db($_) } @db_prefix };
 if ($@) {
   die "$PROG: $@";
@@ -271,7 +277,7 @@ Options:
   --only-classified-output
                           Print no Kraken output for unclassified sequences
   --preload               Loads the entire DB into memory before classification
-  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small), overrides --preload flag
+  --preload-size SIZE     Loads DB into memory in chunks of SIZE, e.g. 500M or 7G (if RAM is small), overrides --preload flag.  Can only be used with a single input database.
   --paired                The two filenames provided are paired-end reads
   --check-names           Ensure each pair of reads have names that agree
                           with each other; ignored if --paired is not specified
