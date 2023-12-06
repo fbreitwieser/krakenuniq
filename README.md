@@ -43,6 +43,8 @@ By default, KrakenUniq performs memory mapping to load the database; i.e., it do
 
 To improve the performance when not enough main memory is available to load the entire database into RAM, we added a new capability to KrakenUniq. When using this new feature, only a chunk of the database is loaded into memory at a time, after which the algorithm iterates over the reads and looks up all k-mers in those reads that are matching in this database chunk. This process is repeated until the entire database has been processed. The k-mer lookups are then merged, and reads are classified based on the results of the full database. This new feature makes it feasible to run KrakenUniq on very large datasets and huge databases on virtually any computer, even a laptop, while providing exact classifications that are identical to those of KrakenUniq in its other modes. Users can employ this feature with --preload-size and specify the amount of available main memory that they want to use for loading chunks of the database, e.g., --preload-size 8G or --preload-size 500M.
 
+IMPORTANT!  The --preload-size option can only be used with a single input database.
+
 This release also includes an improvement for automatic detection of input format.
 The input format (fastq or fasta, bzip2 or gzip compressed) is now detected automatically. No need to use --fasta-input, --fastq-input, --gzip-compressed or --bzip2-compressed switches.
 
