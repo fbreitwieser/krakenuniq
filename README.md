@@ -3,7 +3,11 @@ KrakenUniq: confident and fast metagenomics classification using unique k-mer co
 
 False-positive identifications are a significant problem in metagenomics classification. KrakenUniq (formerly KrakenHLL) is a novel metagenomics classifier that combines the fast k-mer-based classification of [Kraken](https://github.com/DerrickWood/kraken) with an efficient algorithm for assessing the coverage of unique k-mers found in each species in a dataset. On various test datasets, KrakenUniq gives better recall and precision than other methods and effectively classifies and distinguishes pathogens with low abundance from false positives in infectious disease samples. By using the probabilistic cardinality estimator HyperLogLog, KrakenUniq runs as fast as Kraken and requires little additional memory. NEW in v0.7.0: KrakenUniq can run on standard laptops and desktops with as little as 16GB of RAM using the --preload-size option (see below).
 
-**If you use KrakenUniq in your research, please cite our publication:** [KrakenUniq: confident and fast metagenomics classification using unique k-mer counts. Breitwieser FP, Baker DN, Salzberg SL. Genome Biology, Dec 2018. https://doi.org/10.1186/s13059-018-1568-0](https://doi.org/10.1186/s13059-018-1568-0)
+**If you use KrakenUniq in your research, please cite our publications:** 
+
+[KrakenUniq: confident and fast metagenomics classification using unique k-mer counts. Breitwieser FP, Baker DN, Salzberg SL. Genome Biology, Dec 2018. https://doi.org/10.1186/s13059-018-1568-0](https://doi.org/10.1186/s13059-018-1568-0)
+
+[Metagenomic classification with KrakenUniq on low-memory computers. Pockrandt C, Zimin AV, Salzberg SL. The Journal of Open Source Software, Dec 2022. https://doi.org/10.21105/joss.04908](https://joss.theoj.org/papers/10.21105/joss.04908)
 ## KrakenUniq databases available for direct download
 We now have two standard Kraken1/KrakenUniq databases available for free download from the Amazon cloud. You can find links at [https://benlangmead.github.io/aws-indexes/k2](https://benlangmead.github.io/aws-indexes/k2). One is our "standard" database with all RefSeq bacteria, archaea, and viruses, plus common vectors and the human genome. The other is all of the first database plus all available genomes of eukaryotic pathogens. Each DB is over 300GB, and by downloading them you can avoid having to build them yourself.
 
@@ -48,7 +52,7 @@ IMPORTANT!  The --preload-size option can only be used with a single input datab
 This release also includes an improvement for automatic detection of input format.
 The input format (fastq or fasta, bzip2 or gzip compressed) is now detected automatically. No need to use --fasta-input, --fastq-input, --gzip-compressed or --bzip2-compressed switches.
 
-The improvements included in this release are described in the preprint posted on bioRxiv: https://www.biorxiv.org/content/10.1101/2022.06.01.494344v1
+The improvements included in this release are described in our paper in JOSS: https://joss.theoj.org/papers/10.21105/joss.04908
 
 ## New Release v0.6
 This release fixes database preload option. Now --preload option will force loading the database in physical RAM (not swap) if enough physical RAM is available. KrakenUniq (and also Kraken) often ran very slow with really big databases. The problem was that --preload didn't truly force to load the DB in memory, so it spends forever (many days) going back and forth to disk. With the fix included in this release, krakenuniq ran in 16 minutes on a database where before it took >100 hours. 
