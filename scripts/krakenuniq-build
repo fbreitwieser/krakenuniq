@@ -27,6 +27,7 @@ use Cwd 'abs_path';
 use File::Basename;
 use File::Copy;
 use File::Path qw/make_path/;
+use List::Util qw/any/;
 
 my $PROG = basename $0;
 my $KRAKEN_DIR = "#####=KRAKEN_DIR=#####";
@@ -46,6 +47,15 @@ my $DEF_THREAD_CT = 1;
 
 my @VALID_LIBRARY_TYPES = qw|refseq/bacteria refseq/archaea refseq/viral|;
 
+my @VALID_STAGES = qw/
+    count
+    merge
+    shrink
+    sort
+    tax
+    set_lcas
+/;
+
 # Option/task option variables
 my (
   $db,
@@ -59,6 +69,7 @@ my (
   $work_on_disk,
   $shrink_block_offset,
   $min_contig_size,
+  $stop_after,
   @lca_order,
 
   $dl_taxonomy,
@@ -124,6 +135,7 @@ GetOptions(
   "max-db-size=s", \$max_db_size,
   "work-on-disk", \$work_on_disk,
   "shrink-block-offset=i", \$shrink_block_offset,
+  'stop-after=s'=> \$stop_after,
 
   "download-taxonomy" => \$dl_taxonomy,
   "download-library=s" => \$dl_library,
@@ -191,6 +203,10 @@ if ($hash_size !~ /^(\d+[kKmMgG]?)?$/) {
 if ($max_db_size !~ /^$/ && $max_db_size <= 0) {
   die "Can't have negative max database size.\n";
 }
+if (defined $stop_after && ! any {$stop_after eq $_} @VALID_STAGES) {
+  die "Invalid stage ($stop_after) specified in --stop-after."
+    . " Valid stage is one of: @VALID_STAGES.\n";
+} 
 
 if (@library_dirs && defined $taxonomy_dir && !-d $db) {
     system("mkdir -p $db");
@@ -204,6 +220,7 @@ $ENV{"KRAKEN_KMER_LEN"} = $kmer_len;
 $ENV{"KRAKEN_HASH_SIZE"} = $hash_size;
 $ENV{"KRAKEN_MAX_DB_SIZE"} = $max_db_size;
 $ENV{"KRAKEN_WORK_ON_DISK"} = $work_on_disk;
+$ENV{"KRAKEN_STOP_AFTER"} = $stop_after // '';
 
 if ($dl_taxonomy) {
   download_taxonomy();
@@ -292,6 +309,8 @@ Options:
                              Use with draft genomes to reduce contamination, e.g. with values between 1000 and 10000.
   --library-dir DIR          Use DIR for reference sequences instead of DBDIR/library.
   --taxonomy-dir DIR         Use DIR for taxonomy instead of DBDIR/taxonomy.
+  --stop-after STR           Stop build after stage STR (valid stages:
+                             count, merge, shrink, sort, tax, set_lcas)
 
 Experimental:
   --uid-database             Build a UID database (default no)

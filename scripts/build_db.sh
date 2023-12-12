@@ -55,6 +55,15 @@ function cmd () {
   $@
 }
 
+# useful for staged builds -- will stop execution of the build pipeline if
+# STOP_AFTER is set to a given value
+check_stop () {
+  if [[ ! -z "$KRAKEN_STOP_AFTER" && "$KRAKEN_STOP_AFTER" = "$1" ]]; then
+    echo "Stopping after $1 as requested"
+    exit 0
+  fi
+}
+
 
 start_time=$(date "+%s.%N")
 script_dir=`dirname $0`
@@ -116,6 +125,7 @@ echo "Found $N_FILES sequence files (*.{fna,fa,ffn,fasta,fsa}) in the library di
 if [ -e "database.jdb" ] || [ -e "database0.kdb" ]
 then
   echo "Skipping step 1, k-mer set already exists."
+  check_stop "count"
 else
   echo "Creating k-mer set (step 1 of 6)..."
   start_time1=$(date "+%s.%N")
@@ -130,6 +140,8 @@ else
 
   exe eval $JELLYFISH_BIN count -m $KRAKEN_KMER_LEN -s $KRAKEN_HASH_SIZE -C -t $KRAKEN_THREAD_CT \
     -o database <( cat_library )
+
+  check_stop "count"
 
   # Merge only if necessary
   if [ -s "database_1" ]
@@ -146,6 +158,8 @@ else
   fi
   echo "K-mer set created. [$(report_time_elapsed $start_time1)]"
 fi
+
+check_stop "merge"
 
 if [ -z "$KRAKEN_MAX_DB_SIZE" ]
 then
@@ -191,6 +205,8 @@ else
   fi
 fi
 
+check_stop "shrink"
+
 SORTED_DB_NAME=database0.kdb
 if [ -e "$SORTED_DB_NAME" ]
 then
@@ -207,6 +223,8 @@ else
 
   echo "K-mer set sorted. [$(report_time_elapsed $start_time1)]"
 fi
+
+check_stop "sort"
 
 if [ -s "seqid2taxid.map" ]
 then
@@ -239,6 +257,8 @@ else
   mv taxDB.tmp taxDB
   echo "taxDB construction finished. [$(report_time_elapsed $start_time1)]"
 fi
+
+check_stop "tax"
 
 if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   if [ -s "database.kdb" ] && [ "$KRAKEN_RESET_TAXIDS" != "1" ]
@@ -312,6 +332,7 @@ if [ "$KRAKEN_LCA_DATABASE" != "0" ]; then
   fi
 fi
 
+check_stop "set_lcas"
 
 if [ "$KRAKEN_UID_DATABASE" != "0" ]; then
   if [ -s "uid_database.kdb" ]
