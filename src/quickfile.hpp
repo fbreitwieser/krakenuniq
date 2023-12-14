@@ -30,7 +30,7 @@ namespace kraken {
     QuickFile();
     QuickFile(std::string filename, std::string mode="r", size_t size=0);
     ~QuickFile();
-    void open_file(std::string filename, std::string mode="r", size_t size=0);
+    void open_file(std::string filename, std::string mode="r", size_t size=0, bool lock=false);
     char *ptr();
     size_t size();
     void load_file();
