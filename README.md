@@ -87,7 +87,7 @@ Installation from source from GitHub (the latest -- may not be stable):
 ```
 git clone https://github.com/fbreitwieser/krakenuniq
 cd krakenuniq
-./install_krakenuniq /PATH/TO/INSTALL_DIR
+./install_krakenuniq.sh /PATH/TO/INSTALL_DIR
 ```
 
 KrakenUniq requires Jellyfish version 1.x.x to be installed for the database building step (`krakenuniq-build`). Starting with v0.7.3, krakenuniq will download and install jellyfish v1.1.12 automatically by default. To skip installing Jellyfish use the `-s` flag for the `install_krakenuniq.sh` script. Alternatively, you can specify the Jellyfish path to `krakenuniq-build` with `krakenuniq-build --jellyfish-bin /usr/bin/jellyfish1`.
