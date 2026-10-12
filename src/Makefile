@@ -2,12 +2,15 @@ CXX = g++
 FOPENMP?=-fopenmp
 NDEBUG=-D NDEBUG
 
-is_fopenmp_supported := $(shell touch foo.cpp && $(CXX) -fopenmp -c foo.cpp -o foo.o &> /dev/null && printf 'yes' || printf 'no'; rm -f foo.c foo.o)
+# skip this check when running 'clean' target
+ifeq (,$(filter clean,$(MAKECMDGOALS)))
+    is_fopenmp_supported := $(shell printf "int main(){}" | $(CXX) -x c++ -fopenmp -c - -o /dev/null > /dev/null 2>&1 && printf 'yes' || printf 'no')
 
-$(info Compiling with multithreading support: $(is_fopenmp_supported))
-ifeq ($(is_fopenmp_supported), no)
-$(info To compile with OpenMP support, set CXX to a compiler that supports OpenMP, such as g++ or LLVM clang on OSX.)
-FOPENMP=
+    $(info Compiling with multithreading support: $(is_fopenmp_supported))
+    ifeq ($(is_fopenmp_supported), no)
+        $(info To compile with OpenMP support, set CXX to a compiler that supports OpenMP, such as g++ or LLVM clang on OSX.)
+        FOPENMP=
+    endif
 endif
 
 

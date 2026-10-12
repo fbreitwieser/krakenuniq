@@ -7,6 +7,7 @@
 #ifndef REPORT_COLS_H
 #define REPORT_COLS_H
 
+#include<cstdint>
 #include<map>
 #include<string>
 

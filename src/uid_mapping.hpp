@@ -20,6 +20,7 @@
 #ifndef UID_MAPPING_H
 #define UID_MAPPING_H
 
+#include<cstdint>
 #include<vector>
 #include<map>
 #include<unordered_map>
